@@ -170,6 +170,22 @@ CREATE SEQUENCE IF NOT EXISTS my_seq START 1;
 SELECT nextval('my_seq');
 ```
 
+## 予約語に注意
+
+DuckDB/SQL の予約語をカラム名に使う場合はダブルクォートで囲む必要がある。
+
+```sql
+-- NG: key は SQL 予約語
+SELECT key FROM issues WHERE key LIKE 'TODO-%';
+
+-- OK: ダブルクォートで囲む
+SELECT "key" FROM issues WHERE "key" LIKE 'TODO-%';
+```
+
+よく使われる予約語: `key`, `value`, `name`, `order`, `group`, `user`, `type`, `status`, `date`, `comment`
+
+テーブル設計時はできるだけ予約語を避ける（例: `key` → `issue_key`）。
+
 ## よくあるエラーと対処
 
 | エラー | 原因 | 対処 |
