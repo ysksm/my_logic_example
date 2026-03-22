@@ -110,10 +110,16 @@ def _(mo):
 
 
 @app.cell
-def _(YOUTUBE_CHANNEL_IDS, mo):
+def _(YOUTUBE_CHANNEL_IDS, db, mo):
+    # DB に登録済みのチャンネル ID を取得
+    _existing = db.get_channel_ids()
+    # 環境変数の新規チャンネルを追加
+    _env_channels = [ch.strip() for ch in YOUTUBE_CHANNEL_IDS.split(",") if ch.strip()]
+    _all = list(dict.fromkeys(_existing + _env_channels))  # 重複除去・順序保持
+
     channel_text = mo.ui.text_area(
         label="同期するチャンネル（URL または ID、1行1件）",
-        value="\n".join(ch.strip() for ch in YOUTUBE_CHANNEL_IDS.split(",") if ch.strip()),
+        value="\n".join(_all),
         full_width=True,
     )
     channel_text
