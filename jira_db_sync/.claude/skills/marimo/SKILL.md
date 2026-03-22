@@ -260,6 +260,7 @@ mo.as_html(chart)
 | `SyntaxError: no binding for nonlocal` | セルで nonlocal 使用 | リスト `[val]` で回避 |
 | `This cell redefines variables from other cells` | セル間で変数名重複 | `_` プレフィックスを付ける |
 | `Ancestor stopped` | 上流の `mo.stop` で停止 | 上流セルの条件を満たす（選択やボタン押下） |
+| `Accessing the value of a UIElement in the cell that created it` | UI 要素の `.value` を作成セルで参照 | `.value` の参照は別セルで行う |
 | `This cell wasn't run because it has errors` | 構文エラーや変数衝突 | エラーメッセージを確認して修正 |
 | データが空 / テーブルに0件 | 依存が切れていてセル実行順が不正 | 上流セルから変数を return し、下流の引数に追加 |
 | `Notebook already connected` | 別タブで接続中 | 「Take over session」で切り替え |
