@@ -95,15 +95,17 @@ class Database:
             self.conn.execute(sql)
 
     def upsert_channels(self, channels_df: pd.DataFrame):
-        """チャンネルを UPSERT"""
+        """チャンネルを UPSERT（子テーブルの外部キーを先に削除）"""
         if channels_df.empty:
             return
         self.conn.execute(
             "CREATE OR REPLACE TEMP TABLE tmp_ch AS SELECT * FROM channels_df"
         )
-        self.conn.execute("""
-            DELETE FROM channels WHERE id IN (SELECT id FROM tmp_ch)
-        """)
+        # 子テーブルを先に削除（外部キー制約対策）
+        self.conn.execute("DELETE FROM video_history WHERE video_id IN (SELECT id FROM videos WHERE channel_id IN (SELECT id FROM tmp_ch))")
+        self.conn.execute("DELETE FROM videos WHERE channel_id IN (SELECT id FROM tmp_ch)")
+        self.conn.execute("DELETE FROM channel_history WHERE channel_id IN (SELECT id FROM tmp_ch)")
+        self.conn.execute("DELETE FROM channels WHERE id IN (SELECT id FROM tmp_ch)")
         self.conn.execute(
             "INSERT INTO channels SELECT *, CURRENT_TIMESTAMP FROM tmp_ch"
         )
@@ -111,19 +113,27 @@ class Database:
         logger.info("Upserted %d channels", len(channels_df))
 
     def upsert_videos(self, videos_df: pd.DataFrame, channel_id: str | None = None):
-        """動画を UPSERT
+        """動画を UPSERT（video_history の外部キーを先に削除）
 
         channel_id を指定した場合、そのチャンネルの全動画を入れ替え。
         """
         if videos_df.empty:
             return
         if channel_id:
+            # 子テーブルを先に削除
+            self.conn.execute(
+                "DELETE FROM video_history WHERE video_id IN (SELECT id FROM videos WHERE channel_id = ?)",
+                [channel_id],
+            )
             self.conn.execute(
                 "DELETE FROM videos WHERE channel_id = ?", [channel_id]
             )
         else:
             self.conn.execute(
                 "CREATE OR REPLACE TEMP TABLE tmp_vid_ids AS SELECT id FROM videos_df"
+            )
+            self.conn.execute(
+                "DELETE FROM video_history WHERE video_id IN (SELECT id FROM tmp_vid_ids)"
             )
             self.conn.execute(
                 "DELETE FROM videos WHERE id IN (SELECT id FROM tmp_vid_ids)"
