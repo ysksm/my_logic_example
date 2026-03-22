@@ -56,6 +56,8 @@ def _(b64encode, mo, os):
     JIRA_USERNAME = os.environ.get("JIRA_USERNAME", "")
     JIRA_API_TOKEN = os.environ.get("JIRA_API_TOKEN", "")
     JIRA_DB_PATH = os.environ.get("JIRA_DB_PATH", "./data/jira.duckdb")
+    JIRA_PROJECT = os.environ.get("JIRA_PROJECT", "")
+    JIRA_AUTO_SYNC = os.environ.get("JIRA_AUTO_SYNC", "").lower() in ("1", "true", "yes", "full", "incremental")
 
     _missing = []
     if not JIRA_BASE_URL:
@@ -82,8 +84,14 @@ def _(b64encode, mo, os):
         "Content-Type": "application/json",
     }
 
-    mo.md(f"Jira 接続先: **{JIRA_BASE_URL}** (ユーザー: {JIRA_USERNAME})")
-    return HEADERS, JIRA_BASE_URL, JIRA_DB_PATH
+    _auto_mode = os.environ.get("JIRA_AUTO_SYNC", "").lower()
+    _auto_label = ""
+    if JIRA_AUTO_SYNC:
+        _auto_label = f" | 自動同期: **{_auto_mode if _auto_mode in ('incremental',) else 'full'}**"
+    if JIRA_PROJECT:
+        _auto_label += f" | プロジェクト: **{JIRA_PROJECT}**"
+    mo.md(f"Jira 接続先: **{JIRA_BASE_URL}** (ユーザー: {JIRA_USERNAME}){_auto_label}")
+    return HEADERS, JIRA_AUTO_SYNC, JIRA_BASE_URL, JIRA_DB_PATH, JIRA_PROJECT
 
 
 @app.cell
@@ -206,13 +214,12 @@ def _(jira_get, mo, pd):
 
 
 @app.cell
-def _(mo, os, projects_df):
+def _(JIRA_PROJECT, mo, projects_df):
     # 環境変数 JIRA_PROJECT で初期値を指定可能
-    _default_project = os.environ.get("JIRA_PROJECT", "")
     _options = {row["key"]: row["key"] for _, row in projects_df.iterrows()}
     project_selector = mo.ui.dropdown(
         options=_options,
-        value=_default_project if _default_project in _options else None,
+        value=JIRA_PROJECT if JIRA_PROJECT in _options else None,
         label="同期するプロジェクトを選択",
     )
     project_selector
@@ -369,7 +376,7 @@ def _(JIRA_DB_PATH, json, mo, os, selected_project_key):
 
 
 @app.cell
-def _(checkpoint_info, mo):
+def _(JIRA_AUTO_SYNC, checkpoint_info, mo):
     full_sync_button = mo.ui.run_button(label="全件同期")
     incremental_sync_button = mo.ui.run_button(label="差分同期")
     _buttons = [full_sync_button, incremental_sync_button]
@@ -379,12 +386,16 @@ def _(checkpoint_info, mo):
     else:
         resume_sync_button = None
 
-    mo.hstack(_buttons, gap=1)
+    if JIRA_AUTO_SYNC:
+        mo.md("**自動同期モード**: 同期を自動実行します")
+    else:
+        mo.hstack(_buttons, gap=1)
     return full_sync_button, incremental_sync_button, resume_sync_button
 
 
 @app.cell
 def _(
+    JIRA_AUTO_SYNC,
     checkpoint_info,
     datetime,
     fetch_all_issues,
@@ -392,12 +403,17 @@ def _(
     incremental_sync_button,
     last_sync_info,
     mo,
+    os,
     resume_sync_button,
     selected_project_key,
 ):
-    # どのボタンが押されたか判定
-    _is_full = full_sync_button.value
-    _is_incremental = incremental_sync_button.value
+    # 自動同期モード判定
+    _auto_mode = os.environ.get("JIRA_AUTO_SYNC", "").lower()
+    _is_auto_incremental = _auto_mode == "incremental"
+
+    # どのボタンが押されたか判定（自動同期の場合はボタン不要）
+    _is_full = full_sync_button.value or (JIRA_AUTO_SYNC and not _is_auto_incremental)
+    _is_incremental = incremental_sync_button.value or (JIRA_AUTO_SYNC and _is_auto_incremental)
     _is_resume = resume_sync_button.value if resume_sync_button else False
 
     mo.stop(
