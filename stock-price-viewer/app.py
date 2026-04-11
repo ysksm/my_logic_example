@@ -226,5 +226,30 @@ def _(df, mo):
     return (display_df,)
 
 
+@app.cell
+def _(company_name, df, mo, ticker_input):
+    csv_df = df[["Date", "Open", "High", "Low", "Close", "Volume", "PrevClose", "DiffPrice", "DiffPercent"]].copy()
+    csv_df.columns = [
+        "日付", "始値", "高値", "安値", "終値", "取引量",
+        "前日終値", "前日比差分", "前日比乖離率(%)",
+    ]
+    csv_df["日付"] = csv_df["日付"].dt.strftime("%Y-%m-%d")
+
+    csv_bytes = csv_df.to_csv(index=False).encode("utf-8-sig")
+
+    safe_ticker = ticker_input.value.replace(".", "_")
+    filename = f"{safe_ticker}_{company_name}_stock_data.csv"
+
+    download_btn = mo.download(
+        data=csv_bytes,
+        filename=filename,
+        mimetype="text/csv",
+        label=f"CSVダウンロード（{len(csv_df)}件）",
+    )
+
+    mo.md(f"### データダウンロード\n\n{download_btn}")
+    return csv_bytes, csv_df, download_btn, filename, safe_ticker
+
+
 if __name__ == "__main__":
     app.run()
