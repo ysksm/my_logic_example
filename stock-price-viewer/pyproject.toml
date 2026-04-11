@@ -1,0 +1,11 @@
+[project]
+name = "stock-price-viewer"
+version = "0.1.0"
+description = "株価・取引量の可視化と前日比の差分・乖離率を表示するmarimoアプリ"
+requires-python = ">=3.11"
+dependencies = [
+    "marimo",
+    "yfinance",
+    "plotly",
+    "pandas",
+]
