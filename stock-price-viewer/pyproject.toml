@@ -8,4 +8,5 @@ dependencies = [
     "yfinance",
     "plotly",
     "pandas",
+    "pydantic-ai>=1.80.0",
 ]
