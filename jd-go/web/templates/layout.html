@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JD-Go - Jira DB Sync</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/vendor/htmx.min.js"></script>
+    <script src="/static/vendor/htmx-sse.js"></script>
+    <script defer src="/static/vendor/alpine.min.js"></script>
+    <script src="/static/vendor/echarts.min.js"></script>
+</head>
+<body x-data="app()" x-init="init()" class="bg-gray-50 min-h-screen">
+    <!-- Header -->
+    <header class="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
+        <h1 class="text-xl font-bold text-gray-800">JD-Go <span class="text-sm font-normal text-gray-500">Jira DB Sync</span></h1>
+        <div class="flex items-center gap-4">
+            <select x-model="selectedProject" @change="onProjectChange()" class="border rounded px-3 py-1.5 text-sm">
+                <option value="">プロジェクトを選択...</option>
+                <template x-for="p in projects" :key="p.key">
+                    <option :value="p.key" x-text="p.key + ' - ' + p.name"></option>
+                </template>
+            </select>
+            <span x-show="syncStatus" x-text="syncStatus" class="text-sm text-blue-600"></span>
+        </div>
+    </header>
+
+    <div class="max-w-7xl mx-auto px-6 py-6">
+        <!-- Connection Status -->
+        <template x-if="error">
+            <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4" x-text="error"></div>
+        </template>
+
+        <!-- Sync Controls -->
+        <template x-if="selectedProject">
+            <div class="bg-white rounded-lg shadow-sm border p-4 mb-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="font-semibold text-gray-700">同期</h2>
+                        <p class="text-sm text-gray-500" x-text="lastSyncInfo"></p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button @click="startSync('full')" :disabled="syncing"
+                            class="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50">
+                            全件同期
+                        </button>
+                        <button @click="startSync('incremental')" :disabled="syncing"
+                            class="px-4 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700 disabled:opacity-50">
+                            差分同期
+                        </button>
+                        <button x-show="hasCheckpoint" @click="startSync('resume')" :disabled="syncing"
+                            class="px-4 py-2 bg-yellow-600 text-white rounded text-sm hover:bg-yellow-700 disabled:opacity-50">
+                            中断再開
+                        </button>
+                        <button x-show="syncing" @click="cancelSync()"
+                            class="px-4 py-2 bg-red-600 text-white rounded text-sm hover:bg-red-700">
+                            キャンセル
+                        </button>
+                    </div>
+                </div>
+                <!-- Progress bar -->
+                <template x-if="syncing">
+                    <div class="mt-3">
+                        <div class="flex justify-between text-sm text-gray-600 mb-1">
+                            <span x-text="progressText"></span>
+                            <span x-text="Math.round(progressPercent) + '%'"></span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div class="bg-blue-600 h-2 rounded-full transition-all" :style="'width:' + progressPercent + '%'"></div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </template>
+
+        <!-- Tabs -->
+        <template x-if="selectedProject && hasData">
+            <div>
+                <div class="flex border-b border-gray-200 mb-6">
+                    <template x-for="tab in tabs" :key="tab.id">
+                        <button @click="activeTab = tab.id"
+                            :class="activeTab === tab.id ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
+                            class="px-4 py-2 border-b-2 text-sm font-medium" x-text="tab.name">
+                        </button>
+                    </template>
+                </div>
+
+                <!-- Charts Tab -->
+                <div x-show="activeTab === 'charts'" class="space-y-6">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="bg-white rounded-lg shadow-sm border p-4">
+                            <div id="chart-status" class="w-full h-80"></div>
+                        </div>
+                        <div class="bg-white rounded-lg shadow-sm border p-4">
+                            <div id="chart-priority" class="w-full h-80"></div>
+                        </div>
+                        <div class="bg-white rounded-lg shadow-sm border p-4">
+                            <div id="chart-type" class="w-full h-80"></div>
+                        </div>
+                        <div class="bg-white rounded-lg shadow-sm border p-4">
+                            <div id="chart-assignee" class="w-full h-80"></div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-sm border p-4">
+                        <div id="chart-monthly" class="w-full h-80"></div>
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="bg-white rounded-lg shadow-sm border p-4">
+                            <div id="chart-field-changes" class="w-full h-80"></div>
+                        </div>
+                        <div class="bg-white rounded-lg shadow-sm border p-4">
+                            <div id="chart-transitions" class="w-full h-96"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- History Tab -->
+                <div x-show="activeTab === 'history'" class="space-y-6">
+                    <div class="bg-white rounded-lg shadow-sm border p-4">
+                        <div id="chart-daily-status" class="w-full h-96"></div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-sm border p-4">
+                        <div id="chart-created-resolved" class="w-full h-80"></div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-sm border p-4">
+                        <h3 class="font-semibold text-gray-700 mb-3">任意日時点の課題一覧</h3>
+                        <div class="flex items-center gap-4 mb-4">
+                            <input type="date" x-model="snapshotDate" class="border rounded px-3 py-1.5 text-sm">
+                            <button @click="loadSnapshot()" class="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">
+                                取得
+                            </button>
+                            <span x-show="snapshotData" class="text-sm text-gray-500" x-text="snapshotData ? (snapshotData.length || 0) + ' 件' : ''"></span>
+                        </div>
+                        <template x-if="snapshotData && snapshotData.length > 0">
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full text-sm">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-3 py-2 text-left">Key</th>
+                                            <th class="px-3 py-2 text-left">Summary</th>
+                                            <th class="px-3 py-2 text-left">Status</th>
+                                            <th class="px-3 py-2 text-left">Priority</th>
+                                            <th class="px-3 py-2 text-left">Assignee</th>
+                                            <th class="px-3 py-2 text-left">Type</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <template x-for="row in snapshotData" :key="row.key">
+                                            <tr class="border-t">
+                                                <td class="px-3 py-2 font-mono" x-text="row.key"></td>
+                                                <td class="px-3 py-2" x-text="row.summary"></td>
+                                                <td class="px-3 py-2" x-text="row.status"></td>
+                                                <td class="px-3 py-2" x-text="row.priority"></td>
+                                                <td class="px-3 py-2" x-text="row.assignee"></td>
+                                                <td class="px-3 py-2" x-text="row.issue_type"></td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- SQL Tab -->
+                <div x-show="activeTab === 'sql'" class="space-y-4">
+                    <div class="bg-white rounded-lg shadow-sm border p-4">
+                        <textarea x-model="sqlQuery" rows="4"
+                            class="w-full border rounded px-3 py-2 font-mono text-sm"
+                            placeholder="SELECT &quot;key&quot;, summary, status FROM issues LIMIT 20"></textarea>
+                        <div class="flex items-center gap-4 mt-2">
+                            <button @click="executeQuery()" class="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">
+                                実行
+                            </button>
+                            <span x-show="queryResult" class="text-sm text-gray-500" x-text="queryResult ? queryResult.count + ' rows' : ''"></span>
+                            <span x-show="queryError" class="text-sm text-red-600" x-text="queryError"></span>
+                        </div>
+                    </div>
+                    <template x-if="queryResult && queryResult.rows && queryResult.rows.length > 0">
+                        <div class="bg-white rounded-lg shadow-sm border overflow-x-auto">
+                            <table class="min-w-full text-sm">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <template x-for="col in queryResult.columns" :key="col">
+                                            <th class="px-3 py-2 text-left font-medium text-gray-600" x-text="col"></th>
+                                        </template>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template x-for="(row, i) in queryResult.rows" :key="i">
+                                        <tr class="border-t">
+                                            <template x-for="col in queryResult.columns" :key="col">
+                                                <td class="px-3 py-2 max-w-xs truncate" x-text="row[col]"></td>
+                                            </template>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </template>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

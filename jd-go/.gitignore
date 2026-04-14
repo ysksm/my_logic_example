@@ -1,0 +1,17 @@
+# Environment
+.env
+
+# Data
+data/*.duckdb
+data/*.duckdb.wal
+data/sync_state.json
+
+# Binary
+jd-go
+
+# OS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
