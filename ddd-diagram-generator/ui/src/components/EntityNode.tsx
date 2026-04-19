@@ -21,6 +21,9 @@ const STEREOTYPE_STYLE: Record<Stereotype, { border: string; accent: string; lab
 
 export function EntityNode({ data, selected }: NodeProps<ApiNode>) {
   const style = STEREOTYPE_STYLE[data.stereotype] ?? STEREOTYPE_STYLE.class;
+  const fields = data.fields ?? [];
+  const methods = data.methods ?? [];
+  const enumValues = data.enumValues ?? [];
   return (
     <div
       style={{
@@ -53,9 +56,9 @@ export function EntityNode({ data, selected }: NodeProps<ApiNode>) {
         <div style={{ fontWeight: 600, fontSize: 14 }}>{data.name}</div>
       </div>
 
-      {data.fields.length > 0 && (
+      {fields.length > 0 && (
         <div style={{ padding: "6px 10px", borderBottom: "1px solid #e2e8f0" }}>
-          {data.fields.map((f) => (
+          {fields.map((f) => (
             <div key={f.name} style={{ display: "flex", justifyContent: "space-between", gap: 6 }}>
               <span>
                 {f.readonly ? <span style={{ color: "#94a3b8" }}>ro </span> : null}
@@ -70,9 +73,9 @@ export function EntityNode({ data, selected }: NodeProps<ApiNode>) {
         </div>
       )}
 
-      {data.methods.length > 0 && (
+      {methods.length > 0 && (
         <div style={{ padding: "6px 10px", borderBottom: "1px solid #e2e8f0" }}>
-          {data.methods.map((m) => (
+          {methods.map((m) => (
             <div key={m.name} style={{ color: "#334155" }}>
               {m.name}(){m.returnType ? <span style={{ color: "#64748b" }}>: {m.returnType}</span> : null}
             </div>
@@ -80,9 +83,9 @@ export function EntityNode({ data, selected }: NodeProps<ApiNode>) {
         </div>
       )}
 
-      {data.enumValues && data.enumValues.length > 0 && (
+      {enumValues.length > 0 && (
         <div style={{ padding: "6px 10px" }}>
-          {data.enumValues.map((v) => (
+          {enumValues.map((v) => (
             <div key={v} style={{ color: "#475569" }}>
               {v}
             </div>

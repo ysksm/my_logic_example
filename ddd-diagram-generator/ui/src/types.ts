@@ -40,11 +40,15 @@ export interface ApiNode {
   file: string;
   line: number;
   module: string;
-  extends: string[];
-  implements: string[];
-  fields: ApiField[];
-  methods: ApiMethod[];
-  enumValues?: string[];
+  // The Go server normally emits [] for empty lists, but we still accept
+  // null defensively — a stale backend or misconfigured proxy can send
+  // null (Go's zero value for a slice) and crashing the whole canvas
+  // because one node has no fields is not an option.
+  extends: string[] | null;
+  implements: string[] | null;
+  fields: ApiField[] | null;
+  methods: ApiMethod[] | null;
+  enumValues?: string[] | null;
   aggregate?: string;
   exported: boolean;
 }

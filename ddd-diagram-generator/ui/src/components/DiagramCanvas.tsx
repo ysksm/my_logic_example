@@ -84,7 +84,9 @@ function addGroupNodes(visible: ApiNode[], rfNodes: Node[], groupBy: GroupBy): N
     for (const m of members) {
       const p = posById.get(m.id);
       if (!p) continue;
-      const h = 80 + m.fields.length * 18 + (m.methods.length ? 12 + m.methods.length * 16 : 0);
+      const fieldCount = (m.fields ?? []).length;
+      const methodCount = (m.methods ?? []).length;
+      const h = 80 + fieldCount * 18 + (methodCount ? 12 + methodCount * 16 : 0);
       minX = Math.min(minX, p.x);
       minY = Math.min(minY, p.y);
       maxX = Math.max(maxX, p.x + 260);

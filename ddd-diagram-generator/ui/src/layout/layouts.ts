@@ -7,7 +7,9 @@ const NODE_WIDTH = 260;
 const NODE_HEIGHT_BASE = 80;
 
 function nodeHeight(n: ApiNode): number {
-  return NODE_HEIGHT_BASE + n.fields.length * 18 + (n.methods.length > 0 ? 12 + n.methods.length * 16 : 0);
+  const fields = n.fields ?? [];
+  const methods = n.methods ?? [];
+  return NODE_HEIGHT_BASE + fields.length * 18 + (methods.length > 0 ? 12 + methods.length * 16 : 0);
 }
 
 export interface LayoutInput {

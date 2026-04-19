@@ -95,6 +95,7 @@ func Analyze(root string, opt Options) (*Graph, error) {
 	edges := buildEdges(nodes)
 	assignAggregates(nodes, edges)
 	modules := buildModules(nodes)
+	ensureNonNilSlices(nodes)
 
 	g := &Graph{
 		Root:    root,
@@ -343,6 +344,37 @@ func buildModules(nodes []Node) []Module {
 	}
 	sort.Slice(mods, func(i, j int) bool { return mods[i].Name < mods[j].Name })
 	return mods
+}
+
+// ensureNonNilSlices replaces all nil slices inside the graph with empty
+// slices so JSON marshalling always produces [] rather than null. The
+// frontend relies on `.length` / `.map` being callable on every collection.
+func ensureNonNilSlices(nodes []Node) {
+	for i := range nodes {
+		n := &nodes[i]
+		if n.Extends == nil {
+			n.Extends = []string{}
+		}
+		if n.Implements == nil {
+			n.Implements = []string{}
+		}
+		if n.Fields == nil {
+			n.Fields = []Field{}
+		}
+		if n.Methods == nil {
+			n.Methods = []Method{}
+		}
+		for j := range n.Fields {
+			if n.Fields[j].TypeRefs == nil {
+				n.Fields[j].TypeRefs = []string{}
+			}
+		}
+		for j := range n.Methods {
+			if n.Methods[j].TypeRefs == nil {
+				n.Methods[j].TypeRefs = []string{}
+			}
+		}
+	}
 }
 
 func moduleOf(rel string) string {
