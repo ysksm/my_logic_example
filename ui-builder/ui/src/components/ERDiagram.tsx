@@ -8,7 +8,7 @@ interface Props {
   onMove: (name: string, p: DomainPosition) => void;
 }
 
-export type NodeKind = "vo" | "entity" | "aggregate";
+export type NodeKind = "vo" | "entity" | "aggregate" | "model";
 
 interface NodeBox {
   kind: NodeKind;

@@ -69,6 +69,8 @@ html, body, #root { height: 100%; margin: 0; font-family: -apple-system, BlinkMa
   width: 520px; max-height: 80vh; overflow-y: auto;
 }
 .modal h2 { margin: 0 0 12px; }
+.props .field-row { display: grid; gap: 6px; margin-bottom: 6px; }
+.props .field-row input, .props .field-row select { padding: 4px 6px; }
 .modal .field-row { display: grid; grid-template-columns: 2fr 1fr 60px 32px; gap: 6px; margin-bottom: 6px; }
 .modal .field-row input, .modal .field-row select { padding: 4px 6px; }
 .modal-actions { margin-top: 16px; display: flex; gap: 8px; justify-content: flex-end; }

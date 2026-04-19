@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import type {
-  Aggregate, Domain, DomainAttribute, DomainEntity, DomainPosition,
-  DomainReference, ValueObject,
+  Aggregate, DataModel, Domain, DomainAttribute, DomainEntity, DomainPosition,
+  DomainReference, Field, FieldType, ValueObject,
 } from "../types";
 import { DOMAIN_PRIMITIVES } from "../types";
-import { api } from "../api";
+import { api, emptyField } from "../api";
 import { ERDiagram, type NodeKind } from "./ERDiagram";
 
 interface Props { onExit: () => void }
@@ -19,11 +19,13 @@ export function DomainBuilder({ onExit }: Props) {
   const [current, setCurrent] = useState<Domain | null>(null);
   const [dirty, setDirty] = useState(false);
   const [selected, setSelected] = useState<{ kind: NodeKind; name: string } | null>(null);
+  const [models, setModels] = useState<DataModel[]>([]);
 
   useEffect(() => { void refresh(); }, []);
   const refresh = async () => {
-    const list = await api.listDomains();
+    const [list, mList] = await Promise.all([api.listDomains(), api.listModels()]);
     setDomains(list);
+    setModels(mList);
     if (list.length > 0 && !current) setCurrent(list[0]);
   };
 
@@ -58,7 +60,11 @@ export function DomainBuilder({ onExit }: Props) {
     if (!current) return;
     if (dirty) await save();
     const created = await api.scaffoldDomain(current.id);
-    alert(`Generated ${created.length} DataModel(s):\n` + created.map((m) => "• " + m.name).join("\n"));
+    const freshModels = await api.listModels();
+    setModels(freshModels);
+    if (created.length > 0) {
+      setSelected({ kind: "model", name: created[0].name });
+    }
   };
 
   const addVO = (isId: boolean) => update((d) => ({
@@ -100,6 +106,7 @@ export function DomainBuilder({ onExit }: Props) {
   const selectedVO = current?.valueObjects.find((v) => selected?.kind === "vo" && v.name === selected.name) ?? null;
   const selectedEntity = current?.entities.find((e) => selected?.kind === "entity" && e.name === selected.name) ?? null;
   const selectedAggregate = current?.aggregates.find((a) => selected?.kind === "aggregate" && a.name === selected.name) ?? null;
+  const selectedModel = models.find((m) => selected?.kind === "model" && m.name === selected.name) ?? null;
 
   return (
     <div className="app">
@@ -156,6 +163,16 @@ export function DomainBuilder({ onExit }: Props) {
               </li>
             ))}
           </ul>
+          <h3>Data Models</h3>
+          <ul>
+            {models.map((m) => (
+              <li key={m.name}
+                className={`list-item ${selected?.kind === "model" && selected.name === m.name ? "active" : ""}`}
+                onClick={() => setSelected({ kind: "model", name: m.name })}>
+                {m.name} ({m.fields.length})
+              </li>
+            ))}
+          </ul>
         </div>
 
         <div className="canvas-wrap" style={{ background: "#f3f4f6" }}>
@@ -173,7 +190,10 @@ export function DomainBuilder({ onExit }: Props) {
                 ...d,
                 valueObjects: d.valueObjects.map((v) => v.name === selectedVO.name ? { ...v, ...patch } : v),
               }))}
-              onRename={(newName) => update((d) => renameNode(d, "vo", selectedVO.name, newName))}
+              onRename={(newName) => {
+                update((d) => renameNode(d, "vo", selectedVO.name, newName));
+                if (newName) setSelected({ kind: "vo", name: newName });
+              }}
               onDelete={() => {
                 update((d) => ({ ...d, valueObjects: d.valueObjects.filter((v) => v.name !== selectedVO.name) }));
                 setSelected(null);
@@ -190,7 +210,10 @@ export function DomainBuilder({ onExit }: Props) {
                 ...d,
                 entities: d.entities.map((e) => e.name === selectedEntity.name ? { ...e, ...patch } : e),
               }))}
-              onRename={(newName) => update((d) => renameNode(d, "entity", selectedEntity.name, newName))}
+              onRename={(newName) => {
+                update((d) => renameNode(d, "entity", selectedEntity.name, newName));
+                if (newName) setSelected({ kind: "entity", name: newName });
+              }}
               onDelete={() => {
                 update((d) => ({ ...d, entities: d.entities.filter((e) => e.name !== selectedEntity.name) }));
                 setSelected(null);
@@ -208,6 +231,27 @@ export function DomainBuilder({ onExit }: Props) {
               onDelete={() => {
                 update((d) => ({ ...d, aggregates: d.aggregates.filter((a) => a.name !== selectedAggregate.name) }));
                 setSelected(null);
+              }}
+            />
+          )}
+          {selectedModel && (
+            <DataModelEditor
+              model={selectedModel}
+              onSave={async (m) => {
+                await api.saveModel(m);
+                const fresh = await api.listModels();
+                setModels(fresh);
+                setSelected({ kind: "model", name: m.name });
+              }}
+              onDelete={async () => {
+                await api.deleteModel(selectedModel.name);
+                const fresh = await api.listModels();
+                setModels(fresh);
+                setSelected(null);
+              }}
+              onScaffold={async () => {
+                await api.scaffold(selectedModel.name);
+                onExit();
               }}
             />
           )}
@@ -386,6 +430,57 @@ function EntityEditor({ entity, voNames, idVOs, entityNames, onChange, onRename,
         references: [...(entity.references ?? []), { name: "", target: "", cardinality: "one" }],
       })}>+ Add reference</button>
       <button className="danger" style={{ marginTop: 12 }} onClick={onDelete}>Delete Entity</button>
+    </>
+  );
+}
+
+const MODEL_FIELD_TYPES: FieldType[] = ["string", "text", "int", "bool", "date", "ref"];
+
+function DataModelEditor({ model, onSave, onDelete, onScaffold }: {
+  model: DataModel;
+  onSave: (m: DataModel) => Promise<void>;
+  onDelete: () => Promise<void>;
+  onScaffold: () => Promise<void>;
+}) {
+  const [draft, setDraft] = useState<DataModel>(model);
+  useEffect(() => { setDraft(model); }, [model.name]);
+
+  const setField = (idx: number, patch: Partial<Field>) =>
+    setDraft({ ...draft, fields: draft.fields.map((f, i) => (i === idx ? { ...f, ...patch } : f)) });
+
+  return (
+    <>
+      <h3>《Data Model》</h3>
+      <label>name</label>
+      <input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+      <h3 style={{ marginTop: 12 }}>Fields</h3>
+      {draft.fields.map((f, i) => (
+        <div key={i} className="field-row" style={{ gridTemplateColumns: "1fr 1fr 60px 32px" }}>
+          <input value={f.name} placeholder="name"
+            onChange={(e) => setField(i, { name: e.target.value })} />
+          <select value={f.type} onChange={(e) => setField(i, { type: e.target.value as FieldType })}>
+            {MODEL_FIELD_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+          <label style={{ fontSize: 11 }}>
+            <input type="checkbox" checked={!!f.required}
+              onChange={(e) => setField(i, { required: e.target.checked })} /> req
+          </label>
+          <button onClick={() => setDraft({ ...draft, fields: draft.fields.filter((_, j) => j !== i) })}>×</button>
+        </div>
+      ))}
+      <button onClick={() => setDraft({ ...draft, fields: [...draft.fields, emptyField()] })}>
+        + Add field
+      </button>
+      <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
+        <button className="primary" onClick={async () => { if (draft.name) await onSave(draft); }}>
+          Save model
+        </button>
+        <button style={{ background: "#10b981", color: "#fff", border: "none", padding: "6px 10px", borderRadius: 3, cursor: "pointer" }}
+          onClick={onScaffold}>
+          Scaffold App
+        </button>
+      </div>
+      <button className="danger" onClick={onDelete}>Delete model</button>
     </>
   );
 }
