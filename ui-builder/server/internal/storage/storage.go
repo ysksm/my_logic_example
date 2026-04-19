@@ -11,7 +11,7 @@ import (
 	"sync"
 )
 
-// Store holds three independent collections behind one mutex per file.
+// Store holds independent collections behind one mutex per file.
 type Store struct {
 	dir string
 
@@ -19,6 +19,7 @@ type Store struct {
 	models  map[string]DataModel       // key = model name
 	apps    map[string]App             // key = app id
 	records map[string]map[string]Item // model name -> record id -> item
+	domains map[string]Domain          // key = domain id
 }
 
 // DataModel is a Rails-like schema definition.
@@ -53,6 +54,67 @@ type Item struct {
 	Values map[string]interface{} `json:"values"`
 }
 
+// ----- DDD domain model -----
+//
+// Domain holds a DDD-style design: ValueObjects (immutable, used for IDs and
+// general types), Entities (have identity), and Aggregates (consistency
+// boundaries). Layout positions for the ER diagram are stored alongside.
+
+// DomainAttribute is one slot inside a VO or Entity. Type may be a primitive
+// (string|int|float|bool|date|datetime|text) or the name of another VO.
+type DomainAttribute struct {
+	Name     string `json:"name"`
+	Type     string `json:"type"`
+	Required bool   `json:"required,omitempty"`
+	List     bool   `json:"list,omitempty"`
+}
+
+// DomainReference is an Entity → Entity association.
+type DomainReference struct {
+	Name        string `json:"name"`
+	Target      string `json:"target"`
+	Cardinality string `json:"cardinality"` // "one" | "many"
+}
+
+// ValueObject is a DDD VO. IsIdentifier marks IDs (e.g. UserId).
+type ValueObject struct {
+	Name         string            `json:"name"`
+	IsIdentifier bool              `json:"isIdentifier,omitempty"`
+	Attributes   []DomainAttribute `json:"attributes"`
+}
+
+// Entity has an identity (a VO referenced by IdentifierType).
+type Entity struct {
+	Name           string            `json:"name"`
+	IdentifierName string            `json:"identifierName"` // e.g. "id"
+	IdentifierType string            `json:"identifierType"` // VO name
+	Attributes     []DomainAttribute `json:"attributes"`
+	References     []DomainReference `json:"references,omitempty"`
+}
+
+// Aggregate is a consistency boundary rooted at one Entity.
+type Aggregate struct {
+	Name     string   `json:"name"`
+	Root     string   `json:"root"`              // entity name
+	Members  []string `json:"members,omitempty"` // entities included beyond the root
+}
+
+// Position is a node coordinate on the ER canvas.
+type Position struct {
+	X int `json:"x"`
+	Y int `json:"y"`
+}
+
+// Domain is the top-level DDD document.
+type Domain struct {
+	ID           string              `json:"id"`
+	Name         string              `json:"name"`
+	ValueObjects []ValueObject       `json:"valueObjects"`
+	Entities     []Entity            `json:"entities"`
+	Aggregates   []Aggregate         `json:"aggregates"`
+	Layout       map[string]Position `json:"layout,omitempty"` // node name -> position
+}
+
 // New opens (or creates) a Store rooted at dir.
 func New(dir string) (*Store, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -63,6 +125,7 @@ func New(dir string) (*Store, error) {
 		models:  map[string]DataModel{},
 		apps:    map[string]App{},
 		records: map[string]map[string]Item{},
+		domains: map[string]Domain{},
 	}
 	if err := s.load(); err != nil {
 		return nil, err
@@ -79,7 +142,10 @@ func (s *Store) load() error {
 	if err := readJSON(s.path("apps"), &s.apps); err != nil {
 		return err
 	}
-	return readJSON(s.path("records"), &s.records)
+	if err := readJSON(s.path("records"), &s.records); err != nil {
+		return err
+	}
+	return readJSON(s.path("domains"), &s.domains)
 }
 
 func (s *Store) saveLocked(name string, v interface{}) error {
@@ -224,4 +290,40 @@ func (s *Store) DeleteRecord(model, id string) error {
 		delete(bucket, id)
 	}
 	return s.saveLocked("records", s.records)
+}
+
+// ----- Domains (DDD) -----
+
+func (s *Store) ListDomains() []Domain {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]Domain, 0, len(s.domains))
+	for _, d := range s.domains {
+		out = append(out, d)
+	}
+	return out
+}
+
+func (s *Store) GetDomain(id string) (Domain, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	d, ok := s.domains[id]
+	return d, ok
+}
+
+func (s *Store) UpsertDomain(d Domain) error {
+	if d.ID == "" {
+		return fmt.Errorf("domain id required")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.domains[d.ID] = d
+	return s.saveLocked("domains", s.domains)
+}
+
+func (s *Store) DeleteDomain(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.domains, id)
+	return s.saveLocked("domains", s.domains)
 }

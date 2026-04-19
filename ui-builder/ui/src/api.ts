@@ -1,4 +1,4 @@
-import type { AppDoc, AppDocWire, DataModel, Field } from "./types";
+import type { AppDoc, AppDocWire, DataModel, Domain, Field } from "./types";
 import { fromWire } from "./types";
 
 // All requests go through Vite's /api proxy to the Go server.
@@ -48,6 +48,14 @@ export const api = {
     }),
   deleteRecord: (model: string, id: string) =>
     http<void>(`/api/records/${model}/${id}`, { method: "DELETE" }),
+
+  listDomains: () => http<Domain[]>("/api/domains"),
+  getDomain: (id: string) => http<Domain>(`/api/domains/${id}`),
+  saveDomain: (d: Domain) =>
+    http<Domain>("/api/domains", { method: "POST", body: JSON.stringify(d) }),
+  deleteDomain: (id: string) => http<void>(`/api/domains/${id}`, { method: "DELETE" }),
+  scaffoldDomain: (id: string) =>
+    http<DataModel[]>(`/api/domains/${id}/scaffold`, { method: "POST" }),
 };
 
 export function emptyModel(): DataModel {

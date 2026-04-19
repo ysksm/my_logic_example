@@ -7,6 +7,7 @@ import { Properties } from "./components/Properties";
 import { ScreensPanel } from "./components/ScreensPanel";
 import { ModelEditor } from "./components/ModelEditor";
 import { Preview } from "./components/Preview";
+import { DomainBuilder } from "./components/DomainBuilder";
 
 export function App() {
   const [models, setModels] = useState<DataModel[]>([]);
@@ -16,6 +17,7 @@ export function App() {
   const [selectedCompId, setSelectedCompId] = useState<string | null>(null);
   const [showModels, setShowModels] = useState(false);
   const [previewing, setPreviewing] = useState(false);
+  const [showDomain, setShowDomain] = useState(false);
   const [dirty, setDirty] = useState(false);
 
   // Initial load.
@@ -151,6 +153,9 @@ export function App() {
   if (previewing && currentApp) {
     return <Preview app={currentApp} onExit={() => setPreviewing(false)} />;
   }
+  if (showDomain) {
+    return <DomainBuilder onExit={async () => { setShowDomain(false); await refresh(); }} />;
+  }
 
   return (
     <div className="app">
@@ -165,6 +170,7 @@ export function App() {
         </select>
         <button onClick={newApp}>+ New app</button>
         <button onClick={() => setShowModels(true)}>Models</button>
+        <button onClick={() => setShowDomain(true)}>Domain (DDD)</button>
         <button onClick={save} disabled={!currentApp || !dirty}>{dirty ? "Save*" : "Save"}</button>
         <button className="primary" onClick={() => setPreviewing(true)} disabled={!currentApp}>▶ Preview</button>
       </div>

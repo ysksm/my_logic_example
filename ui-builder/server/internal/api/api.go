@@ -35,6 +35,8 @@ func Register(mux *http.ServeMux, s *storage.Store) {
 	mux.HandleFunc("/api/apps", h.apps)
 	mux.HandleFunc("/api/apps/", h.appByID)
 	mux.HandleFunc("/api/records/", h.records)
+	mux.HandleFunc("/api/domains", h.domains)
+	mux.HandleFunc("/api/domains/", h.domainByID)
 }
 
 // WithCORS wraps a handler with permissive CORS so the React dev server can call it.
@@ -218,6 +220,72 @@ func (h *handler) records(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeJSON(w, http.StatusOK, it)
+	default:
+		writeErr(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+// ----- Domains -----
+
+func (h *handler) domains(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		writeJSON(w, http.StatusOK, h.s.ListDomains())
+	case http.MethodPost:
+		var d storage.Domain
+		if err := json.NewDecoder(r.Body).Decode(&d); err != nil {
+			writeErr(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		if err := h.s.UpsertDomain(d); err != nil {
+			writeErr(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, d)
+	default:
+		writeErr(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+// /api/domains/{id} or /api/domains/{id}/scaffold
+func (h *handler) domainByID(w http.ResponseWriter, r *http.Request) {
+	rest := strings.TrimPrefix(r.URL.Path, "/api/domains/")
+	parts := strings.SplitN(rest, "/", 2)
+	id := parts[0]
+	if id == "" {
+		writeErr(w, http.StatusBadRequest, "domain id required")
+		return
+	}
+	if len(parts) == 2 && parts[1] == "scaffold" && r.Method == http.MethodPost {
+		d, ok := h.s.GetDomain(id)
+		if !ok {
+			writeErr(w, http.StatusNotFound, "domain not found")
+			return
+		}
+		models := scaffold.FromDomain(d)
+		for _, m := range models {
+			if err := h.s.UpsertModel(m); err != nil {
+				writeErr(w, http.StatusInternalServerError, err.Error())
+				return
+			}
+		}
+		writeJSON(w, http.StatusOK, models)
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		d, ok := h.s.GetDomain(id)
+		if !ok {
+			writeErr(w, http.StatusNotFound, "not found")
+			return
+		}
+		writeJSON(w, http.StatusOK, d)
+	case http.MethodDelete:
+		if err := h.s.DeleteDomain(id); err != nil {
+			writeErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
 	default:
 		writeErr(w, http.StatusMethodNotAllowed, "method not allowed")
 	}
