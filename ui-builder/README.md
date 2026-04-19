@@ -1,140 +1,133 @@
 # ui-builder
 
-A Tooljet-style low-code UI builder that is **data-model first**.
-Define your schema once and the server scaffolds a full CRUD application
-(list / new / show / edit screens with state-machine transitions). The
-React builder lets you keep editing the generated screens — drag
-components on the canvas, edit props, wire transitions, and hit
-**▶ Preview** to use the app for real against the same Go API.
+Tooljet 風のローコード UI ビルダー。**データモデル先行 (data-model first)** の設計思想で、スキーマを定義すればサーバーがフルな CRUD アプリ (一覧 / 新規 / 詳細 / 編集の 4 画面 + 状態遷移) をスキャフォールドします。React 製ビルダーで生成後のスクリーンを編集 — コンポーネントをキャンバスにドラッグ、プロパティを編集、遷移を接続し、**▶ Preview** ボタンで同じ Go API を使って実際に動かせます。
 
 ```
 ui-builder/
-├── server/      # Go HTTP API, JSON-file storage, scaffold generator
-└── ui/          # React + TypeScript builder + preview runtime
+├── server/      # Go HTTP API、JSON ファイル永続化、スキャフォールドジェネレーター
+└── ui/          # React + TypeScript 製ビルダー + プレビューランタイム
 ```
 
-## Concepts
+## 概念
 
-- **DataModel** — Rails-style schema (`name`, `fields[]`).
-  Field types: `string | text | int | bool | date | ref`.
-- **App** — UI metadata document. Contains:
-  - `screens[]` — each screen owns absolutely-positioned `components`.
-  - `transitions[]` — `{from, to, event}` edges. Each screen *is* a state.
-  - `initialScreen` — the start state.
-  - `stateVariables` — runtime variables (e.g. `selectedId`).
-- **Component** — `{id, type, props, events}` where `events.onClick`
-  declares an `EventAction` (`navigate | saveRecord | deleteRecord | setVar`).
-- **Scaffold** — `POST /api/models/{name}/scaffold` produces an App with
-  list / new / show / edit screens already wired.
+- **DataModel** — Rails 風のスキーマ (`name`, `fields[]`)。
+  フィールド型: `string | text | int | bool | date | ref`。
+- **App** — UI メタデータドキュメント。以下を含む:
+  - `screens[]` — 各スクリーンは絶対配置の `components` を保持。
+  - `transitions[]` — `{from, to, event}` の辺。各スクリーン *は状態そのもの*。
+  - `initialScreen` — 開始状態。
+  - `stateVariables` — ランタイム変数 (例 `selectedId`)。
+- **Component** — `{id, type, props, events}`。`events.onClick` で
+  `EventAction` (`navigate | saveRecord | deleteRecord | setVar`) を宣言。
+- **Scaffold** — `POST /api/models/{name}/scaffold` で list / new / show / edit の
+  4 画面が配線済みの App を生成。
 
-Bindings use simple tokens, evaluated at runtime, never `eval`'d:
+バインディングは単純なトークンで表現され、ランタイムで解決されます (`eval` は一切使いません):
 
-| Token         | Source                                 |
-|---------------|----------------------------------------|
-| `$state.x`    | runtime state variables / form values  |
-| `$record.x`   | the record selected for show/edit      |
-| `$row.x`      | the table row that fired the event     |
+| トークン       | 参照元                                 |
+|----------------|----------------------------------------|
+| `$state.x`     | ランタイム状態変数 / フォーム値         |
+| `$record.x`    | 詳細/編集画面で選択中のレコード         |
+| `$row.x`       | イベントを発火したテーブル行            |
 
-Form inputs use `bind="form.fieldName"` to read/write into `state.form`.
-A `saveRecord` action then POSTs `state.form` to `/api/records/{model}`.
+フォーム入力は `bind="form.fieldName"` を使って `state.form` に読み書きします。
+`saveRecord` アクションが `state.form` を `/api/records/{model}` へ POST します。
 
-## Run it
+## 起動方法
 
-In two terminals:
+ターミナル 2 つで:
 
 ```sh
-# 1. Go API on :8080
+# 1. Go API を :8080 で起動
 cd server
 go run . -addr :8080 -data ./data
 
-# 2. React builder on :5173 (proxies /api → :8080)
+# 2. React ビルダーを :5173 で起動 (/api は :8080 へプロキシ)
 cd ui
 npm install
 npm run dev
 ```
 
-Open http://localhost:5173, click **Models** → add a `Post` model
-(`title:string`, `body:text`, `published:bool`), then **Scaffold app**.
-The new app loads in the builder; press **▶ Preview** to use it.
+http://localhost:5173 を開き、**Models** をクリックして `Post` モデル
+(`title:string`, `body:text`, `published:bool`) を追加、**Scaffold app** を押下。
+生成された App がビルダーに読み込まれるので、**▶ Preview** で実際に動かせます。
 
-## DDD Domain Builder
+## DDD ドメインビルダー
 
-Click **Domain (DDD)** in the top bar to enter a full-screen ER editor.
+トップバーの **Domain (DDD)** をクリックするとフルスクリーンの ER 図エディタに入ります。
 
-The domain document has three node kinds, each represented as a draggable
-node on an SVG canvas:
+ドメインドキュメントは 3 種類のノードで構成され、SVG キャンバス上でドラッグ可能なノードとして表示されます:
 
-| Kind            | Header colour | Purpose                                   |
-|-----------------|---------------|-------------------------------------------|
-| 《Value Object》 | blue          | Immutable composite types and **IDs**     |
-| 《Entity》      | green         | Has identity (an Identifier VO)           |
-| 《Aggregate》   | dashed purple | Consistency boundary, wraps its members   |
+| 種類              | ヘッダー色   | 役割                                        |
+|-------------------|--------------|---------------------------------------------|
+| 《Value Object》  | 青           | 不変な複合型および **ID**                   |
+| 《Entity》        | 緑           | 同一性を持つ (Identifier VO を参照)         |
+| 《Aggregate》     | 紫・破線     | 整合性境界。所属ノードを囲む枠              |
 
-Edges:
-- **Solid arrow** — Entity → Entity reference (`one` / `many`)
-- **Dashed line** — Entity uses a Value Object (identifier or attribute)
+辺:
+- **実線矢印** — Entity → Entity の参照 (`one` / `many`)
+- **破線** — Entity が Value Object を利用 (identifier または属性)
 
-Click **→ Generate DataModels** to flatten the domain into the regular
-DataModels collection (which can then be scaffolded into Apps via the
-existing flow):
+**→ Generate DataModels** をクリックするとドメインが既存の DataModel コレクションへ
+平坦化されます (その後は通常のフローで App スキャフォールドまで繋がります):
 
-- Each Entity becomes a DataModel.
-- Identifier VOs collapse to their underlying primitive
-  (`UserId{value:string}` → field `id: string`).
-- A regular VO attribute is expanded inline using `attr_subfield`
-  naming (`total: Money` with `Money{amount,currency}` →
-  `total_amount`, `total_currency`).
-- Entity references become `ref` fields pointing at the target name.
+- 各 Entity が DataModel になります。
+- Identifier VO は内部プリミティブへ畳み込まれます
+  (`UserId{value:string}` → `id: string` フィールド)。
+- 通常 VO 属性は `attr_subfield` 命名で展開されます
+  (`Money{amount,currency}` を持つ `total: Money` →
+  `total_amount`, `total_currency`)。
+- Entity の参照はターゲット名を指す `ref` フィールドになります。
 
-So the full flow is **DDD model → DataModels → scaffolded App**.
+つまり全体フローは **DDD モデル → DataModel → スキャフォールド App** です。
 
 ## API
 
-| Method | Path                                   | Purpose                       |
-|-------:|----------------------------------------|-------------------------------|
-| GET    | `/api/health`                          | liveness                      |
-| GET    | `/api/models`                          | list data models              |
-| POST   | `/api/models`                          | upsert one                    |
-| DELETE | `/api/models/{name}`                   | delete model + its records    |
-| POST   | `/api/models/{name}/scaffold`          | generate App from model       |
-| GET    | `/api/apps`                            | list apps                     |
-| GET    | `/api/apps/{id}`                       | get one                       |
-| POST   | `/api/apps`                            | upsert one                    |
-| DELETE | `/api/apps/{id}`                       | delete                        |
-| GET    | `/api/records/{model}`                 | list records                  |
-| POST   | `/api/records/{model}`                 | upsert `{id, values}`         |
-| DELETE | `/api/records/{model}/{id}`            | delete one                    |
-| GET    | `/api/domains`                         | list DDD domains              |
-| POST   | `/api/domains`                         | upsert a domain               |
-| GET    | `/api/domains/{id}`                    | get one                       |
-| DELETE | `/api/domains/{id}`                    | delete                        |
-| POST   | `/api/domains/{id}/scaffold`           | flatten domain → DataModels   |
+| Method | Path                                   | 用途                            |
+|-------:|----------------------------------------|---------------------------------|
+| GET    | `/api/health`                          | 生存確認                        |
+| GET    | `/api/models`                          | データモデル一覧                |
+| POST   | `/api/models`                          | モデルの upsert                 |
+| DELETE | `/api/models/{name}`                   | モデルとレコードを削除          |
+| POST   | `/api/models/{name}/scaffold`          | モデルから App を生成           |
+| GET    | `/api/apps`                            | App 一覧                        |
+| GET    | `/api/apps/{id}`                       | App 取得                        |
+| POST   | `/api/apps`                            | App の upsert                   |
+| DELETE | `/api/apps/{id}`                       | App 削除                        |
+| GET    | `/api/records/{model}`                 | レコード一覧                    |
+| POST   | `/api/records/{model}`                 | `{id, values}` の upsert        |
+| DELETE | `/api/records/{model}/{id}`            | レコード削除                    |
+| GET    | `/api/domains`                         | DDD ドメイン一覧                |
+| POST   | `/api/domains`                         | ドメインの upsert               |
+| GET    | `/api/domains/{id}`                    | ドメイン取得                    |
+| DELETE | `/api/domains/{id}`                    | ドメイン削除                    |
+| POST   | `/api/domains/{id}/scaffold`           | ドメイン → DataModel に平坦化   |
 
-Storage is three JSON files under `-data` (`models.json`, `apps.json`,
-`records.json`) so there is no DB to provision.
+永続化は `-data` 以下の JSON ファイル (`models.json`, `apps.json`,
+`records.json`, `domains.json`) で完結するため、DB のプロビジョニングは不要です。
 
-## Layout
+## ディレクトリ構成
 
 ```
 server/
   main.go
   internal/
-    storage/      # JSON-file repo for models, apps, records
-    api/          # http.ServeMux routes + CORS middleware
-    scaffold/     # DataModel → App generator
+    storage/      # models / apps / records / domains の JSON ファイル永続化
+    api/          # http.ServeMux ルーティング + CORS ミドルウェア
+    scaffold/     # DataModel → App、および Domain → DataModel ジェネレーター
 ui/
   src/
-    types.ts                 # shared shapes
-    api.ts                   # fetch wrapper
-    App.tsx                  # builder shell (top bar + 3 panels)
+    types.ts                 # 共通型定義
+    api.ts                   # fetch ラッパー
+    App.tsx                  # ビルダーのシェル (トップバー + 3 ペイン)
     components/
-      Palette.tsx            # left-rail component list
-      Canvas.tsx             # drag/resize design surface
-      Properties.tsx         # right-rail prop + event editor
-      ScreensPanel.tsx       # state machine editor
-      ModelEditor.tsx        # data-model CRUD modal
-      Preview.tsx            # runtime that interprets the metadata
-      renderComponent.tsx    # one renderer shared by canvas + preview
-      DomainBuilder.tsx      # full-screen DDD editor
-      ERDiagram.tsx          # SVG ER-diagram (VO/Entity/Aggregate)
+      Palette.tsx            # 左側コンポーネント一覧
+      Canvas.tsx             # ドラッグ/リサイズ可能な設計面
+      Properties.tsx         # 右側プロパティ + イベントエディタ
+      ScreensPanel.tsx       # 状態機械エディタ
+      ModelEditor.tsx        # データモデル CRUD モーダル
+      Preview.tsx            # メタデータを解釈するランタイム
+      renderComponent.tsx    # キャンバスとプレビューで共有するレンダラー
+      DomainBuilder.tsx      # フルスクリーン DDD エディタ
+      ERDiagram.tsx          # SVG ER 図 (VO / Entity / Aggregate)
 ```
