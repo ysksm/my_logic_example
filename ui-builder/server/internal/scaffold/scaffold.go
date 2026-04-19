@@ -67,7 +67,7 @@ func FromModel(m storage.DataModel) storage.App {
 
 	transitions := []transition{
 		{From: id + "_list", To: id + "_new", Event: "newBtn"},
-		{From: id + "_list", To: id + "_show", Event: "table.rowClick"},
+		{From: id + "_list", To: id + "_show", Event: "table"},
 		{From: id + "_new", To: id + "_list", Event: "saved"},
 		{From: id + "_show", To: id + "_edit", Event: "editBtn"},
 		{From: id + "_show", To: id + "_list", Event: "backBtn"},

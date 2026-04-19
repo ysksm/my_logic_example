@@ -71,14 +71,21 @@ export function App() {
 
   const updateComp = (patch: Partial<AppComponent>) => {
     if (!currentScreen || !selectedComp) return;
+    const previousCompId = selectedComp.id;
+    const nextCompId = patch.id;
+    const isRenamingComp = !!nextCompId && nextCompId !== previousCompId;
+
     updateApp((a) => ({
       ...a,
       screens: a.screens.map((s) => s.id !== currentScreen.id ? s : ({
         ...s,
-        components: s.components.map((c) => c.id === selectedComp.id ? { ...c, ...patch } : c),
+        components: s.components.map((c) => c.id === previousCompId ? { ...c, ...patch } : c),
       })),
+      transitions: isRenamingComp
+        ? a.transitions.map((t) => t.event === previousCompId ? { ...t, event: nextCompId } : t)
+        : a.transitions,
     }));
-    if (patch.id) setSelectedCompId(patch.id);
+    if (isRenamingComp) setSelectedCompId(nextCompId);
   };
 
   const deleteComp = () => {

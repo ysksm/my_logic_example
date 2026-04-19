@@ -23,11 +23,17 @@ export function resolve(value: unknown, ctx: Ctx, row?: Record<string, unknown>)
 // In design mode interactions are inert; in preview mode events fire actions.
 export function renderComponent(c: AppComponent, ctx: Ctx) {
   const p = c.props;
-  const onClick = (e: React.MouseEvent, payload?: unknown) => {
+  const onClick = (
+    e: React.MouseEvent,
+    payload?: unknown,
+    eventName: "onClick" | "onRowClick" = "onClick",
+  ) => {
     if (ctx.mode === "design") return;
     e.stopPropagation();
-    const action = c.events?.onClick;
-    if (action) ctx.fire?.(c.id, payload);
+    ctx.fire?.(
+      c.id,
+      eventName === "onClick" ? payload : { eventName, payload },
+    );
   };
 
   switch (c.type) {
@@ -116,7 +122,7 @@ export function renderComponent(c: AppComponent, ctx: Ctx) {
               {rows.map((r) => {
                 const merged = { id: r.id, ...r.values };
                 return (
-                  <tr key={r.id} onClick={(e) => onClick(e, merged)}>
+                  <tr key={r.id} onClick={(e) => onClick(e, merged, "onRowClick")}>
                     {cols.map((c) => <td key={c.key}>{String((merged as Record<string, unknown>)[c.key] ?? "")}</td>)}
                   </tr>
                 );
