@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { analyze } from "./api";
 import { ControlPanel } from "./components/ControlPanel";
 import { DiagramCanvas } from "./components/DiagramCanvas";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import type { ApiEdge, ApiGraph, ApiNode, GroupBy, LayoutName, Stereotype } from "./types";
 
 export function App() {
@@ -133,22 +134,24 @@ export function App() {
 
       <main style={{ flex: 1, position: "relative" }}>
         {graph ? (
-          <DiagramCanvas
-            graph={graph}
-            visibleNodes={visibleNodes}
-            visibleEdges={visibleEdges}
-            layout={layout}
-            groupBy={groupBy}
-            manualPositions={manualPositions}
-            onNodePositionChange={(id, pos) =>
-              setManualPositions((m) => ({ ...m, [id]: pos }))
-            }
-            onSelectNode={(id) => {
-              setSelected(id);
-              if (id) setFocus(id);
-            }}
-            layoutNonce={layoutNonce}
-          />
+          <ErrorBoundary key={layoutNonce}>
+            <DiagramCanvas
+              graph={graph}
+              visibleNodes={visibleNodes}
+              visibleEdges={visibleEdges}
+              layout={layout}
+              groupBy={groupBy}
+              manualPositions={manualPositions}
+              onNodePositionChange={(id, pos) =>
+                setManualPositions((m) => ({ ...m, [id]: pos }))
+              }
+              onSelectNode={(id) => {
+                setSelected(id);
+                if (id) setFocus(id);
+              }}
+              layoutNonce={layoutNonce}
+            />
+          </ErrorBoundary>
         ) : (
           <div
             style={{

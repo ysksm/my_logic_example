@@ -1,4 +1,5 @@
-import dagre from "@dagrejs/dagre";
+import * as dagre from "@dagrejs/dagre";
+import type { CSSProperties } from "react";
 import type { Node, Edge } from "reactflow";
 import type { ApiEdge, ApiNode, LayoutName } from "../types";
 
@@ -143,8 +144,8 @@ function edgeColor(kind: ApiEdge["kind"]): string {
   }
 }
 
-function edgeStyle(kind: ApiEdge["kind"]): React.CSSProperties {
-  const base: React.CSSProperties = { stroke: edgeColor(kind), strokeWidth: 1.5 };
+function edgeStyle(kind: ApiEdge["kind"]): CSSProperties {
+  const base: CSSProperties = { stroke: edgeColor(kind), strokeWidth: 1.5 };
   if (kind === "implements") {
     base.strokeDasharray = "4 4";
   }
