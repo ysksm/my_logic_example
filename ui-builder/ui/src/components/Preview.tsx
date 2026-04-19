@@ -55,16 +55,22 @@ export function Preview({ app, onExit }: Props) {
     if (t) setScreenId(t.to);
   }, [app.transitions]);
 
-  const fire = useCallback(async (eventName: string, payload?: unknown) => {
+  const fire = useCallback(async (componentId: string, payload?: unknown) => {
     if (!screen) return;
-    const comp = screen.components.find((c) => c.id === eventName);
-    const action: EventAction | undefined = comp?.events?.onClick ?? comp?.events?.["onRowClick"];
-    if (!action) {
-      transition(screen.id, eventName);
-      return;
+    const comp = screen.components.find((c) => c.id === componentId);
+    let eventKey: "onClick" | "onRowClick" = "onClick";
+    let actualPayload = payload;
+    if (
+      payload && typeof payload === "object" &&
+      "eventName" in payload && "payload" in payload
+    ) {
+      const wrapper = payload as { eventName: "onClick" | "onRowClick"; payload: unknown };
+      eventKey = wrapper.eventName;
+      actualPayload = wrapper.payload;
     }
-    await runAction(action, payload);
-    transition(screen.id, eventName);
+    const action: EventAction | undefined = comp?.events?.[eventKey];
+    if (action) await runAction(action, actualPayload);
+    transition(screen.id, componentId);
   }, [screen, transition]);
 
   const runAction = useCallback(async (action: EventAction, payload?: unknown) => {
@@ -72,11 +78,14 @@ export function Preview({ app, onExit }: Props) {
     switch (action.action) {
       case "navigate": {
         if (action.setVars) {
-          const next = { ...state };
-          for (const [k, v] of Object.entries(action.setVars)) {
-            next[k] = resolve(v, { mode: "preview", state, records, recordForCurrentScreen }, row);
-          }
-          setState(next);
+          const setVars = action.setVars;
+          setState((prev) => {
+            const next = { ...prev };
+            for (const [k, v] of Object.entries(setVars)) {
+              next[k] = resolve(v, { mode: "preview", state: prev, records, recordForCurrentScreen }, row);
+            }
+            return next;
+          });
         }
         if (action.target) setScreenId(action.target);
         break;
@@ -94,7 +103,7 @@ export function Preview({ app, onExit }: Props) {
         if (!id) id = String(Date.now());
         await api.saveRecord(action.model, id, values);
         await reloadRecords(action.model);
-        setState({ ...state, [fromKey]: {} });
+        setState((prev) => ({ ...prev, [fromKey]: {} }));
         if (action.thenEvent) transition(screen!.id, action.thenEvent);
         break;
       }
@@ -108,7 +117,10 @@ export function Preview({ app, onExit }: Props) {
         break;
       }
       case "setVar":
-        if (action.varName) setState({ ...state, [action.varName]: action.value });
+        if (action.varName) {
+          const varName = action.varName;
+          setState((prev) => ({ ...prev, [varName]: action.value }));
+        }
         break;
     }
   }, [state, records, recordForCurrentScreen, reloadRecords, screen, transition]);

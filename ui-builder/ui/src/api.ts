@@ -16,9 +16,13 @@ export const api = {
   listModels: () => http<DataModel[]>("/api/models"),
   saveModel: (m: DataModel) =>
     http<DataModel>("/api/models", { method: "POST", body: JSON.stringify(m) }),
-  deleteModel: (name: string) => http<void>(`/api/models/${name}`, { method: "DELETE" }),
+  deleteModel: (name: string) =>
+    http<void>(`/api/models/${encodeURIComponent(name)}`, { method: "DELETE" }),
   scaffold: async (name: string): Promise<AppDoc> => {
-    const wire = await http<AppDocWire>(`/api/models/${name}/scaffold`, { method: "POST" });
+    const wire = await http<AppDocWire>(
+      `/api/models/${encodeURIComponent(name)}/scaffold`,
+      { method: "POST" },
+    );
     return fromWire(wire);
   },
 
@@ -26,7 +30,8 @@ export const api = {
     const wire = await http<AppDocWire[]>("/api/apps");
     return wire.map(fromWire);
   },
-  getApp: async (id: string): Promise<AppDoc> => fromWire(await http<AppDocWire>(`/api/apps/${id}`)),
+  getApp: async (id: string): Promise<AppDoc> =>
+    fromWire(await http<AppDocWire>(`/api/apps/${encodeURIComponent(id)}`)),
   saveApp: async (a: AppDoc): Promise<AppDoc> => {
     const wire = {
       ...a,
@@ -37,25 +42,30 @@ export const api = {
     const out = await http<AppDocWire>("/api/apps", { method: "POST", body: JSON.stringify(wire) });
     return fromWire(out);
   },
-  deleteApp: (id: string) => http<void>(`/api/apps/${id}`, { method: "DELETE" }),
+  deleteApp: (id: string) =>
+    http<void>(`/api/apps/${encodeURIComponent(id)}`, { method: "DELETE" }),
 
   listRecords: <T = Record<string, unknown>>(model: string) =>
-    http<{ id: string; values: T }[]>(`/api/records/${model}`),
+    http<{ id: string; values: T }[]>(`/api/records/${encodeURIComponent(model)}`),
   saveRecord: <T = Record<string, unknown>>(model: string, id: string, values: T) =>
-    http<{ id: string; values: T }>(`/api/records/${model}`, {
+    http<{ id: string; values: T }>(`/api/records/${encodeURIComponent(model)}`, {
       method: "POST",
       body: JSON.stringify({ id, values }),
     }),
   deleteRecord: (model: string, id: string) =>
-    http<void>(`/api/records/${model}/${id}`, { method: "DELETE" }),
+    http<void>(
+      `/api/records/${encodeURIComponent(model)}/${encodeURIComponent(id)}`,
+      { method: "DELETE" },
+    ),
 
   listDomains: () => http<Domain[]>("/api/domains"),
-  getDomain: (id: string) => http<Domain>(`/api/domains/${id}`),
+  getDomain: (id: string) => http<Domain>(`/api/domains/${encodeURIComponent(id)}`),
   saveDomain: (d: Domain) =>
     http<Domain>("/api/domains", { method: "POST", body: JSON.stringify(d) }),
-  deleteDomain: (id: string) => http<void>(`/api/domains/${id}`, { method: "DELETE" }),
+  deleteDomain: (id: string) =>
+    http<void>(`/api/domains/${encodeURIComponent(id)}`, { method: "DELETE" }),
   scaffoldDomain: (id: string) =>
-    http<DataModel[]>(`/api/domains/${id}/scaffold`, { method: "POST" }),
+    http<DataModel[]>(`/api/domains/${encodeURIComponent(id)}/scaffold`, { method: "POST" }),
 };
 
 export function emptyModel(): DataModel {

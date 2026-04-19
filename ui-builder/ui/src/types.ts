@@ -143,7 +143,14 @@ export const DOMAIN_PRIMITIVES: DomainPrimitive[] = [
 export function fromWire(a: AppDocWire): AppDoc {
   const parse = <T,>(v: T | string | undefined, fallback: T): T => {
     if (v === undefined || v === null) return fallback;
-    if (typeof v === "string") return v ? (JSON.parse(v) as T) : fallback;
+    if (typeof v === "string") {
+      if (!v) return fallback;
+      try {
+        return JSON.parse(v) as T;
+      } catch {
+        return fallback;
+      }
+    }
     return v;
   };
   return {
