@@ -24,6 +24,8 @@ pub struct ServerConfig {
 pub struct CollectorConfig {
     #[serde(with = "humantime_serde", default = "default_interval")]
     pub interval: Duration,
+    #[serde(default = "default_unit")]
+    pub unit: String,
 }
 
 impl Default for ServerConfig {
@@ -39,6 +41,7 @@ impl Default for CollectorConfig {
     fn default() -> Self {
         Self {
             interval: default_interval(),
+            unit: default_unit(),
         }
     }
 }
@@ -51,6 +54,9 @@ fn default_metrics_path() -> String {
 }
 fn default_interval() -> Duration {
     Duration::from_secs(5)
+}
+fn default_unit() -> String {
+    "ratio".into()
 }
 
 pub fn load(path: &Path) -> Result<Config> {

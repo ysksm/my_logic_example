@@ -10,6 +10,41 @@ use sysinfo::{
     CpuRefreshKind, MemoryRefreshKind, RefreshKind, System, MINIMUM_CPU_UPDATE_INTERVAL,
 };
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Unit {
+    Ratio,
+    Percent,
+}
+
+impl Unit {
+    pub fn from_str(s: &str) -> anyhow::Result<Self> {
+        match s {
+            "ratio" => Ok(Unit::Ratio),
+            "percent" => Ok(Unit::Percent),
+            other => anyhow::bail!("invalid unit {:?}: must be \"ratio\" or \"percent\"", other),
+        }
+    }
+    fn suffix(self) -> &'static str {
+        match self {
+            Unit::Ratio => "ratio",
+            Unit::Percent => "percent",
+        }
+    }
+    fn range_text(self) -> &'static str {
+        match self {
+            Unit::Ratio => "(0-1)",
+            Unit::Percent => "(0-100)",
+        }
+    }
+    /// Multiplier applied to a 0-100 percent input to land in the configured unit.
+    fn from_percent_factor(self) -> f64 {
+        match self {
+            Unit::Ratio => 0.01,
+            Unit::Percent => 1.0,
+        }
+    }
+}
+
 #[derive(Clone, Hash, PartialEq, Eq, Debug, EncodeLabelSet)]
 pub struct CpuLabels {
     pub cpu: String,
@@ -17,25 +52,27 @@ pub struct CpuLabels {
 
 #[derive(Default, Clone)]
 pub struct Metrics {
-    pub cpu_usage_ratio: Family<CpuLabels, Gauge<f64, AtomicU64>>,
+    pub cpu_usage: Family<CpuLabels, Gauge<f64, AtomicU64>>,
     pub mem_total_bytes: Gauge<f64, AtomicU64>,
     pub mem_used_bytes: Gauge<f64, AtomicU64>,
     pub mem_available_bytes: Gauge<f64, AtomicU64>,
-    pub mem_used_ratio: Gauge<f64, AtomicU64>,
+    pub mem_used: Gauge<f64, AtomicU64>,
     pub swap_total_bytes: Gauge<f64, AtomicU64>,
     pub swap_used_bytes: Gauge<f64, AtomicU64>,
-    pub swap_used_ratio: Gauge<f64, AtomicU64>,
+    pub swap_used: Gauge<f64, AtomicU64>,
     pub last_success: Gauge<f64, AtomicU64>,
 }
 
-pub fn build_metrics() -> (Registry, Arc<Metrics>) {
+pub fn build_metrics(unit: Unit) -> (Registry, Arc<Metrics>) {
     let m = Arc::new(Metrics::default());
     let mut r = Registry::default();
+    let s = unit.suffix();
+    let rng = unit.range_text();
 
     r.register(
-        "m_exporter_cpu_usage_ratio",
-        "CPU usage ratio (0-1) per logical core, plus cpu=\"total\"",
-        m.cpu_usage_ratio.clone(),
+        format!("m_exporter_cpu_usage_{s}"),
+        format!("CPU usage {s} {rng} per logical core, plus cpu=\"total\""),
+        m.cpu_usage.clone(),
     );
     r.register(
         "m_exporter_memory_total_bytes",
@@ -53,9 +90,9 @@ pub fn build_metrics() -> (Registry, Arc<Metrics>) {
         m.mem_available_bytes.clone(),
     );
     r.register(
-        "m_exporter_memory_used_ratio",
-        "Used memory ratio (0-1)",
-        m.mem_used_ratio.clone(),
+        format!("m_exporter_memory_used_{s}"),
+        format!("Used memory {s} {rng}"),
+        m.mem_used.clone(),
     );
     r.register(
         "m_exporter_swap_total_bytes",
@@ -68,9 +105,9 @@ pub fn build_metrics() -> (Registry, Arc<Metrics>) {
         m.swap_used_bytes.clone(),
     );
     r.register(
-        "m_exporter_swap_used_ratio",
-        "Used swap ratio (0-1)",
-        m.swap_used_ratio.clone(),
+        format!("m_exporter_swap_used_{s}"),
+        format!("Used swap {s} {rng}"),
+        m.swap_used.clone(),
     );
     r.register(
         "m_exporter_collector_last_success_timestamp_seconds",
@@ -81,7 +118,7 @@ pub fn build_metrics() -> (Registry, Arc<Metrics>) {
     (r, m)
 }
 
-pub async fn run_collector(metrics: Arc<Metrics>, sample_interval: Duration) {
+pub async fn run_collector(metrics: Arc<Metrics>, unit: Unit, sample_interval: Duration) {
     let mut sys = System::new_with_specifics(
         RefreshKind::new()
             .with_cpu(CpuRefreshKind::everything())
@@ -90,7 +127,7 @@ pub async fn run_collector(metrics: Arc<Metrics>, sample_interval: Duration) {
 
     sys.refresh_cpu_all();
     tokio::time::sleep(MINIMUM_CPU_UPDATE_INTERVAL).await;
-    collect_once(&mut sys, &metrics);
+    collect_once(&mut sys, &metrics, unit);
 
     let mut ticker = tokio::time::interval(sample_interval);
     ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
@@ -98,27 +135,27 @@ pub async fn run_collector(metrics: Arc<Metrics>, sample_interval: Duration) {
 
     loop {
         ticker.tick().await;
-        collect_once(&mut sys, &metrics);
+        collect_once(&mut sys, &metrics, unit);
     }
 }
 
-fn collect_once(sys: &mut System, m: &Metrics) {
+fn collect_once(sys: &mut System, m: &Metrics, unit: Unit) {
+    let factor = unit.from_percent_factor();
+
     sys.refresh_cpu_all();
     let cpus = sys.cpus();
-    let mut sum = 0.0_f64;
+    let mut sum_pct = 0.0_f64;
     for (i, cpu) in cpus.iter().enumerate() {
-        let v = cpu.cpu_usage() as f64 / 100.0;
-        m.cpu_usage_ratio
+        let pct = cpu.cpu_usage() as f64;
+        m.cpu_usage
             .get_or_create(&CpuLabels { cpu: i.to_string() })
-            .set(v);
-        sum += v;
+            .set(pct * factor);
+        sum_pct += pct;
     }
     if !cpus.is_empty() {
-        m.cpu_usage_ratio
-            .get_or_create(&CpuLabels {
-                cpu: "total".to_string(),
-            })
-            .set(sum / cpus.len() as f64);
+        m.cpu_usage
+            .get_or_create(&CpuLabels { cpu: "total".to_string() })
+            .set(sum_pct / cpus.len() as f64 * factor);
     }
 
     sys.refresh_memory();
@@ -127,15 +164,15 @@ fn collect_once(sys: &mut System, m: &Metrics) {
     m.mem_total_bytes.set(total);
     m.mem_used_bytes.set(used);
     m.mem_available_bytes.set(sys.available_memory() as f64);
-    m.mem_used_ratio
-        .set(if total > 0.0 { used / total } else { 0.0 });
+    let mem_pct = if total > 0.0 { used / total * 100.0 } else { 0.0 };
+    m.mem_used.set(mem_pct * factor);
 
     let stotal = sys.total_swap() as f64;
     let sused = sys.used_swap() as f64;
     m.swap_total_bytes.set(stotal);
     m.swap_used_bytes.set(sused);
-    m.swap_used_ratio
-        .set(if stotal > 0.0 { sused / stotal } else { 0.0 });
+    let swap_pct = if stotal > 0.0 { sused / stotal * 100.0 } else { 0.0 };
+    m.swap_used.set(swap_pct * factor);
 
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)

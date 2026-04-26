@@ -17,7 +17,7 @@ use prometheus_client::registry::Registry;
 use tokio::net::TcpListener;
 use tokio::signal;
 
-use crate::collector::{build_metrics, run_collector};
+use crate::collector::{build_metrics, run_collector, Unit};
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -41,21 +41,23 @@ async fn main() -> Result<()> {
     let args = Args::parse();
     let cfg = config::load(&args.config)
         .with_context(|| format!("load config {}", args.config.display()))?;
+    let unit = Unit::from_str(&cfg.collector.unit)?;
     tracing::info!(
-        "loaded config from {}: addr={} path={} interval={:?}",
+        "loaded config from {}: addr={} path={} interval={:?} unit={}",
         args.config.display(),
         cfg.server.listen_addr,
         cfg.server.metrics_path,
-        cfg.collector.interval
+        cfg.collector.interval,
+        cfg.collector.unit,
     );
 
-    let (registry, metrics) = build_metrics();
+    let (registry, metrics) = build_metrics(unit);
     let state = Arc::new(AppState { registry });
 
     let collector_metrics = metrics.clone();
     let interval = cfg.collector.interval;
     let collector_handle = tokio::spawn(async move {
-        run_collector(collector_metrics, interval).await;
+        run_collector(collector_metrics, unit, interval).await;
     });
 
     let app = Router::new()

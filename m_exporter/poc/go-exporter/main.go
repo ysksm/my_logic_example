@@ -23,11 +23,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("load config: %v", err)
 	}
-	log.Printf("loaded config from %s: addr=%s path=%s interval=%s",
-		*configPath, cfg.Server.ListenAddr, cfg.Server.MetricsPath, cfg.Collector.Interval.Duration)
+	log.Printf("loaded config from %s: addr=%s path=%s interval=%s unit=%s",
+		*configPath, cfg.Server.ListenAddr, cfg.Server.MetricsPath, cfg.Collector.Interval.Duration, cfg.Collector.Unit)
 
 	reg := prometheus.NewRegistry()
-	registerMetrics(reg)
+	if err := registerMetrics(reg, cfg.Collector.Unit); err != nil {
+		log.Fatalf("register metrics: %v", err)
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

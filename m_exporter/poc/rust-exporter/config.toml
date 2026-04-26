@@ -4,3 +4,4 @@ metrics_path = "/metrics"
 
 [collector]
 interval = "5s"
+unit     = "ratio"   # "ratio" → cpu_usage_ratio (0-1) / "percent" → cpu_usage_percent (0-100)

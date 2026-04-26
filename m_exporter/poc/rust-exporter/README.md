@@ -29,6 +29,7 @@ interval = "5s"
 | `server.listen_addr`    | `0.0.0.0:9101`  | バインドアドレス（Go 版とポート分離）              |
 | `server.metrics_path`   | `/metrics`      | エンドポイント                                      |
 | `collector.interval`    | `5s`            | バックグラウンド収集の周期（humantime 形式の文字列）|
+| `collector.unit`        | `ratio`         | `"ratio"` (0-1) または `"percent"` (0-100)。後者ではメトリクス名末尾も `_percent` になる |
 
 ## 実行
 
@@ -43,11 +44,13 @@ curl -s http://127.0.0.1:9101/metrics | grep ^m_exporter_
 
 Go 版とメトリクス名・ラベル・型を揃えています:
 
-- `m_exporter_cpu_usage_ratio{cpu="0|1|...|total"}`
+- `m_exporter_cpu_usage_{ratio,percent}{cpu="0|1|...|total"}`
 - `m_exporter_memory_{total,used,available}_bytes`
-- `m_exporter_memory_used_ratio`
-- `m_exporter_swap_{total,used}_bytes`、`m_exporter_swap_used_ratio`
+- `m_exporter_memory_used_{ratio,percent}`
+- `m_exporter_swap_{total,used}_bytes`、`m_exporter_swap_used_{ratio,percent}`
 - `m_exporter_collector_last_success_timestamp_seconds`
+
+`*_ratio` / `*_percent` の選択は `collector.unit` で切り替え（既定 `ratio`）。
 
 **Go 版との差分**:
 - `m_exporter_collector_errors_total` は **Rust 版では出していない**。`sysinfo` は refresh 系 API がエラーを返さないため、立てるだけ無意味な metric になるので除外

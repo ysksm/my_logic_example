@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"strconv"
 	"time"
@@ -12,10 +13,41 @@ import (
 )
 
 var (
-	cpuUsageRatio = prometheus.NewGaugeVec(
+	cpuUsage             *prometheus.GaugeVec
+	memTotalBytes        prometheus.Gauge
+	memUsedBytes         prometheus.Gauge
+	memAvailableBytes    prometheus.Gauge
+	memUsage             prometheus.Gauge
+	swapTotalBytes       prometheus.Gauge
+	swapUsedBytes        prometheus.Gauge
+	swapUsage            prometheus.Gauge
+	collectorLastSuccess prometheus.Gauge
+	collectorErrorsTotal *prometheus.CounterVec
+
+	// unitScale converts gopsutil's 0-100 percent into the configured unit.
+	// ratio:   0.01  (so 80 → 0.8)
+	// percent: 1.0   (so 80 → 80)
+	unitScale float64
+)
+
+func registerMetrics(reg prometheus.Registerer, unit string) error {
+	var (
+		suffix string
+		rng    string
+	)
+	switch unit {
+	case "ratio":
+		suffix, rng, unitScale = "ratio", "(0-1)", 0.01
+	case "percent":
+		suffix, rng, unitScale = "percent", "(0-100)", 1.0
+	default:
+		return fmt.Errorf("invalid unit %q: must be \"ratio\" or \"percent\"", unit)
+	}
+
+	cpuUsage = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "m_exporter_cpu_usage_ratio",
-			Help: "CPU usage ratio (0-1) per logical core, plus cpu=\"total\".",
+			Name: "m_exporter_cpu_usage_" + suffix,
+			Help: "CPU usage " + suffix + " " + rng + " per logical core, plus cpu=\"total\".",
 		},
 		[]string{"cpu"},
 	)
@@ -31,9 +63,9 @@ var (
 		Name: "m_exporter_memory_available_bytes",
 		Help: "Memory available for new allocations, in bytes.",
 	})
-	memUsedRatio = prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "m_exporter_memory_used_ratio",
-		Help: "Used memory ratio (0-1).",
+	memUsage = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "m_exporter_memory_used_" + suffix,
+		Help: "Used memory " + suffix + " " + rng + ".",
 	})
 	swapTotalBytes = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "m_exporter_swap_total_bytes",
@@ -43,9 +75,9 @@ var (
 		Name: "m_exporter_swap_used_bytes",
 		Help: "Used swap in bytes.",
 	})
-	swapUsedRatio = prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "m_exporter_swap_used_ratio",
-		Help: "Used swap ratio (0-1).",
+	swapUsage = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "m_exporter_swap_used_" + suffix,
+		Help: "Used swap " + suffix + " " + rng + ".",
 	})
 	collectorLastSuccess = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "m_exporter_collector_last_success_timestamp_seconds",
@@ -58,19 +90,17 @@ var (
 		},
 		[]string{"source"},
 	)
-)
 
-func registerMetrics(reg prometheus.Registerer) {
 	reg.MustRegister(
-		cpuUsageRatio,
-		memTotalBytes, memUsedBytes, memAvailableBytes, memUsedRatio,
-		swapTotalBytes, swapUsedBytes, swapUsedRatio,
+		cpuUsage,
+		memTotalBytes, memUsedBytes, memAvailableBytes, memUsage,
+		swapTotalBytes, swapUsedBytes, swapUsage,
 		collectorLastSuccess, collectorErrorsTotal,
 	)
+	return nil
 }
 
 func runCollector(ctx context.Context, interval time.Duration) {
-	// Seed CPU baseline so the first tick produces a meaningful delta.
 	if _, err := cpu.PercentWithContext(ctx, 0, true); err != nil {
 		log.Printf("collector: cpu seed failed: %v", err)
 	}
@@ -99,11 +129,11 @@ func collectOnce(ctx context.Context) {
 	} else {
 		var sum float64
 		for i, p := range perCore {
-			cpuUsageRatio.WithLabelValues(strconv.Itoa(i)).Set(p / 100.0)
+			cpuUsage.WithLabelValues(strconv.Itoa(i)).Set(p * unitScale)
 			sum += p
 		}
 		if n := len(perCore); n > 0 {
-			cpuUsageRatio.WithLabelValues("total").Set(sum / float64(n) / 100.0)
+			cpuUsage.WithLabelValues("total").Set(sum / float64(n) * unitScale)
 		}
 	}
 
@@ -115,7 +145,7 @@ func collectOnce(ctx context.Context) {
 		memTotalBytes.Set(float64(vm.Total))
 		memUsedBytes.Set(float64(vm.Used))
 		memAvailableBytes.Set(float64(vm.Available))
-		memUsedRatio.Set(vm.UsedPercent / 100.0)
+		memUsage.Set(vm.UsedPercent * unitScale)
 	}
 
 	if sm, err := mem.SwapMemoryWithContext(ctx); err != nil {
@@ -125,7 +155,7 @@ func collectOnce(ctx context.Context) {
 	} else {
 		swapTotalBytes.Set(float64(sm.Total))
 		swapUsedBytes.Set(float64(sm.Used))
-		swapUsedRatio.Set(sm.UsedPercent / 100.0)
+		swapUsage.Set(sm.UsedPercent * unitScale)
 	}
 
 	if ok {

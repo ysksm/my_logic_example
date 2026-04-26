@@ -181,18 +181,20 @@ flowchart TB
 
 | メトリクス                                            | 型      | ラベル | 値域       |
 | ----------------------------------------------------- | ------- | ------ | ---------- |
-| `m_exporter_cpu_usage_ratio`                          | Gauge   | `cpu`  | 0.0 - 1.0  |
+| `m_exporter_cpu_usage_{ratio,percent}`                | Gauge   | `cpu`  | 0-1 / 0-100 |
 | `m_exporter_memory_total_bytes`                       | Gauge   | -      | bytes      |
 | `m_exporter_memory_used_bytes`                        | Gauge   | -      | bytes      |
 | `m_exporter_memory_available_bytes`                   | Gauge   | -      | bytes      |
-| `m_exporter_memory_used_ratio`                        | Gauge   | -      | 0.0 - 1.0  |
+| `m_exporter_memory_used_{ratio,percent}`              | Gauge   | -      | 0-1 / 0-100 |
 | `m_exporter_swap_total_bytes`                         | Gauge   | -      | bytes      |
 | `m_exporter_swap_used_bytes`                          | Gauge   | -      | bytes      |
-| `m_exporter_swap_used_ratio`                          | Gauge   | -      | 0.0 - 1.0  |
+| `m_exporter_swap_used_{ratio,percent}`                | Gauge   | -      | 0-1 / 0-100 |
 | `m_exporter_collector_last_success_timestamp_seconds` | Gauge   | -      | unix sec   |
 | `m_exporter_collector_errors_total`                   | Counter | `source` | (Go 側のみ) |
 
 `cpu="total"` ラベルが per-core 値の単純平均、`cpu="0".."N-1"` が各論理コア。
+比率系（cpu/memory/swap usage）の単位は `[collector] unit = "ratio"`（既定、0-1）か `unit = "percent"`（0-100）で切り替え。
+切り替えるとメトリクス名末尾も `*_ratio` / `*_percent` で変わるので、Grafana 側のクエリと合わせて差し替える。
 
 ### 3.3 言語別の依存
 
