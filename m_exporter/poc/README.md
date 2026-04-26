@@ -6,11 +6,12 @@
 
 ## ディレクトリ
 
-| ディレクトリ      | 内容                                                            | 既定ポート |
-| ----------------- | --------------------------------------------------------------- | ---------- |
-| `go-exporter/`    | Go 実装。`net/http` + `prometheus/client_golang` + `gopsutil`   | `9100`     |
-| `rust-exporter/`  | Rust 実装。`axum` + `prometheus-client` + `sysinfo`             | `9101`     |
-| `infra/`          | Prometheus 3.5.2 + Grafana 13.0.1 をローカル起動するスクリプト  | `9090`/`3000` |
+| ディレクトリ        | 内容                                                                       | 既定ポート       |
+| ------------------- | -------------------------------------------------------------------------- | ---------------- |
+| `go-exporter/`      | Go 実装の exporter。`net/http` + `prometheus/client_golang` + `gopsutil`   | `9100`           |
+| `rust-exporter/`    | Rust 実装の exporter。`axum` + `prometheus-client` + `sysinfo`             | `9101`           |
+| `infra/`            | Prometheus 3.5.2 + Grafana 13.0.1 をローカル起動するスクリプト             | `9090` / `3000`  |
+| `mini-prometheus/`  | Prometheus 本体相当 (TSDB + scrape + PromQL + HTTP API) の最小再実装       | `9092` / `9093`  |
 
 ## 共通スコープ
 
@@ -37,10 +38,17 @@ curl -s http://localhost:9101/metrics | grep ^m_exporter_ | head
 open http://localhost:9090/targets       # Prometheus
 open http://localhost:3000               # Grafana (admin / admin)
 
-# 4. 全部止める
-cd poc/rust-exporter && ./stop.sh
-cd ../go-exporter    && ./stop.sh
-cd ../infra          && ./stop.sh
+# 4. （任意）本家 Prometheus の代わりに mini-prom を使う
+cd ../mini-prometheus/go    && ./start.sh    # :9092
+cd ../rust                  && ./start.sh    # :9093
+curl -s 'http://localhost:9092/api/v1/query?query=sum(m_exporter_cpu_usage_ratio)by(cpu)' | jq
+
+# 5. 全部止める
+cd poc/rust-exporter        && ./stop.sh
+cd ../go-exporter           && ./stop.sh
+cd ../infra                 && ./stop.sh
+cd ../mini-prometheus/go    && ./stop.sh
+cd ../rust                  && ./stop.sh
 ```
 
 ## 各サービスの runtime 配置
@@ -53,6 +61,8 @@ cd ../infra          && ./stop.sh
 | `rust-exporter`  | `poc/rust-exporter/.run/exporter.pid` | `poc/rust-exporter/.run/exporter.log` |
 | Prometheus       | `poc/infra/data/prometheus.pid`    | `poc/infra/data/logs/prometheus.log` |
 | Grafana          | `poc/infra/data/grafana.pid`       | `poc/infra/data/logs/grafana.log`    |
+| mini-prom (go)   | `poc/mini-prometheus/go/.run/server.pid`   | `poc/mini-prometheus/go/.run/server.log`   |
+| mini-prom (rust) | `poc/mini-prometheus/rust/.run/server.pid` | `poc/mini-prometheus/rust/.run/server.log` |
 
 ## Prometheus scrape 設定
 
