@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 )
@@ -20,10 +21,29 @@ func main() {
 	if err != nil {
 		log.Fatalf("load config: %v", err)
 	}
-	log.Printf("loaded config from %s: addr=%s retention=%d jobs=%d",
-		*configPath, cfg.Server.ListenAddr, cfg.Storage.RetentionSamples, len(cfg.Scrape))
+	log.Printf("loaded config from %s: addr=%s retention=%d jobs=%d data_dir=%q snapshot=%s",
+		*configPath, cfg.Server.ListenAddr, cfg.Storage.RetentionSamples, len(cfg.Scrape),
+		cfg.Storage.DataDir, cfg.Storage.SnapshotInterval.Duration)
 
 	storage := NewStorage(cfg.Storage.RetentionSamples)
+
+	snapshotPath := ""
+	if cfg.Storage.DataDir != "" {
+		if err := os.MkdirAll(cfg.Storage.DataDir, 0o755); err != nil {
+			log.Fatalf("create data_dir %q: %v", cfg.Storage.DataDir, err)
+		}
+		snapshotPath = filepath.Join(cfg.Storage.DataDir, "snapshot.json")
+		if data, err := os.ReadFile(snapshotPath); err == nil {
+			if n, err := storage.Restore(data); err != nil {
+				log.Printf("restore snapshot %s: %v", snapshotPath, err)
+			} else {
+				log.Printf("restored %d series from %s", n, snapshotPath)
+			}
+		} else if !errors.Is(err, os.ErrNotExist) {
+			log.Printf("read snapshot %s: %v", snapshotPath, err)
+		}
+	}
+
 	scrape := NewScrapeManager(cfg.Scrape, storage)
 	api := &API{storage: storage, scrape: scrape}
 
@@ -31,8 +51,13 @@ func main() {
 	defer stop()
 	scrape.Run(ctx)
 
+	if snapshotPath != "" && cfg.Storage.SnapshotInterval.Duration > 0 {
+		go runSnapshotLoop(ctx, snapshotPath, storage, cfg.Storage.SnapshotInterval.Duration)
+	}
+
 	mux := http.NewServeMux()
 	api.Routes(mux)
+	mux.HandleFunc("/graph", graphHandler())
 	mux.HandleFunc("/", indexHandler(scrape))
 
 	srv := &http.Server{
@@ -58,5 +83,28 @@ func main() {
 	defer cancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Printf("server shutdown: %v", err)
+	}
+
+	if snapshotPath != "" {
+		if err := WriteSnapshot(snapshotPath, storage); err != nil {
+			log.Printf("final snapshot: %v", err)
+		} else {
+			log.Printf("final snapshot written to %s", snapshotPath)
+		}
+	}
+}
+
+func runSnapshotLoop(ctx context.Context, path string, st *Storage, interval time.Duration) {
+	t := time.NewTicker(interval)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			if err := WriteSnapshot(path, st); err != nil {
+				log.Printf("snapshot %s: %v", path, err)
+			}
+		}
 	}
 }

@@ -19,7 +19,9 @@ type ServerConfig struct {
 }
 
 type StorageConfig struct {
-	RetentionSamples int `toml:"retention_samples"`
+	RetentionSamples int      `toml:"retention_samples"`
+	DataDir          string   `toml:"data_dir"`
+	SnapshotInterval duration `toml:"snapshot_interval"`
 }
 
 type ScrapeConfig struct {
@@ -61,6 +63,9 @@ func loadConfig(path string) (*Config, error) {
 	}
 	if c.Storage.RetentionSamples <= 0 {
 		c.Storage.RetentionSamples = 720
+	}
+	if c.Storage.SnapshotInterval.Duration < 0 {
+		c.Storage.SnapshotInterval.Duration = 0
 	}
 	for _, s := range c.Scrape {
 		if s.MetricsPath == "" {

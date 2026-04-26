@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>mini-prometheus / graph</title>
+<style>
+  body { font-family: sans-serif; margin: 1.5rem; color: #222; }
+  h1 a { color: inherit; text-decoration: none; }
+  .controls { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; margin-bottom: 1rem; }
+  .controls input, .controls button, .controls label { font-size: 14px; }
+  .controls input { padding: .35rem .5rem; border: 1px solid #bbb; }
+  .controls input[name=expr] { flex: 1; min-width: 28em; font-family: monospace; }
+  .controls button { padding: .4rem 1rem; cursor: pointer; }
+  #chart-wrap { border: 1px solid #ddd; padding: .5rem; }
+  #chart { width: 100%; height: 360px; display: block; }
+  table { border-collapse: collapse; margin-top: .8rem; font-size: 13px; }
+  th, td { border: 1px solid #ccc; padding: .3rem .6rem; text-align: left; }
+  th { background: #eee; }
+  .legend { display: flex; flex-wrap: wrap; gap: .8rem; margin-top: .5rem; font-size: 12px; }
+  .legend-swatch { display: inline-block; width: 1em; height: .8em; vertical-align: middle; margin-right: .3em; border-radius: 2px; }
+  .err { color: #c00; padding: .5rem 0; }
+  .muted { color: #888; font-size: 12px; }
+  .examples { margin: 0 0 .5rem 0; padding: 0; list-style: none; font-size: 12px; }
+  .examples li { display: inline-block; margin-right: .5rem; }
+  .examples a { color: #06c; cursor: pointer; }
+</style>
+</head>
+<body>
+<h1><a href="/">mini-prometheus</a> / graph</h1>
+<form id="qform" class="controls">
+  <input name="expr" placeholder='m_exporter_cpu_usage_ratio{cpu="total"}'>
+  <label><input type="radio" name="type" value="instant"> Instant</label>
+  <label><input type="radio" name="type" value="range" checked> Range</label>
+  <span>Range: <input name="range" value="15m" size="6"></span>
+  <span>Step: <input name="step" value="15s" size="6"></span>
+  <span>End: <input name="end" placeholder="now" size="22"></span>
+  <button type="submit">Execute</button>
+</form>
+<ul class="examples">
+  <li>quick:</li>
+  <li><a data-q='up'>up</a></li>
+  <li><a data-q='m_exporter_cpu_usage_ratio{cpu="total"}'>m_exporter_cpu_usage_ratio{cpu="total"}</a></li>
+  <li><a data-q='m_exporter_memory_used_ratio'>m_exporter_memory_used_ratio</a></li>
+  <li><a data-q='sum by (job) (m_exporter_cpu_usage_ratio)'>sum by (job) (m_exporter_cpu_usage_ratio)</a></li>
+  <li><a data-q='rate(m_exporter_collector_errors_total[5m])'>rate(...errors_total[5m])</a></li>
+</ul>
+<div id="status"></div>
+<div id="chart-wrap"><canvas id="chart" width="1400" height="360"></canvas></div>
+<div id="legend" class="legend"></div>
+<div id="table"></div>
+
+<script>
+const COLORS = ['#1f77b4','#ff7f0e','#2ca02c','#d62728','#9467bd','#8c564b','#e377c2','#7f7f7f','#bcbd22','#17becf'];
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+}
+function parseDur(s) {
+  const m = /^(\d+)(ms|s|m|h|d)$/.exec((s||'').trim());
+  if (!m) return 0;
+  const n = parseInt(m[1], 10);
+  const u = { ms: 0.001, s: 1, m: 60, h: 3600, d: 86400 }[m[2]];
+  return n * u;
+}
+function toUnix(s) {
+  s = (s||'').trim();
+  if (!s) return Math.floor(Date.now() / 1000);
+  if (/^\d+(\.\d+)?$/.test(s)) return parseFloat(s);
+  const d = new Date(s);
+  return isNaN(d) ? Math.floor(Date.now() / 1000) : Math.floor(d.getTime() / 1000);
+}
+function labelString(metric) {
+  const name = metric['__name__'] || '';
+  const rest = Object.entries(metric).filter(([k]) => k !== '__name__')
+    .map(([k,v]) => k + '="' + v + '"').join(',');
+  return name + (rest ? '{' + rest + '}' : '');
+}
+
+async function run(ev) {
+  if (ev) ev.preventDefault();
+  const f = document.getElementById('qform');
+  const expr = f.expr.value.trim();
+  const type = (f.type.value || 'range');
+  const status = document.getElementById('status');
+  status.innerHTML = '';
+  document.getElementById('table').innerHTML = '';
+  clearChart();
+  if (!expr) return;
+
+  const params = new URLSearchParams();
+  params.set('query', expr);
+  let url;
+  if (type === 'instant') {
+    if (f.end.value.trim()) params.set('time', toUnix(f.end.value));
+    url = '/api/v1/query?' + params;
+  } else {
+    const endTs = toUnix(f.end.value);
+    const rangeSec = parseDur(f.range.value) || 900;
+    const stepSec  = parseDur(f.step.value)  || 15;
+    params.set('start', (endTs - rangeSec).toFixed(0));
+    params.set('end',   endTs.toFixed(0));
+    params.set('step',  stepSec);
+    url = '/api/v1/query_range?' + params;
+  }
+
+  const t0 = performance.now();
+  let res;
+  try {
+    res = await fetch(url, { headers: { 'Accept': 'application/json' } }).then(r => r.json());
+  } catch (e) {
+    status.innerHTML = '<div class="err">fetch failed: ' + escapeHtml(e.message) + '</div>';
+    return;
+  }
+  const dt = (performance.now() - t0).toFixed(0);
+  if (res.status !== 'success') {
+    status.innerHTML = '<div class="err">' + escapeHtml((res.errorType || '') + ': ' + (res.error || '')) + '</div>';
+    return;
+  }
+  const n = (res.data && res.data.result) ? res.data.result.length : 0;
+  status.innerHTML = '<span class="muted">' + n + ' series &middot; ' + dt + ' ms</span>';
+
+  if (type === 'instant') renderInstant(res.data);
+  else renderRange(res.data);
+}
+
+function renderInstant(data) {
+  const tbl = document.getElementById('table');
+  if (data.resultType === 'scalar') {
+    tbl.innerHTML = '<table><tr><th>scalar</th></tr><tr><td>' + escapeHtml(data.result[1]) + '</td></tr></table>';
+    return;
+  }
+  if (data.resultType !== 'vector') {
+    tbl.innerHTML = '<pre>' + escapeHtml(JSON.stringify(data, null, 2)) + '</pre>';
+    return;
+  }
+  let h = '<table><tr><th>series</th><th>value</th></tr>';
+  for (const r of data.result) {
+    h += '<tr><td>' + escapeHtml(labelString(r.metric)) + '</td>'
+       + '<td>' + escapeHtml(r.value[1]) + '</td></tr>';
+  }
+  h += '</table>';
+  tbl.innerHTML = h;
+}
+
+function renderRange(data) {
+  if (data.resultType !== 'matrix') {
+    document.getElementById('table').innerHTML = '<pre>' + escapeHtml(JSON.stringify(data, null, 2)) + '</pre>';
+    return;
+  }
+  drawChart(data.result);
+}
+
+function clearChart() {
+  const c = document.getElementById('chart');
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, c.width, c.height);
+  document.getElementById('legend').innerHTML = '';
+}
+
+function fitCanvas() {
+  const c = document.getElementById('chart');
+  const ratio = window.devicePixelRatio || 1;
+  const cssW = c.clientWidth || 1200;
+  const cssH = 360;
+  c.width  = cssW  * ratio;
+  c.height = cssH * ratio;
+  c.style.height = cssH + 'px';
+  const ctx = c.getContext('2d');
+  ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+  return { ctx, W: cssW, H: cssH };
+}
+
+function drawChart(matrix) {
+  const { ctx, W, H } = fitCanvas();
+  const padL = 60, padR = 20, padT = 20, padB = 36;
+  ctx.clearRect(0, 0, W, H);
+  if (!matrix.length) {
+    ctx.fillStyle = '#888';
+    ctx.font = '14px sans-serif';
+    ctx.fillText('(no data)', padL, padT + 20);
+    return;
+  }
+
+  let tmin = Infinity, tmax = -Infinity, vmin = Infinity, vmax = -Infinity;
+  for (const s of matrix) {
+    for (const [t, v] of s.values) {
+      const tn = +t, vn = parseFloat(v);
+      if (!isNaN(tn)) { if (tn < tmin) tmin = tn; if (tn > tmax) tmax = tn; }
+      if (!isNaN(vn)) { if (vn < vmin) vmin = vn; if (vn > vmax) vmax = vn; }
+    }
+  }
+  if (!isFinite(tmin) || !isFinite(vmin)) {
+    ctx.fillStyle = '#888'; ctx.font = '14px sans-serif';
+    ctx.fillText('(no plottable points)', padL, padT + 20);
+    return;
+  }
+  if (vmin === vmax) { vmax = vmin + 1; }
+  if (tmin === tmax) { tmax = tmin + 1; }
+
+  const x = t => padL + (t - tmin) / (tmax - tmin) * (W - padL - padR);
+  const y = v => H - padB - (v - vmin) / (vmax - vmin) * (H - padT - padB);
+
+  // grid + axes
+  ctx.strokeStyle = '#888';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(padL, padT); ctx.lineTo(padL, H - padB); ctx.lineTo(W - padR, H - padB);
+  ctx.stroke();
+  ctx.fillStyle = '#333';
+  ctx.font = '11px sans-serif';
+  ctx.textBaseline = 'middle';
+  for (let i = 0; i <= 5; i++) {
+    const v = vmin + (vmax - vmin) * i / 5;
+    const py = y(v);
+    ctx.strokeStyle = '#eee';
+    ctx.beginPath(); ctx.moveTo(padL, py); ctx.lineTo(W - padR, py); ctx.stroke();
+    ctx.strokeStyle = '#888';
+    ctx.beginPath(); ctx.moveTo(padL - 4, py); ctx.lineTo(padL, py); ctx.stroke();
+    ctx.fillText(formatNumber(v), 6, py);
+  }
+  ctx.textBaseline = 'top';
+  for (let i = 0; i <= 4; i++) {
+    const t = tmin + (tmax - tmin) * i / 4;
+    const px = x(t);
+    ctx.beginPath(); ctx.moveTo(px, H - padB); ctx.lineTo(px, H - padB + 4); ctx.stroke();
+    const d = new Date(t * 1000);
+    ctx.fillText(d.toLocaleTimeString(), px - 28, H - padB + 6);
+  }
+
+  // lines
+  let leg = '';
+  matrix.forEach((s, idx) => {
+    const color = COLORS[idx % COLORS.length];
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    let first = true;
+    for (const [t, v] of s.values) {
+      const vn = parseFloat(v);
+      if (isNaN(vn)) { first = true; continue; }
+      const px = x(+t), py = y(vn);
+      if (first) { ctx.moveTo(px, py); first = false; }
+      else        { ctx.lineTo(px, py); }
+    }
+    ctx.stroke();
+    leg += '<div><span class="legend-swatch" style="background:' + color + '"></span>'
+         + escapeHtml(labelString(s.metric)) + '</div>';
+  });
+  document.getElementById('legend').innerHTML = leg;
+}
+
+function formatNumber(v) {
+  if (v === 0) return '0';
+  const a = Math.abs(v);
+  if (a >= 1e9 || a < 1e-3) return v.toExponential(2);
+  if (a >= 100)  return v.toFixed(1);
+  if (a >= 1)    return v.toFixed(3);
+  return v.toFixed(4);
+}
+
+document.getElementById('qform').addEventListener('submit', run);
+document.querySelectorAll('.examples a').forEach(a => {
+  a.addEventListener('click', e => {
+    e.preventDefault();
+    document.querySelector('input[name=expr]').value = a.dataset.q;
+    run(null);
+  });
+});
+
+// Initial query (preset to a useful starter expression)
+window.addEventListener('load', () => {
+  const f = document.getElementById('qform');
+  if (!f.expr.value) f.expr.value = 'm_exporter_cpu_usage_ratio{cpu="total"}';
+  run(null);
+});
+</script>
+</body>
+</html>

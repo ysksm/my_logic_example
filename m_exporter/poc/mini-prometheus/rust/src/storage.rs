@@ -262,4 +262,24 @@ impl Storage {
             .map(|set| set.iter().cloned().collect())
             .unwrap_or_default()
     }
+
+    /// Iterate over every series, mapping it to T via the closure.
+    /// The closure receives the labels and a flat (oldest-to-newest) sample slice.
+    pub fn iter_series_for_snapshot<F, T>(&self, f: F) -> Vec<T>
+    where
+        F: Fn(&Labels, &[Sample]) -> T,
+    {
+        let g = self.inner.read().unwrap();
+        let mut out = Vec::with_capacity(g.series.len());
+        for s in g.series.values() {
+            let s = s.read().unwrap();
+            let mut samples = Vec::with_capacity(s.size);
+            for i in 0..s.size {
+                let idx = (s.head + s.capacity - s.size + i) % s.capacity;
+                samples.push(s.samples[idx]);
+            }
+            out.push(f(&s.labels, &samples));
+        }
+        out
+    }
 }

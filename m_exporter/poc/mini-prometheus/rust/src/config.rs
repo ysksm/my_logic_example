@@ -30,13 +30,22 @@ fn default_listen_addr() -> String { "0.0.0.0:9093".into() }
 pub struct StorageConfig {
     #[serde(default = "default_retention")]
     pub retention_samples: usize,
+    #[serde(default)]
+    pub data_dir: String,
+    #[serde(with = "humantime_serde", default = "default_snapshot_interval")]
+    pub snapshot_interval: Duration,
 }
 impl Default for StorageConfig {
     fn default() -> Self {
-        Self { retention_samples: default_retention() }
+        Self {
+            retention_samples: default_retention(),
+            data_dir: String::new(),
+            snapshot_interval: default_snapshot_interval(),
+        }
     }
 }
 fn default_retention() -> usize { 720 }
+fn default_snapshot_interval() -> Duration { Duration::from_secs(30) }
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct ScrapeConfig {

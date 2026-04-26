@@ -32,6 +32,7 @@ pub fn router(state: AppState) -> Router {
         .route("/-/healthy", get(ok))
         .route("/-/ready", get(ok))
         .route("/", get(crate::web::index))
+        .route("/graph", get(crate::web::graph))
         .with_state(state)
 }
 
