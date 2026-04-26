@@ -18,10 +18,11 @@ PROM_URL="https://github.com/prometheus/prometheus/releases/download/v${PROM_VER
 
 GRAFANA_VERSION="13.0.1"
 GRAFANA_BUILD_ID="24542347077"
-GRAFANA_ARCH="darwin_amd64"
-GRAFANA_TARBALL="grafana_${GRAFANA_VERSION}_${GRAFANA_BUILD_ID}_${GRAFANA_ARCH}.tar.gz"
-GRAFANA_URL="https://dl.grafana.com/grafana/release/${GRAFANA_VERSION}/${GRAFANA_TARBALL}"
-GRAFANA_DIR_NAME="grafana-${GRAFANA_VERSION}"
+GRAFANA_ARCH="darwin_arm64"
+GRAFANA_PKG="grafana-enterprise"
+GRAFANA_TARBALL="${GRAFANA_PKG}_${GRAFANA_VERSION}_${GRAFANA_BUILD_ID}_${GRAFANA_ARCH}.tar.gz"
+GRAFANA_URL="https://dl.grafana.com/${GRAFANA_PKG}/release/${GRAFANA_VERSION}/${GRAFANA_TARBALL}"
+GRAFANA_DIR_NAME="${GRAFANA_PKG}-${GRAFANA_VERSION}"
 
 mkdir -p \
   "$DOWNLOADS" \

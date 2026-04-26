@@ -10,7 +10,10 @@ INFRA_DIR="$(pwd)"
 DATA_DIR="$INFRA_DIR/data"
 
 PROM_HOME="$(echo "$DATA_DIR"/prometheus-*.darwin-* 2>/dev/null | awk '{print $1}')"
-GRAFANA_HOME="$(echo "$DATA_DIR"/grafana-[0-9]* 2>/dev/null | awk '{print $1}')"
+GRAFANA_HOME=""
+for d in "$DATA_DIR"/grafana-*; do
+  [ -x "$d/bin/grafana" ] && GRAFANA_HOME="$d"
+done
 
 if [ ! -x "${PROM_HOME:-}/prometheus" ]; then
   echo "Prometheus not found under $DATA_DIR. Run ./init.sh first." >&2
