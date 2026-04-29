@@ -2,10 +2,14 @@ import type { CaptureGateway } from "@application/ports";
 import type {
   CaptureSession,
   ListInterfacesResponse,
+  ListPeersResponse,
   ListSessionsResponse,
   NetworkInterface,
+  OUIResponse,
+  Peer,
   StartCaptureRequest,
   StartCaptureResponse,
+  StatsResponse,
   StopCaptureResponse,
 } from "@domain/idl";
 
@@ -44,6 +48,34 @@ export class HttpCaptureGateway implements CaptureGateway {
     await throwIfErr(r);
     const body = (await r.json()) as StopCaptureResponse;
     return body.session;
+  }
+
+  async listPeers(id: string, kind?: "ip" | "mac"): Promise<Peer[]> {
+    const url = new URL(
+      `${this.baseUrl || location.origin}/api/v1/sessions/${encodeURIComponent(id)}/peers`,
+    );
+    if (kind) url.searchParams.set("kind", kind);
+    const r = await fetch(url.toString().replace(location.origin, this.baseUrl));
+    await throwIfErr(r);
+    const body = (await r.json()) as ListPeersResponse;
+    return body.peers ?? [];
+  }
+
+  async stats(id: string, top?: number): Promise<StatsResponse> {
+    const url = new URL(
+      `${this.baseUrl || location.origin}/api/v1/sessions/${encodeURIComponent(id)}/stats`,
+    );
+    if (top) url.searchParams.set("top", String(top));
+    const r = await fetch(url.toString().replace(location.origin, this.baseUrl));
+    await throwIfErr(r);
+    return (await r.json()) as StatsResponse;
+  }
+
+  async lookupVendor(mac: string): Promise<string> {
+    const r = await fetch(`${this.baseUrl}/api/v1/oui/${encodeURIComponent(mac)}`);
+    await throwIfErr(r);
+    const body = (await r.json()) as OUIResponse;
+    return body.vendor;
   }
 }
 

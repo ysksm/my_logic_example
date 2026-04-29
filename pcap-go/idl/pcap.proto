@@ -35,6 +35,123 @@ message Packet {
   string dst = 11;               // best-effort dst
   string summary = 12;           // single-line description
   bytes  payload = 13;           // optional, base64 in JSON
+  Layers layers = 14;            // per-layer structured detail
+}
+
+message Layers {
+  EthernetLayer ethernet = 1;
+  IPLayer        ip      = 2;
+  TCPLayer       tcp     = 3;
+  UDPLayer       udp     = 4;
+  ICMPLayer      icmp    = 5;
+  DNSLayer       dns     = 6;
+  HTTPLayer      http    = 7;
+  TLSLayer       tls     = 8;
+}
+
+message EthernetLayer {
+  string src_mac    = 1;
+  string dst_mac    = 2;
+  string src_vendor = 3;   // resolved via OUI; "" when unknown
+  string dst_vendor = 4;
+  string ether_type = 5;   // "IPv4", "IPv6", "ARP", ...
+}
+
+message IPLayer {
+  uint32 version       = 1;   // 4 or 6
+  string src           = 2;
+  string dst           = 3;
+  uint32 ttl           = 4;   // hop_limit for IPv6
+  uint32 protocol      = 5;
+  string protocol_name = 6;   // "TCP", "UDP", "ICMP", ...
+  uint32 length        = 7;
+  string flags         = 8;   // "DF", "MF", ...
+}
+
+message TCPLayer {
+  uint32 src_port = 1;
+  uint32 dst_port = 2;
+  uint32 seq      = 3;
+  uint32 ack      = 4;
+  uint32 window   = 5;
+  string flags    = 6;   // "SYN,ACK"
+  uint32 length   = 7;   // payload length
+}
+
+message UDPLayer {
+  uint32 src_port = 1;
+  uint32 dst_port = 2;
+  uint32 length   = 3;
+}
+
+message ICMPLayer {
+  string type = 1;   // "EchoRequest", "EchoReply", ...
+  uint32 code = 2;
+}
+
+message DNSLayer {
+  string opcode    = 1;
+  bool   response  = 2;
+  string rcode     = 3;
+  repeated string questions = 4;  // qname/qtype list
+  repeated string answers   = 5;  // string-form RRs
+}
+
+message HTTPLayer {
+  string method      = 1;   // request only
+  string path        = 2;
+  string host        = 3;
+  uint32 status_code = 4;   // response only
+  string user_agent  = 5;
+  string content_type = 6;
+}
+
+message TLSLayer {
+  string version    = 1;   // "TLS 1.2", "TLS 1.3", ...
+  string handshake  = 2;   // "ClientHello", "ServerHello", ...
+  string sni        = 3;
+}
+
+message Peer {
+  string kind        = 1;   // "ip" | "mac"
+  string address     = 2;   // IP or MAC string
+  string vendor      = 3;   // for MAC peers
+  uint64 packets     = 4;
+  uint64 bytes       = 5;
+  uint64 sent        = 6;   // packets observed as src
+  uint64 received    = 7;   // packets observed as dst
+  string first_seen  = 8;
+  string last_seen   = 9;
+}
+
+message ProtocolStat {
+  string name  = 1;   // "TCP" / "UDP" / "ICMPv4" / "OTHER"
+  uint64 count = 2;
+  uint64 bytes = 3;
+}
+
+message RateBucket {
+  string ts    = 1;   // RFC3339 of bucket start (1s granularity)
+  uint64 count = 2;
+  uint64 bytes = 3;
+}
+
+message StatsResponse {
+  uint64 total_packets = 1;
+  uint64 total_bytes   = 2;
+  repeated ProtocolStat transport   = 3;   // by transport layer
+  repeated ProtocolStat application = 4;   // by application layer
+  repeated Peer top_peers = 5;             // top-N by packets
+  repeated RateBucket rate = 6;            // last 60s
+}
+
+message ListPeersResponse {
+  repeated Peer peers = 1;
+}
+
+message OUIResponse {
+  string mac    = 1;
+  string vendor = 2;
 }
 
 message CaptureSession {

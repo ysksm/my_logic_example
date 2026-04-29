@@ -11,6 +11,16 @@ binary that exposes both a CLI and an embedded Web UI.
 - WebSocket live stream of decoded packets.
 - IDL-first contract: `idl/pcap.proto` is the single source of truth between
   backend and frontend.
+- Per-layer decoded detail (Ethernet, IPv4/IPv6, TCP, UDP, ICMP, DNS, HTTP,
+  TLS) with a Wireshark-style detail pane.
+- MAC → vendor lookup using an embedded OUI table (Apple, Intel, Cisco,
+  Samsung, Espressif, Raspberry Pi, …).
+- Peer list (IP + MAC peers with vendor, packets / bytes / sent / received,
+  first/last seen).
+- Visualization: transport / application protocol distribution, top peers,
+  60-second packet-rate sparkline.
+- Filter bar: free-text (host, vendor, SNI, summary), address, port,
+  protocol toggle (TCP/UDP/ICMPv4/DNS/TLS/HTTP).
 
 ## Repository layout
 
@@ -90,7 +100,10 @@ See `idl/README.md` for the full contract. Quick reference:
 | POST   | `/api/v1/sessions`                    |
 | DELETE | `/api/v1/sessions/{id}`               |
 | GET    | `/api/v1/sessions/{id}/packets`       |
+| GET    | `/api/v1/sessions/{id}/peers`         |
+| GET    | `/api/v1/sessions/{id}/stats`         |
 | GET    | `/api/v1/sessions/{id}/stream` (WS)   |
+| GET    | `/api/v1/oui/{mac}`                   |
 
 ## IDL
 

@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/google/gopacket"
@@ -88,69 +89,195 @@ func decodePacket(seq uint64, iface string, pkt gopacket.Packet) Packet {
 		Interface:     iface,
 	}
 
-	if l := pkt.LinkLayer(); l != nil {
+	// --- Link layer (Ethernet) ---
+	if eth, _ := pkt.Layer(layers.LayerTypeEthernet).(*layers.Ethernet); eth != nil {
+		p.LinkLayer = "Ethernet"
+		src := eth.SrcMAC.String()
+		dst := eth.DstMAC.String()
+		p.Layers.Ethernet = &EthernetLayer{
+			SrcMAC:    src,
+			DstMAC:    dst,
+			SrcVendor: LookupVendor(src),
+			DstVendor: LookupVendor(dst),
+			EtherType: eth.EthernetType.String(),
+		}
+		p.Src, p.Dst = src, dst
+	} else if l := pkt.LinkLayer(); l != nil {
 		p.LinkLayer = l.LayerType().String()
-		src, dst := l.LinkFlow().Endpoints()
-		p.Src, p.Dst = src.String(), dst.String()
+		s, d := l.LinkFlow().Endpoints()
+		p.Src, p.Dst = s.String(), d.String()
 	}
-	if l := pkt.NetworkLayer(); l != nil {
+
+	// --- Network layer ---
+	if ip4, _ := pkt.Layer(layers.LayerTypeIPv4).(*layers.IPv4); ip4 != nil {
+		p.NetworkLayer = "IPv4"
+		flags := []string{}
+		if ip4.Flags&layers.IPv4DontFragment != 0 {
+			flags = append(flags, "DF")
+		}
+		if ip4.Flags&layers.IPv4MoreFragments != 0 {
+			flags = append(flags, "MF")
+		}
+		p.Layers.IP = &IPLayer{
+			Version:      4,
+			Src:          ip4.SrcIP.String(),
+			Dst:          ip4.DstIP.String(),
+			TTL:          uint32(ip4.TTL),
+			Protocol:     uint32(ip4.Protocol),
+			ProtocolName: ip4.Protocol.String(),
+			Length:       uint32(ip4.Length),
+			Flags:        strings.Join(flags, ","),
+		}
+		p.Src, p.Dst = ip4.SrcIP.String(), ip4.DstIP.String()
+	} else if ip6, _ := pkt.Layer(layers.LayerTypeIPv6).(*layers.IPv6); ip6 != nil {
+		p.NetworkLayer = "IPv6"
+		p.Layers.IP = &IPLayer{
+			Version:      6,
+			Src:          ip6.SrcIP.String(),
+			Dst:          ip6.DstIP.String(),
+			TTL:          uint32(ip6.HopLimit),
+			Protocol:     uint32(ip6.NextHeader),
+			ProtocolName: ip6.NextHeader.String(),
+			Length:       uint32(ip6.Length),
+		}
+		p.Src, p.Dst = ip6.SrcIP.String(), ip6.DstIP.String()
+	} else if l := pkt.NetworkLayer(); l != nil {
 		p.NetworkLayer = l.LayerType().String()
-		src, dst := l.NetworkFlow().Endpoints()
-		p.Src, p.Dst = src.String(), dst.String()
 	}
-	if l := pkt.TransportLayer(); l != nil {
+
+	// --- Transport layer ---
+	if tcp, _ := pkt.Layer(layers.LayerTypeTCP).(*layers.TCP); tcp != nil {
+		p.TransportLayer = "TCP"
+		p.Layers.TCP = &TCPLayer{
+			SrcPort: uint32(tcp.SrcPort),
+			DstPort: uint32(tcp.DstPort),
+			Seq:     tcp.Seq,
+			Ack:     tcp.Ack,
+			Window:  uint32(tcp.Window),
+			Flags:   tcpFlags(tcp),
+			Length:  uint32(len(tcp.Payload)),
+		}
+		if p.Layers.IP != nil {
+			p.Src = net.JoinHostPort(p.Layers.IP.Src, fmt.Sprintf("%d", tcp.SrcPort))
+			p.Dst = net.JoinHostPort(p.Layers.IP.Dst, fmt.Sprintf("%d", tcp.DstPort))
+		}
+	} else if udp, _ := pkt.Layer(layers.LayerTypeUDP).(*layers.UDP); udp != nil {
+		p.TransportLayer = "UDP"
+		p.Layers.UDP = &UDPLayer{
+			SrcPort: uint32(udp.SrcPort),
+			DstPort: uint32(udp.DstPort),
+			Length:  uint32(udp.Length),
+		}
+		if p.Layers.IP != nil {
+			p.Src = net.JoinHostPort(p.Layers.IP.Src, fmt.Sprintf("%d", udp.SrcPort))
+			p.Dst = net.JoinHostPort(p.Layers.IP.Dst, fmt.Sprintf("%d", udp.DstPort))
+		}
+	} else if icmp, _ := pkt.Layer(layers.LayerTypeICMPv4).(*layers.ICMPv4); icmp != nil {
+		p.TransportLayer = "ICMPv4"
+		p.Layers.ICMP = &ICMPLayer{
+			Type: icmp.TypeCode.String(),
+			Code: uint32(icmp.TypeCode.Code()),
+		}
+	} else if l := pkt.TransportLayer(); l != nil {
 		p.TransportLayer = l.LayerType().String()
-		src, dst := l.TransportFlow().Endpoints()
-		// merge with network IP if present
-		if p.NetworkLayer != "" {
-			ns, nd := pkt.NetworkLayer().NetworkFlow().Endpoints()
-			p.Src = net.JoinHostPort(ns.String(), src.String())
-			p.Dst = net.JoinHostPort(nd.String(), dst.String())
-		} else {
-			p.Src, p.Dst = src.String(), dst.String()
+	}
+
+	// --- Application layer (best-effort) ---
+	if dns, _ := pkt.Layer(layers.LayerTypeDNS).(*layers.DNS); dns != nil {
+		p.ApplicationLayer = "DNS"
+		dl := &DNSLayer{
+			Opcode:   dns.OpCode.String(),
+			Response: dns.QR,
+			Rcode:    dns.ResponseCode.String(),
+		}
+		for _, q := range dns.Questions {
+			dl.Questions = append(dl.Questions, fmt.Sprintf("%s %s", string(q.Name), q.Type))
+		}
+		for _, a := range dns.Answers {
+			dl.Answers = append(dl.Answers, fmt.Sprintf("%s %s %s", string(a.Name), a.Type, a.String()))
+		}
+		p.Layers.DNS = dl
+	} else if app := pkt.ApplicationLayer(); app != nil {
+		p.ApplicationLayer = app.LayerType().String()
+		payload := app.Payload()
+		if h := decodeHTTP(payload); h != nil {
+			p.ApplicationLayer = "HTTP"
+			p.Layers.HTTP = h
+		} else if t := decodeTLSHandshake(payload); t != nil {
+			p.ApplicationLayer = "TLS"
+			p.Layers.TLS = t
 		}
 	}
-	if l := pkt.ApplicationLayer(); l != nil {
-		p.ApplicationLayer = l.LayerType().String()
-	}
+
 	if err := pkt.ErrorLayer(); err != nil {
 		p.Summary = "decode error: " + err.Error()
 	} else {
-		p.Summary = summarize(pkt)
+		p.Summary = summarize(&p)
 	}
 	return p
 }
 
-func summarize(pkt gopacket.Packet) string {
-	if t := pkt.Layer(layers.LayerTypeTCP); t != nil {
-		tcp := t.(*layers.TCP)
-		flags := ""
-		if tcp.SYN {
-			flags += "S"
-		}
-		if tcp.ACK {
-			flags += "A"
-		}
-		if tcp.FIN {
-			flags += "F"
-		}
-		if tcp.RST {
-			flags += "R"
-		}
-		if tcp.PSH {
-			flags += "P"
-		}
-		return fmt.Sprintf("TCP %d→%d [%s] seq=%d", tcp.SrcPort, tcp.DstPort, flags, tcp.Seq)
+func tcpFlags(t *layers.TCP) string {
+	parts := []string{}
+	if t.SYN {
+		parts = append(parts, "SYN")
 	}
-	if u := pkt.Layer(layers.LayerTypeUDP); u != nil {
-		udp := u.(*layers.UDP)
-		return fmt.Sprintf("UDP %d→%d len=%d", udp.SrcPort, udp.DstPort, udp.Length)
+	if t.ACK {
+		parts = append(parts, "ACK")
 	}
-	if pkt.Layer(layers.LayerTypeICMPv4) != nil {
-		return "ICMPv4"
+	if t.FIN {
+		parts = append(parts, "FIN")
 	}
-	if l := pkt.NetworkLayer(); l != nil {
-		return l.LayerType().String()
+	if t.RST {
+		parts = append(parts, "RST")
+	}
+	if t.PSH {
+		parts = append(parts, "PSH")
+	}
+	if t.URG {
+		parts = append(parts, "URG")
+	}
+	return strings.Join(parts, ",")
+}
+
+func summarize(p *Packet) string {
+	if p.Layers.HTTP != nil {
+		h := p.Layers.HTTP
+		if h.Method != "" {
+			return fmt.Sprintf("HTTP %s %s%s", h.Method, h.Host, h.Path)
+		}
+		return fmt.Sprintf("HTTP %d %s", h.StatusCode, h.ContentType)
+	}
+	if p.Layers.DNS != nil {
+		d := p.Layers.DNS
+		if d.Response {
+			return fmt.Sprintf("DNS resp %s answers=%d", d.Rcode, len(d.Answers))
+		}
+		if len(d.Questions) > 0 {
+			return "DNS query " + d.Questions[0]
+		}
+		return "DNS"
+	}
+	if p.Layers.TLS != nil {
+		t := p.Layers.TLS
+		if t.SNI != "" {
+			return fmt.Sprintf("TLS %s %s sni=%s", t.Version, t.Handshake, t.SNI)
+		}
+		return fmt.Sprintf("TLS %s %s", t.Version, t.Handshake)
+	}
+	if p.Layers.TCP != nil {
+		t := p.Layers.TCP
+		return fmt.Sprintf("TCP %d→%d [%s] seq=%d len=%d", t.SrcPort, t.DstPort, t.Flags, t.Seq, t.Length)
+	}
+	if p.Layers.UDP != nil {
+		u := p.Layers.UDP
+		return fmt.Sprintf("UDP %d→%d len=%d", u.SrcPort, u.DstPort, u.Length)
+	}
+	if p.Layers.ICMP != nil {
+		return "ICMPv4 " + p.Layers.ICMP.Type
+	}
+	if p.NetworkLayer != "" {
+		return p.NetworkLayer
 	}
 	return "frame"
 }

@@ -5,7 +5,9 @@ import type {
   CaptureSession,
   NetworkInterface,
   Packet,
+  Peer,
   StartCaptureRequest,
+  StatsResponse,
 } from "@domain/idl";
 
 export interface CaptureGateway {
@@ -13,6 +15,9 @@ export interface CaptureGateway {
   listSessions(): Promise<CaptureSession[]>;
   startCapture(req: StartCaptureRequest): Promise<CaptureSession>;
   stopCapture(id: string): Promise<CaptureSession>;
+  listPeers(id: string, kind?: "ip" | "mac"): Promise<Peer[]>;
+  stats(id: string, top?: number): Promise<StatsResponse>;
+  lookupVendor(mac: string): Promise<string>;
 }
 
 export interface PacketStream {

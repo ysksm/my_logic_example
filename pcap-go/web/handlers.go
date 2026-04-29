@@ -59,6 +59,33 @@ func (s *Server) handleListPackets(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, core.ListPacketsResponse{Packets: pkts, NextSeq: next})
 }
 
+func (s *Server) handleListPeers(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	kind := r.URL.Query().Get("kind") // optional: "ip" | "mac"
+	peers, err := s.mgr.Peers(id, kind)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, core.ListPeersResponse{Peers: peers})
+}
+
+func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	topN, _ := strconv.Atoi(r.URL.Query().Get("top"))
+	stats, err := s.mgr.Stats(id, topN)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, stats)
+}
+
+func (s *Server) handleOUI(w http.ResponseWriter, r *http.Request) {
+	mac := r.PathValue("mac")
+	writeJSON(w, http.StatusOK, core.OUIResponse{MAC: mac, Vendor: core.LookupVendor(mac)})
+}
+
 func writeJSON(w http.ResponseWriter, status int, body any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)

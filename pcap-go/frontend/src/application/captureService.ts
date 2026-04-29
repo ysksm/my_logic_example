@@ -29,4 +29,16 @@ export class CaptureService {
   stop(id: string) {
     return this.gw.stopCapture(id);
   }
+
+  peers(id: string, kind?: "ip" | "mac") {
+    return this.gw.listPeers(id, kind);
+  }
+
+  stats(id: string, top?: number) {
+    return this.gw.stats(id, top);
+  }
+
+  vendor(mac: string) {
+    return this.gw.lookupVendor(mac);
+  }
 }

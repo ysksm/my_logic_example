@@ -19,6 +19,9 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/sessions", s.handleStartSession)
 	mux.HandleFunc("DELETE /api/v1/sessions/{id}", s.handleStopSession)
 	mux.HandleFunc("GET /api/v1/sessions/{id}/packets", s.handleListPackets)
+	mux.HandleFunc("GET /api/v1/sessions/{id}/peers", s.handleListPeers)
+	mux.HandleFunc("GET /api/v1/sessions/{id}/stats", s.handleStats)
+	mux.HandleFunc("GET /api/v1/oui/{mac}", s.handleOUI)
 
 	// WebSocket
 	mux.HandleFunc("GET /api/v1/sessions/{id}/stream", s.handleStream)
