@@ -1,0 +1,12 @@
+bin/
+*.test
+*.out
+
+# Frontend build output is checked in to web/static so the Go binary always has
+# something to embed; intermediate dist/ inside frontend/ is not.
+frontend/dist/
+frontend/node_modules/
+
+# Go workspace caches
+.idea/
+.vscode/

@@ -1,0 +1,96 @@
+// pcap-go IDL — single source of truth for backend ⇄ frontend communication.
+//
+// Wire format: JSON over HTTP (REST) and JSON-encoded messages over WebSocket.
+// Field names use snake_case on the wire (matches protojson defaults).
+//
+// Hand-maintained Go types live in core/models.go.
+// Hand-maintained TS types live in frontend/src/domain/idl.ts.
+// Both files MUST be kept in sync with this schema.
+
+syntax = "proto3";
+
+package pcap;
+
+// ---------- Resources ----------
+
+message NetworkInterface {
+  string name = 1;          // e.g. "en0"
+  string description = 2;   // human-readable
+  repeated string addresses = 3;
+  bool is_loopback = 4;
+  bool is_up = 5;
+}
+
+message Packet {
+  uint64 seq = 1;                // monotonic per-session sequence
+  string captured_at = 2;        // RFC3339 nano
+  uint32 length = 3;             // wire length
+  uint32 capture_length = 4;     // bytes actually captured
+  string interface = 5;
+  string link_layer = 6;         // "Ethernet", "Loopback", ...
+  string network_layer = 7;      // "IPv4", "IPv6", ""
+  string transport_layer = 8;    // "TCP", "UDP", "ICMPv4", ""
+  string application_layer = 9;  // "DNS", "HTTP", ""
+  string src = 10;               // best-effort src "ip:port" or "mac"
+  string dst = 11;               // best-effort dst
+  string summary = 12;           // single-line description
+  bytes  payload = 13;           // optional, base64 in JSON
+}
+
+message CaptureSession {
+  string id = 1;
+  string interface = 2;
+  string bpf_filter = 3;
+  uint32 snaplen = 4;
+  bool promiscuous = 5;
+  string state = 6;        // "running" | "stopped" | "error"
+  string started_at = 7;
+  string stopped_at = 8;
+  uint64 packet_count = 9;
+  string error = 10;
+}
+
+// ---------- Requests / Responses ----------
+
+message ListInterfacesResponse {
+  repeated NetworkInterface interfaces = 1;
+}
+
+message StartCaptureRequest {
+  string interface = 1;
+  string bpf_filter = 2;   // e.g. "tcp port 80"
+  uint32 snaplen = 3;      // default 65535
+  bool promiscuous = 4;
+}
+
+message StartCaptureResponse {
+  CaptureSession session = 1;
+}
+
+message StopCaptureResponse {
+  CaptureSession session = 1;
+}
+
+message ListSessionsResponse {
+  repeated CaptureSession sessions = 1;
+}
+
+message ListPacketsRequest {
+  string session_id = 1;
+  uint64 after_seq = 2;   // return packets with seq > after_seq
+  uint32 limit = 3;       // default 200
+}
+
+message ListPacketsResponse {
+  repeated Packet packets = 1;
+  uint64 next_seq = 2;
+}
+
+// ---------- WebSocket stream ----------
+
+message StreamEnvelope {
+  string type = 1;        // "packet" | "session" | "error"
+  Packet packet = 2;
+  CaptureSession session = 3;
+  string message = 4;
+}
