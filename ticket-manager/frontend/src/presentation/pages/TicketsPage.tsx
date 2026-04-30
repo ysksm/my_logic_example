@@ -1,8 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTickets } from "@/application/hooks/useTickets";
 import { useRepositories } from "@/application/hooks/useRepositories";
 import { useTags } from "@/application/hooks/useTags";
-import type { Ticket, TicketStatus, TicketType } from "@/domain/types";
+import type { Ticket, TicketCreate, TicketStatus, TicketType } from "@/domain/types";
 import { TICKET_STATUSES, TICKET_TYPES } from "@/domain/types";
 import { StatusBadge, TypeBadge } from "@/presentation/components/Badges";
 import TicketForm, { childTypeFor, type TicketFormPreset } from "@/presentation/components/TicketForm";
@@ -16,6 +16,7 @@ export default function TicketsPage() {
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [preset, setPreset] = useState<TicketFormPreset | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [quickAdd, setQuickAdd] = useState<{ parent: Ticket } | null>(null);
 
   const { tickets, error, create, update, remove, addTag, removeTag } = useTickets({
     type: filterType || undefined,
@@ -149,7 +150,10 @@ export default function TicketsPage() {
         {error && <p style={{ color: "red" }}>{error}</p>}
 
         {viewMode === "mindmap" ? (
-          <Mindmap tickets={tickets} onAddChild={startChild} />
+          <Mindmap
+            tickets={tickets}
+            onAddChild={(t) => setQuickAdd({ parent: t })}
+          />
         ) : (
           <table>
             <thead>
@@ -191,6 +195,17 @@ export default function TicketsPage() {
           </table>
         )}
       </div>
+
+      {quickAdd && (
+        <QuickAddChildModal
+          parent={quickAdd.parent}
+          onCancel={() => setQuickAdd(null)}
+          onCreate={async (req, keepOpen) => {
+            await create(req);
+            if (!keepOpen) setQuickAdd(null);
+          }}
+        />
+      )}
     </>
   );
 }
@@ -209,6 +224,106 @@ interface RowProps {
   onAddTag: (tag: string) => void;
   onRemoveTag: (tag: string) => void;
   onAddChild: () => void;
+}
+
+// ===== Quick add modal (mindmap node click) =====
+function QuickAddChildModal({
+  parent,
+  onCancel,
+  onCreate,
+}: {
+  parent: Ticket;
+  onCancel: () => void;
+  onCreate: (req: TicketCreate, keepOpen: boolean) => Promise<void>;
+}) {
+  const [title, setTitle] = useState("");
+  const [type, setType] = useState<TicketType>(childTypeFor(parent.type));
+  const [status, setStatus] = useState<TicketStatus>("TODO");
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCancel();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onCancel]);
+
+  async function submit(keepOpen: boolean) {
+    if (!title.trim() || submitting) return;
+    setSubmitting(true);
+    try {
+      await onCreate(
+        {
+          title: title.trim(),
+          type,
+          status,
+          parent_id: parent.id,
+          tags: [],
+        },
+        keepOpen,
+      );
+      setTitle("");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onMouseDown={onCancel}>
+      <div className="modal-card" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h3 style={{ margin: 0 }}>子チケット追加</h3>
+          <button className="secondary modal-close" onClick={onCancel} aria-label="閉じる">×</button>
+        </div>
+        <div className="modal-body">
+          <div className="muted" style={{ marginBottom: 8 }}>
+            親: <strong>[{parent.type}] {parent.title}</strong>
+          </div>
+          <div className="row">
+            <input
+              placeholder="タイトル"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  submit(e.metaKey || e.ctrlKey);
+                }
+              }}
+              style={{ flex: 1 }}
+              autoFocus
+            />
+            <select value={type} onChange={(e) => setType(e.target.value as TicketType)}>
+              {TICKET_TYPES.map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+            <select value={status} onChange={(e) => setStatus(e.target.value as TicketStatus)}>
+              {TICKET_STATUSES.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+          <p className="muted" style={{ marginTop: 6, fontSize: 11 }}>
+            Enter: 追加して閉じる / ⌘+Enter: 追加して続ける
+          </p>
+        </div>
+        <div className="modal-foot">
+          <button className="secondary" onClick={onCancel}>キャンセル</button>
+          <button
+            className="secondary"
+            onClick={() => submit(true)}
+            disabled={!title.trim() || submitting}
+          >追加して続ける</button>
+          <button
+            onClick={() => submit(false)}
+            disabled={!title.trim() || submitting}
+          >追加</button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ===== Mindmap (SVG horizontal tree) =====
@@ -242,22 +357,38 @@ function Mindmap({ tickets, onAddChild }: { tickets: Ticket[]; onAddChild: (t: T
             const d = `M${e.x1},${e.y1} C${midX},${e.y1} ${midX},${e.y2} ${e.x2},${e.y2}`;
             return <path key={i} d={d} stroke="#cbd5e1" strokeWidth={1.5} fill="none" />;
           })}
-          {nodes.map((n) => (
-            <g
-              key={n.t.id}
-              transform={`translate(${n.x},${n.y})`}
-              className={`mm-node mm-${n.t.type.toLowerCase()} mm-status-${n.t.status.toLowerCase()}`}
-              style={{ cursor: n.t.type !== "SUBTASK" ? "pointer" : "default" }}
-              onClick={() => n.t.type !== "SUBTASK" && onAddChild(n.t)}
-            >
-              <rect width={NODE_W} height={NODE_H} rx={6} ry={6} className="mm-rect" />
-              <text x={8} y={14} className="mm-type">[{n.t.type}]</text>
-              <text x={8} y={28} className="mm-title">{trim(n.t.title, 22)}</text>
-              {n.t.status !== "TODO" && (
-                <circle cx={NODE_W - 10} cy={10} r={4} className={`mm-dot status-${n.t.status.toLowerCase()}`} />
-              )}
-            </g>
-          ))}
+          {nodes.map((n) => {
+            const canAddChild = n.t.type !== "SUBTASK";
+            return (
+              <g
+                key={n.t.id}
+                transform={`translate(${n.x},${n.y})`}
+                className={`mm-node mm-${n.t.type.toLowerCase()} mm-status-${n.t.status.toLowerCase()}`}
+              >
+                <rect width={NODE_W} height={NODE_H} rx={6} ry={6} className="mm-rect" />
+                <text x={8} y={14} className="mm-type">[{n.t.type}]</text>
+                <text x={8} y={28} className="mm-title">{trim(n.t.title, 22)}</text>
+                {n.t.status !== "TODO" && (
+                  <circle cx={8} cy={NODE_H - 6} r={3} className={`mm-dot status-${n.t.status.toLowerCase()}`} />
+                )}
+                {canAddChild && (
+                  <g
+                    className="mm-plus"
+                    transform={`translate(${NODE_W - 14}, 14)`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onAddChild(n.t);
+                    }}
+                    style={{ cursor: "pointer" }}
+                  >
+                    <title>子チケットを追加</title>
+                    <circle r={9} className="mm-plus-circle" />
+                    <text textAnchor="middle" y={4} className="mm-plus-text">+</text>
+                  </g>
+                )}
+              </g>
+            );
+          })}
         </g>
       </svg>
     </div>

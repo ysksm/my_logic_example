@@ -365,6 +365,24 @@ tr:hover { background: #f9fafb; }
 .mm-node.mm-status-done .mm-rect { fill: #f0fdf4; }
 .mm-node.mm-status-in_progress .mm-rect { fill: #fffbeb; }
 
+/* "+" badge that opens the quick-add modal */
+.mm-plus-circle {
+  fill: var(--accent);
+  stroke: white;
+  stroke-width: 1.5;
+  opacity: 0.6;
+  transition: opacity 0.1s, fill 0.1s;
+}
+.mm-plus-text {
+  fill: white;
+  font-size: 14px;
+  font-weight: 700;
+  pointer-events: none;
+  user-select: none;
+}
+.mm-node:hover .mm-plus-circle { opacity: 1; }
+.mm-plus:hover .mm-plus-circle { fill: var(--accent-hover); opacity: 1; }
+
 .tag {
   display: inline-block;
   padding: 1px 6px;
