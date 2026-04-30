@@ -37,8 +37,10 @@ backend:
 	cd $(SERVER) && go build -o ../$(BIN) ./cmd/server
 
 # Wails デスクトップ: 開発実行 (フロントを embed → Wails ウィンドウ起動)
+# DB はユーザーコンフィグディレクトリの DuckDB がデフォルト。
+# 一時 DB を使いたい場合は: `DB_DSN=/tmp/foo.duckdb make desktop`
 desktop: frontend
-	cd $(SERVER) && CGO_ENABLED=1 go run -tags dev ./cmd/desktop -db-driver $(DB_DRIVER) -db $(DB)
+	cd $(SERVER) && CGO_ENABLED=1 go run -tags dev ./cmd/desktop
 
 # Wails デスクトップ: 本番バイナリ ($(DESKTOP_BIN))
 build-desktop: frontend
