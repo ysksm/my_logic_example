@@ -9,15 +9,16 @@ import (
 	"time"
 
 	"github.com/ysksm/my_logic_example/ticket-manager/server/internal/domain"
+	"github.com/ysksm/my_logic_example/ticket-manager/server/internal/infra/dbx"
 )
 
 var ErrNotFound = errors.New("not found")
 
 type TicketRepository struct {
-	db *sql.DB
+	db *dbx.DB
 }
 
-func NewTicketRepository(db *sql.DB) *TicketRepository {
+func NewTicketRepository(db *dbx.DB) *TicketRepository {
 	return &TicketRepository{db: db}
 }
 
@@ -175,10 +176,18 @@ func (r *TicketRepository) Delete(ctx context.Context, id string) error {
 
 func (r *TicketRepository) AddTag(ctx context.Context, ticketID, tag string) error {
 	now := time.Now().UTC()
-	if _, err := r.db.ExecContext(ctx, `INSERT INTO tags (name, created_at) VALUES (?, ?) ON CONFLICT (name) DO NOTHING`, tag, now); err != nil {
+	insertTag := fmt.Sprintf(`%s INTO tags (name, created_at) VALUES (?, ?)%s`,
+		dbx.InsertVerb(r.db.Driver),
+		dbx.OnConflictDoNothing(r.db.Driver, "name"),
+	)
+	if _, err := r.db.ExecContext(ctx, insertTag, tag, now); err != nil {
 		return fmt.Errorf("upsert tag: %w", err)
 	}
-	if _, err := r.db.ExecContext(ctx, `INSERT INTO ticket_tags (ticket_id, tag_name) VALUES (?, ?) ON CONFLICT DO NOTHING`, ticketID, tag); err != nil {
+	insertLink := fmt.Sprintf(`%s INTO ticket_tags (ticket_id, tag_name) VALUES (?, ?)%s`,
+		dbx.InsertVerb(r.db.Driver),
+		dbx.OnConflictDoNothing(r.db.Driver, "ticket_id", "tag_name"),
+	)
+	if _, err := r.db.ExecContext(ctx, insertLink, ticketID, tag); err != nil {
 		return fmt.Errorf("attach tag: %w", err)
 	}
 	return nil

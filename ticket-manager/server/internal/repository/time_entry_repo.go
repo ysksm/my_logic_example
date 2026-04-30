@@ -8,13 +8,14 @@ import (
 	"time"
 
 	"github.com/ysksm/my_logic_example/ticket-manager/server/internal/domain"
+	"github.com/ysksm/my_logic_example/ticket-manager/server/internal/infra/dbx"
 )
 
 type TimeEntryRepository struct {
-	db *sql.DB
+	db *dbx.DB
 }
 
-func NewTimeEntryRepository(db *sql.DB) *TimeEntryRepository {
+func NewTimeEntryRepository(db *dbx.DB) *TimeEntryRepository {
 	return &TimeEntryRepository{db: db}
 }
 
@@ -39,7 +40,7 @@ func (r *TimeEntryRepository) List(ctx context.Context, f TimeEntryFilter) ([]do
 		conds = append(conds, "te.work_date <= CAST(? AS DATE)")
 		args = append(args, f.To)
 	}
-	q := `SELECT te.id, te.ticket_id, COALESCE(t.title, ''), te."user", te.hours,
+	q := `SELECT te.id, te.ticket_id, COALESCE(t.title, ''), te.user_name, te.hours,
                  te.work_date, te.start_at, te.end_at, te.note, te.created_at
           FROM time_entries te LEFT JOIN tickets t ON t.id = te.ticket_id`
 	if len(conds) > 0 {
@@ -82,7 +83,7 @@ func (r *TimeEntryRepository) List(ctx context.Context, f TimeEntryFilter) ([]do
 
 func (r *TimeEntryRepository) Get(ctx context.Context, id string) (*domain.TimeEntry, error) {
 	row := r.db.QueryRowContext(ctx, `
-        SELECT te.id, te.ticket_id, COALESCE(t.title, ''), te."user", te.hours,
+        SELECT te.id, te.ticket_id, COALESCE(t.title, ''), te.user_name, te.hours,
                te.work_date, te.start_at, te.end_at, te.note, te.created_at
         FROM time_entries te LEFT JOIN tickets t ON t.id = te.ticket_id
         WHERE te.id = ?`, id)
@@ -117,7 +118,7 @@ func (r *TimeEntryRepository) Get(ctx context.Context, id string) (*domain.TimeE
 func (r *TimeEntryRepository) Create(ctx context.Context, e *domain.TimeEntry) error {
 	e.CreatedAt = time.Now().UTC()
 	_, err := r.db.ExecContext(ctx, `
-        INSERT INTO time_entries (id, ticket_id, "user", hours, work_date, start_at, end_at, note, created_at)
+        INSERT INTO time_entries (id, ticket_id, user_name, hours, work_date, start_at, end_at, note, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		e.ID, nullStr(e.TicketID), e.User, e.Hours, e.WorkDate,
 		nullTime(e.StartAt), nullTime(e.EndAt),
@@ -129,7 +130,7 @@ func (r *TimeEntryRepository) Create(ctx context.Context, e *domain.TimeEntry) e
 func (r *TimeEntryRepository) Update(ctx context.Context, e *domain.TimeEntry) error {
 	res, err := r.db.ExecContext(ctx, `
         UPDATE time_entries
-        SET ticket_id=?, "user"=?, hours=?, work_date=?, start_at=?, end_at=?, note=?
+        SET ticket_id=?, user_name=?, hours=?, work_date=?, start_at=?, end_at=?, note=?
         WHERE id=?`,
 		nullStr(e.TicketID), e.User, e.Hours, e.WorkDate,
 		nullTime(e.StartAt), nullTime(e.EndAt), e.Note, e.ID,
