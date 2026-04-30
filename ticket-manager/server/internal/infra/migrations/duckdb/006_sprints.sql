@@ -1,5 +1,5 @@
 -- スプリント (反復) と、チケットのスプリント割当て。
--- バックログ = sprint_id が NULL のチケット
+-- バックログ = sprint_id が NULL のチケット。
 
 CREATE TABLE IF NOT EXISTS sprints (
     id          VARCHAR PRIMARY KEY,

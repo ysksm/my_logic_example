@@ -8,18 +8,8 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
-	"github.com/go-chi/cors"
-
-	"github.com/ysksm/my_logic_example/ticket-manager/server/internal/git"
-	"github.com/ysksm/my_logic_example/ticket-manager/server/internal/handler"
-	"github.com/ysksm/my_logic_example/ticket-manager/server/internal/infra"
+	"github.com/ysksm/my_logic_example/ticket-manager/server/internal/app"
 	"github.com/ysksm/my_logic_example/ticket-manager/server/internal/infra/dbx"
-	"github.com/ysksm/my_logic_example/ticket-manager/server/internal/maintenance"
-	"github.com/ysksm/my_logic_example/ticket-manager/server/internal/repository"
-	"github.com/ysksm/my_logic_example/ticket-manager/server/internal/service"
-	"github.com/ysksm/my_logic_example/ticket-manager/server/internal/webui"
 )
 
 func main() {
@@ -30,55 +20,20 @@ func main() {
 	dsnFlag := flag.String("db", defaultDSN, "DB connection string (file path for duckdb/sqlite, URL/DSN for postgres/mysql)")
 	flag.Parse()
 
-	maintToken := os.Getenv("MAINTENANCE_TOKEN")
-
 	driver, err := dbx.ParseDriver(*driverFlag)
 	if err != nil {
 		log.Fatalf("config: %v", err)
 	}
 
-	db, err := infra.OpenDB(driver, *dsnFlag)
+	a, err := app.New(app.Config{
+		Driver:           driver,
+		DSN:              *dsnFlag,
+		MaintenanceToken: os.Getenv("MAINTENANCE_TOKEN"),
+	})
 	if err != nil {
-		log.Fatalf("open db: %v", err)
+		log.Fatalf("app init: %v", err)
 	}
-	defer db.Close()
-
-	if err := infra.Migrate(db); err != nil {
-		log.Fatalf("migrate: %v", err)
-	}
-
-	ticketRepo := repository.NewTicketRepository(db)
-	timeRepo := repository.NewTimeEntryRepository(db)
-	calRepo := repository.NewCalendarRepository(db)
-	repoRepo := repository.NewRepoRepository(db)
-	sprintRepo := repository.NewSprintRepository(db)
-
-	gitClient := git.New()
-
-	h := &handler.Handlers{
-		Tickets: service.NewTicketService(ticketRepo),
-		Times:   service.NewTimeEntryService(timeRepo),
-		Cal:     service.NewCalendarService(calRepo),
-		Repos:   service.NewRepositoryService(repoRepo, gitClient),
-		Sprints: service.NewSprintService(sprintRepo),
-		Maint:   maintenance.New(db, maintToken),
-	}
-
-	r := chi.NewRouter()
-	r.Use(middleware.RequestID)
-	r.Use(middleware.RealIP)
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
-	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"*"},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"*"},
-		AllowCredentials: false,
-	}))
-
-	h.Mount(r)
-
-	r.Handle("/*", webui.Handler())
+	defer a.Close()
 
 	url := accessURL(*addr)
 	fmt.Println()
@@ -92,7 +47,7 @@ func main() {
 	fmt.Println()
 
 	log.Printf("ticket-manager listening on %s (driver=%s dsn=%s)", *addr, driver, *dsnFlag)
-	if err := http.ListenAndServe(*addr, r); err != nil {
+	if err := http.ListenAndServe(*addr, a.Handler()); err != nil {
 		log.Fatal(err)
 	}
 }
