@@ -1,0 +1,13 @@
+# Go build artifacts
+server/ticket-manager-server
+server/*.duckdb
+server/*.duckdb.wal
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/tsconfig.tsbuildinfo
+
+# Local DB files anywhere under this project
+*.duckdb
+*.duckdb.wal
