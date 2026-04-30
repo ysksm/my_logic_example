@@ -207,7 +207,9 @@ tr:hover { background: #f9fafb; }
   border-bottom: 1px dashed #f1f3f6;
   cursor: pointer;
 }
-.slot.hour-start { border-bottom-color: #e3e6eb; border-bottom-style: solid; }
+/* The last 15-min slot of each hour gets a solid line so it aligns with the
+   hour-label's bottom border in the time gutter (both are at y=N*48 - 1px). */
+.slot.hour-end { border-bottom-color: #e3e6eb; border-bottom-style: solid; }
 .slot:hover { background: #f1f5f9; }
 
 .positioned-item {

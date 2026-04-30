@@ -304,7 +304,7 @@ function WeekView({ cursor }: { cursor: Date }) {
                 {Array.from({ length: SLOTS_PER_DAY }, (_, i) => (
                   <div
                     key={i}
-                    className={`slot ${i % 4 === 0 ? "hour-start" : ""}`}
+                    className={`slot ${i % 4 === 3 ? "hour-end" : ""}`}
                     style={{ height: SLOT_PX }}
                     onMouseDown={(e) => {
                       e.preventDefault(); // no text selection
