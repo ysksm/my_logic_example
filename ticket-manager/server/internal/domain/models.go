@@ -59,7 +59,7 @@ type Tag struct {
 
 type TimeEntry struct {
 	ID          string     `json:"id"`
-	TicketID    string     `json:"ticket_id"`
+	TicketID    *string    `json:"ticket_id"`
 	TicketTitle string     `json:"ticket_title,omitempty"`
 	User        string     `json:"user"`
 	Hours       float64    `json:"hours"`
@@ -91,6 +91,7 @@ type CalendarItem struct {
 	Hours    *float64   `json:"hours,omitempty"`
 	Status   *string    `json:"status,omitempty"`
 	EventID  *string    `json:"event_id,omitempty"`
+	EntryID  *string    `json:"entry_id,omitempty"`
 	StartAt  *time.Time `json:"start_at,omitempty"`
 	EndAt    *time.Time `json:"end_at,omitempty"`
 }

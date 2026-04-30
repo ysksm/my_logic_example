@@ -70,6 +70,8 @@ export const api = {
     request<TimeEntry[]>("GET", "/api/time-entries" + qs(params)),
   createTimeEntry: (e: TimeEntryCreate) =>
     request<TimeEntry>("POST", "/api/time-entries", e),
+  updateTimeEntry: (id: string, e: Partial<TimeEntry>) =>
+    request<TimeEntry>("PUT", `/api/time-entries/${id}`, e),
   deleteTimeEntry: (id: string) => request<void>("DELETE", `/api/time-entries/${id}`),
 
   // calendar
@@ -78,6 +80,8 @@ export const api = {
   listEvents: () => request<CalendarEvent[]>("GET", "/api/calendar/events"),
   createEvent: (e: CalendarEventCreate) =>
     request<CalendarEvent>("POST", "/api/calendar/events", e),
+  updateEvent: (id: string, e: Partial<CalendarEvent>) =>
+    request<CalendarEvent>("PUT", `/api/calendar/events/${id}`, e),
   deleteEvent: (id: string) => request<void>("DELETE", `/api/calendar/events/${id}`),
 
   // repositories

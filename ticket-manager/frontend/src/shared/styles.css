@@ -203,6 +203,21 @@ tr:hover { background: #f9fafb; }
   position: relative;
   border-right: 1px solid var(--border);
 }
+/* Vertical divider splitting the day-col into 予定 (left) | 工数 (right) */
+.day-col::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: #f1f3f6;
+  pointer-events: none;
+}
+.col-split-label {
+  font-size: 10px;
+  margin-top: 2px;
+}
 .slot {
   border-bottom: 1px dashed #f1f3f6;
   cursor: pointer;
@@ -214,15 +229,16 @@ tr:hover { background: #f9fafb; }
 
 .positioned-item {
   position: absolute;
-  left: 2px;
-  right: 2px;
   border-radius: 3px;
   font-size: 11px;
   padding: 2px 4px;
   overflow: hidden;
-  cursor: default;
-  pointer-events: none;
+  cursor: grab;
+  pointer-events: auto;
+  user-select: none;
 }
+.positioned-item:active { cursor: grabbing; }
+.positioned-item.ghosted { opacity: 0.35; }
 .positioned-item.event { background: #fef3c7; color: #92400e; border: 1px solid #fbbf24; }
 .positioned-item.time  { background: #ecfdf5; color: #065f46; border: 1px solid #34d399; }
 .positioned-item .ttl {
@@ -230,20 +246,43 @@ tr:hover { background: #f9fafb; }
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.positioned-item .resize-handle {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 6px;
+  cursor: ns-resize;
+  background: linear-gradient(to bottom, transparent, rgba(0,0,0,0.05));
+}
+.positioned-item .resize-handle:hover { background: rgba(0,0,0,0.1); }
+.week-view.dragging .positioned-item { pointer-events: none; }
+.week-view.dragging .positioned-item.ghosted { pointer-events: none; }
+
+/* ghost preview when an item is being moved across columns */
+.ghost-block {
+  position: absolute;
+  border-radius: 3px;
+  pointer-events: none;
+  border: 1px dashed;
+  z-index: 2;
+}
+.ghost-block.ev { background: rgba(251, 191, 36, 0.25); border-color: #fbbf24; }
+.ghost-block.tm { background: rgba(52, 211, 153, 0.25); border-color: #34d399; }
 
 /* Drag selection preview overlay */
 .week-view.dragging { cursor: ns-resize; }
 .week-view.dragging .slot { cursor: ns-resize; }
 .drag-preview {
   position: absolute;
-  left: 2px;
-  right: 2px;
   background: rgba(37, 99, 235, 0.18);
   border: 1px dashed var(--accent);
   border-radius: 3px;
   pointer-events: none;
   z-index: 1;
 }
+.drag-preview.ev { background: rgba(251, 191, 36, 0.25); border-color: #fbbf24; }
+.drag-preview.tm { background: rgba(52, 211, 153, 0.25); border-color: #34d399; }
 .drag-preview-label {
   position: absolute;
   top: 2px;

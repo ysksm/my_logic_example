@@ -45,7 +45,7 @@ export interface Tag {
 
 export interface TimeEntry {
   id: string;
-  ticket_id: string;
+  ticket_id: string | null;
   ticket_title?: string;
   user: string;
   hours: number;
@@ -57,7 +57,7 @@ export interface TimeEntry {
 }
 
 export interface TimeEntryCreate {
-  ticket_id: string;
+  ticket_id?: string | null;
   user?: string;
   hours: number;
   work_date: string;
@@ -74,6 +74,7 @@ export interface CalendarItem {
   hours?: number | null;
   status?: TicketStatus;
   event_id?: string | null;
+  entry_id?: string | null;
   start_at?: string | null;
   end_at?: string | null;
 }

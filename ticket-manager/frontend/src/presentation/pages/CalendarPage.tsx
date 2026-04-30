@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useCalendarRange, useEvents } from "@/application/hooks/useCalendar";
 import { useTimeEntries } from "@/application/hooks/useTimeEntries";
 import { useTickets } from "@/application/hooks/useTickets";
 import type { CalendarItem } from "@/domain/types";
 
 type View = "week" | "month";
+type Kind = "EVENT" | "TIME_ENTRY";
 
 // ===== date helpers =====
 function startOfMonth(d: Date) {
@@ -27,19 +28,17 @@ function fmtDate(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 function isoWithZone(d: Date) {
-  // RFC3339 in UTC. DuckDB stores naked TIMESTAMP; the server parses Go's
-  // default RFC3339 (Z suffix). Round-trips back as the same instant; the UI
-  // converts to local time for display.
   return d.toISOString();
 }
 function pad(n: number) { return String(n).padStart(2, "0"); }
+function clamp(v: number, lo: number, hi: number) { return Math.max(lo, Math.min(hi, v)); }
 
 // ===== week view layout constants =====
-const SLOT_MIN = 15;          // each clickable slot is 15 minutes
-const SLOT_PX = 12;           // visual height of a 15-min slot
-const HOUR_PX = SLOT_PX * 4;  // = 48
-const SLOTS_PER_DAY = 24 * 4; // = 96
-const DAY_PX = HOUR_PX * 24;  // = 1152
+const SLOT_MIN = 15;
+const SLOT_PX = 12;
+const HOUR_PX = SLOT_PX * 4;
+const SLOTS_PER_DAY = 24 * 4;
+const DAY_PX = HOUR_PX * 24;
 
 export default function CalendarPage() {
   const [view, setView] = useState<View>("week");
@@ -75,7 +74,8 @@ export default function CalendarPage() {
       {view === "week" ? <WeekView cursor={cursor} /> : <MonthView cursor={cursor} />}
       {view === "week" && (
         <p className="muted" style={{ marginTop: 8 }}>
-          ヒント: スロットをドラッグして範囲を選択 (15分単位) → ダイアログで予定 / 工数を入力。クリックだけでも 15 分の項目を作成できます。
+          ヒント: 左半分=予定 / 右半分=工数。空きスロットをドラッグして新規作成、
+          既存の枠は本体ドラッグで移動 / 下端ドラッグでリサイズできます。
         </p>
       )}
     </>
@@ -143,17 +143,33 @@ function MonthView({ cursor }: { cursor: Date }) {
   );
 }
 
-// ===== Week view with drag-to-select 15-min slots =====
+// ===== Week view =====
 interface DragState {
   dayIdx: number;
-  anchorSlot: number;   // slot at mousedown
-  currentSlot: number;  // slot under cursor right now
+  anchorSlot: number;
+  currentSlot: number;
+  side: Kind;
 }
 
 interface Selection {
-  date: Date;       // local midnight of the selected day
-  startMin: number; // minutes from midnight
-  endMin: number;   // exclusive end minutes
+  date: Date;
+  startMin: number;
+  endMin: number;
+  kind: Kind;
+}
+
+interface ItemDrag {
+  itemKey: string;
+  kind: Kind;
+  mode: "move" | "resize";
+  originalDayIdx: number;
+  originalStartSlot: number;
+  originalEndSlot: number;
+  // For move: where the cursor first grabbed the item, in slots from item start
+  grabOffsetSlot: number;
+  ghostDayIdx: number;
+  ghostStartSlot: number;
+  ghostEndSlot: number;
 }
 
 function WeekView({ cursor }: { cursor: Date }) {
@@ -163,23 +179,25 @@ function WeekView({ cursor }: { cursor: Date }) {
   const to = fmtDate(days[6]);
 
   const { items, refresh: refreshItems } = useCalendarRange(from, to);
-  const { create: createEvent } = useEvents();
-  const { create: createTime } = useTimeEntries({ from, to });
+  const { events, create: createEvent, update: updateEvent } = useEvents();
+  const { entries, create: createTime, update: updateTimeEntry } = useTimeEntries({ from, to });
   const { tickets } = useTickets();
 
   const [drag, setDrag] = useState<DragState | null>(null);
   const [selection, setSelection] = useState<Selection | null>(null);
+  const [itemDrag, setItemDrag] = useState<ItemDrag | null>(null);
 
-  // Commit drag on global mouseup; cancel with ESC.
+  // Commit "drag to create" on global mouseup
   useEffect(() => {
     if (!drag) return;
     const onUp = () => {
       const startSlot = Math.min(drag.anchorSlot, drag.currentSlot);
-      const endSlot = Math.max(drag.anchorSlot, drag.currentSlot) + 1; // inclusive → exclusive
+      const endSlot = Math.max(drag.anchorSlot, drag.currentSlot) + 1;
       setSelection({
         date: days[drag.dayIdx],
         startMin: startSlot * SLOT_MIN,
         endMin: endSlot * SLOT_MIN,
+        kind: drag.side,
       });
       setDrag(null);
     };
@@ -193,6 +211,92 @@ function WeekView({ cursor }: { cursor: Date }) {
       window.removeEventListener("keydown", onKey);
     };
   }, [drag, days]);
+
+  // Item drag handlers (move / resize existing items)
+  useEffect(() => {
+    if (!itemDrag) return;
+    const onMove = (e: MouseEvent) => {
+      const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
+      if (!el) return;
+      const slotEl = el.closest<HTMLElement>("[data-slot][data-day-idx]");
+      if (!slotEl) return;
+      const dayIdx = Number(slotEl.dataset.dayIdx);
+      const slot = Number(slotEl.dataset.slot);
+      setItemDrag((prev) => {
+        if (!prev) return prev;
+        if (prev.mode === "resize") {
+          // Resize end only; end >= start + 1
+          const newEnd = clamp(slot + 1, prev.ghostStartSlot + 1, SLOTS_PER_DAY);
+          return { ...prev, ghostEndSlot: newEnd };
+        }
+        // Move: keep duration; cursor stays at original grab offset
+        const dur = prev.originalEndSlot - prev.originalStartSlot;
+        let newStart = slot - prev.grabOffsetSlot;
+        newStart = clamp(newStart, 0, SLOTS_PER_DAY - dur);
+        return {
+          ...prev,
+          ghostDayIdx: dayIdx,
+          ghostStartSlot: newStart,
+          ghostEndSlot: newStart + dur,
+        };
+      });
+    };
+    const onUp = async () => {
+      const d = itemDrag;
+      setItemDrag(null);
+      if (!d) return;
+      const startDate = new Date(days[d.ghostDayIdx]);
+      startDate.setHours(0, d.ghostStartSlot * SLOT_MIN, 0, 0);
+      const endDate = new Date(days[d.ghostDayIdx]);
+      endDate.setHours(0, d.ghostEndSlot * SLOT_MIN, 0, 0);
+
+      // No-op if unchanged
+      if (
+        d.originalDayIdx === d.ghostDayIdx &&
+        d.originalStartSlot === d.ghostStartSlot &&
+        d.originalEndSlot === d.ghostEndSlot
+      ) {
+        return;
+      }
+
+      try {
+        if (d.kind === "EVENT") {
+          const orig = events.find((e) => e.id === d.itemKey);
+          if (!orig) return;
+          await updateEvent(d.itemKey, {
+            ...orig,
+            start_date: fmtDate(startDate),
+            start_at: isoWithZone(startDate),
+            end_at: isoWithZone(endDate),
+          });
+        } else {
+          const orig = entries.find((e) => e.id === d.itemKey);
+          if (!orig) return;
+          await updateTimeEntry(d.itemKey, {
+            ...orig,
+            work_date: fmtDate(startDate),
+            start_at: isoWithZone(startDate),
+            end_at: isoWithZone(endDate),
+            hours: (endDate.getTime() - startDate.getTime()) / 3600000,
+          });
+        }
+        await refreshItems();
+      } catch (err) {
+        console.error("item drag commit failed", err);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setItemDrag(null);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [itemDrag, days, events, entries, updateEvent, updateTimeEntry, refreshItems]);
 
   async function submitEvent(
     title: string,
@@ -214,8 +318,7 @@ function WeekView({ cursor }: { cursor: Date }) {
     await refreshItems();
   }
 
-  async function submitTime(ticketId: string, note: string, start: Date, end: Date) {
-    if (!ticketId) return;
+  async function submitTime(ticketId: string | null, note: string, start: Date, end: Date) {
     const hours = (end.getTime() - start.getTime()) / 3600000;
     await createTime({
       ticket_id: ticketId,
@@ -240,14 +343,46 @@ function WeekView({ cursor }: { cursor: Date }) {
     return m;
   }, [items]);
 
+  function startItemDrag(
+    item: CalendarItem,
+    mode: "move" | "resize",
+    e: React.MouseEvent,
+    dayIdx: number,
+  ) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!item.start_at) return;
+    const itemKey = item.kind === "EVENT" ? item.event_id : item.entry_id;
+    if (!itemKey) return;
+    const start = new Date(item.start_at);
+    const end = item.end_at ? new Date(item.end_at) : new Date(start.getTime() + 30 * 60000);
+    const startSlot = Math.floor((start.getHours() * 60 + start.getMinutes()) / SLOT_MIN);
+    const endSlot = Math.ceil((end.getHours() * 60 + end.getMinutes()) / SLOT_MIN);
+    // Compute grab offset by mouse y within the item rect
+    const rect = (e.currentTarget as HTMLElement).closest<HTMLElement>(".positioned-item")!.getBoundingClientRect();
+    const offsetPx = e.clientY - rect.top;
+    const grabOffsetSlot = clamp(Math.floor(offsetPx / SLOT_PX), 0, endSlot - startSlot - 1);
+    setItemDrag({
+      itemKey,
+      kind: item.kind === "EVENT" ? "EVENT" : "TIME_ENTRY",
+      mode,
+      originalDayIdx: dayIdx,
+      originalStartSlot: startSlot,
+      originalEndSlot: endSlot,
+      grabOffsetSlot,
+      ghostDayIdx: dayIdx,
+      ghostStartSlot: startSlot,
+      ghostEndSlot: endSlot,
+    });
+  }
+
   const todayStr = fmtDate(new Date());
   const dayNames = ["日", "月", "火", "水", "木", "金", "土"];
 
   return (
     <>
-      <div className={`week-view panel ${drag ? "dragging" : ""}`} style={{ padding: 0 }}>
+      <div className={`week-view panel ${drag || itemDrag ? "dragging" : ""}`} style={{ padding: 0 }}>
         <div className="week-grid">
-          {/* header row */}
           <div className="week-gutter week-header" />
           {days.map((d) => {
             const isToday = fmtDate(d) === todayStr;
@@ -255,11 +390,11 @@ function WeekView({ cursor }: { cursor: Date }) {
               <div key={d.toISOString()} className={`week-header ${isToday ? "today" : ""}`}>
                 <div className="muted">{dayNames[d.getDay()]}</div>
                 <div style={{ fontWeight: 600 }}>{d.getMonth() + 1}/{d.getDate()}</div>
+                <div className="muted col-split-label">予定 | 工数</div>
               </div>
             );
           })}
 
-          {/* All-day strip: items without start_at */}
           <div className="week-gutter all-day-label muted">all-day</div>
           {days.map((d) => {
             const ds = fmtDate(d);
@@ -280,35 +415,30 @@ function WeekView({ cursor }: { cursor: Date }) {
             );
           })}
 
-          {/* Hour gutter (24 rows) */}
           <div className="week-gutter time-gutter">
             {Array.from({ length: 24 }, (_, h) => (
               <div key={h} className="hour-label">{pad(h)}:00</div>
             ))}
           </div>
 
-          {/* 7 day columns */}
           {days.map((d, dayIdx) => {
             const ds = fmtDate(d);
             const timed = (itemsByDay.get(ds) ?? []).filter((it) => !!it.start_at);
             return (
-              <div
-                key={"col-" + ds}
-                className="day-col"
-                style={{ height: DAY_PX }}
-                onMouseLeave={() => {
-                  // Clamp current to dayIdx's bounds: leaving the column shouldn't
-                  // expand the selection further; do nothing to keep current value.
-                }}
-              >
+              <div key={"col-" + ds} className="day-col" style={{ height: DAY_PX }}>
                 {Array.from({ length: SLOTS_PER_DAY }, (_, i) => (
                   <div
                     key={i}
                     className={`slot ${i % 4 === 3 ? "hour-end" : ""}`}
                     style={{ height: SLOT_PX }}
+                    data-slot={i}
+                    data-day-idx={dayIdx}
                     onMouseDown={(e) => {
-                      e.preventDefault(); // no text selection
-                      setDrag({ dayIdx, anchorSlot: i, currentSlot: i });
+                      if (itemDrag) return;
+                      e.preventDefault();
+                      const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                      const side: Kind = e.clientX - r.left < r.width / 2 ? "EVENT" : "TIME_ENTRY";
+                      setDrag({ dayIdx, anchorSlot: i, currentSlot: i, side });
                     }}
                     onMouseEnter={() => {
                       if (drag && drag.dayIdx === dayIdx) {
@@ -318,13 +448,37 @@ function WeekView({ cursor }: { cursor: Date }) {
                   />
                 ))}
 
-                {/* Drag preview overlay */}
-                {drag && drag.dayIdx === dayIdx && (
-                  <DragPreview drag={drag} />
-                )}
+                {drag && drag.dayIdx === dayIdx && <DragPreview drag={drag} />}
 
-                {/* Positioned items */}
-                {timed.map((it, idx) => <PositionedItem key={idx} item={it} />)}
+                {timed.map((it) => {
+                  const key = (it.kind === "EVENT" ? it.event_id : it.entry_id) ?? "";
+                  if (itemDrag && itemDrag.itemKey === key && itemDrag.ghostDayIdx !== dayIdx) {
+                    return null; // moved to another day
+                  }
+                  return (
+                    <PositionedItem
+                      key={key}
+                      item={it}
+                      ghosted={Boolean(itemDrag && itemDrag.itemKey === key)}
+                      ghost={
+                        itemDrag && itemDrag.itemKey === key && itemDrag.ghostDayIdx === dayIdx
+                          ? { startSlot: itemDrag.ghostStartSlot, endSlot: itemDrag.ghostEndSlot }
+                          : null
+                      }
+                      onMoveStart={(e) => startItemDrag(it, "move", e, dayIdx)}
+                      onResizeStart={(e) => startItemDrag(it, "resize", e, dayIdx)}
+                    />
+                  );
+                })}
+
+                {/* Render ghost preview when item moved here from another day */}
+                {itemDrag && itemDrag.ghostDayIdx === dayIdx && itemDrag.originalDayIdx !== dayIdx && (
+                  <GhostBlock
+                    kind={itemDrag.kind}
+                    startSlot={itemDrag.ghostStartSlot}
+                    endSlot={itemDrag.ghostEndSlot}
+                  />
+                )}
               </div>
             );
           })}
@@ -352,8 +506,11 @@ function DragPreview({ drag }: { drag: DragState }) {
   const height = (end - start) * SLOT_PX;
   const startMin = start * SLOT_MIN;
   const endMin = end * SLOT_MIN;
+  const sideStyle = drag.side === "EVENT"
+    ? { left: 2, right: "calc(50% + 1px)" }
+    : { left: "calc(50% + 1px)", right: 2 };
   return (
-    <div className="drag-preview" style={{ top, height }}>
+    <div className={`drag-preview ${drag.side === "EVENT" ? "ev" : "tm"}`} style={{ top, height, ...sideStyle }}>
       <div className="drag-preview-label">
         {pad(Math.floor(startMin / 60))}:{pad(startMin % 60)}
         {" – "}
@@ -363,21 +520,55 @@ function DragPreview({ drag }: { drag: DragState }) {
   );
 }
 
-function PositionedItem({ item }: { item: CalendarItem }) {
+function GhostBlock({
+  kind, startSlot, endSlot,
+}: { kind: Kind; startSlot: number; endSlot: number }) {
+  const top = startSlot * SLOT_PX;
+  const height = (endSlot - startSlot) * SLOT_PX;
+  const sideStyle: React.CSSProperties = kind === "EVENT"
+    ? { left: 2, right: "calc(50% + 1px)" }
+    : { left: "calc(50% + 1px)", right: 2 };
+  return <div className={`ghost-block ${kind === "EVENT" ? "ev" : "tm"}`} style={{ top, height, ...sideStyle }} />;
+}
+
+interface PositionedProps {
+  item: CalendarItem;
+  ghosted: boolean;
+  ghost: { startSlot: number; endSlot: number } | null;
+  onMoveStart: (e: React.MouseEvent) => void;
+  onResizeStart: (e: React.MouseEvent) => void;
+}
+
+function PositionedItem({ item, ghosted, ghost, onMoveStart, onResizeStart }: PositionedProps) {
+  const ref = useRef<HTMLDivElement>(null);
   const start = new Date(item.start_at!);
   const end = item.end_at ? new Date(item.end_at) : new Date(start.getTime() + 30 * 60 * 1000);
   const startMin = start.getHours() * 60 + start.getMinutes();
   const durMin = Math.max(15, (end.getTime() - start.getTime()) / 60000);
-  const top = (startMin / SLOT_MIN) * SLOT_PX;
-  const height = (durMin / SLOT_MIN) * SLOT_PX;
+  let top = (startMin / SLOT_MIN) * SLOT_PX;
+  let height = (durMin / SLOT_MIN) * SLOT_PX;
+  if (ghost) {
+    top = ghost.startSlot * SLOT_PX;
+    height = (ghost.endSlot - ghost.startSlot) * SLOT_PX;
+  }
   const cls = item.kind === "EVENT" ? "event" : "time";
+  const sideStyle: React.CSSProperties = item.kind === "EVENT"
+    ? { left: 2, right: "calc(50% + 1px)" }
+    : { left: "calc(50% + 1px)", right: 2 };
   const time = `${pad(start.getHours())}:${pad(start.getMinutes())}`;
   const label = item.kind === "TIME_ENTRY"
     ? `${time} · ${item.hours}h · ${item.title}`
     : `${time} · ${item.title}`;
   return (
-    <div className={`positioned-item ${cls}`} style={{ top, height }} title={label}>
+    <div
+      ref={ref}
+      className={`positioned-item ${cls} ${ghosted ? "ghosted" : ""}`}
+      style={{ top, height, ...sideStyle }}
+      title={label + " (ドラッグで移動 / 下端でリサイズ)"}
+      onMouseDown={onMoveStart}
+    >
       <div className="ttl">{label}</div>
+      <div className="resize-handle" onMouseDown={onResizeStart} title="ドラッグでリサイズ" />
     </div>
   );
 }
@@ -396,16 +587,14 @@ function SelectionDialog({
   onChange: (s: Selection) => void;
   onCancel: () => void;
   onSubmitEvent: (title: string, description: string, ticketId: string | null, start: Date, end: Date) => Promise<void>;
-  onSubmitTime: (ticketId: string, note: string, start: Date, end: Date) => Promise<void>;
+  onSubmitTime: (ticketId: string | null, note: string, start: Date, end: Date) => Promise<void>;
 }) {
-  const [kind, setKind] = useState<"EVENT" | "TIME_ENTRY">("EVENT");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [ticketId, setTicketId] = useState("");
   const [eventTicketId, setEventTicketId] = useState("");
   const [note, setNote] = useState("");
 
-  // Close on ESC
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onCancel();
@@ -433,10 +622,10 @@ function SelectionDialog({
   }
 
   async function onAdd() {
-    if (kind === "EVENT") {
+    if (selection.kind === "EVENT") {
       await onSubmitEvent(title, description, eventTicketId || null, startDate, endDate);
     } else {
-      await onSubmitTime(ticketId, note, startDate, endDate);
+      await onSubmitTime(ticketId || null, note, startDate, endDate);
     }
   }
 
@@ -451,12 +640,12 @@ function SelectionDialog({
         <div className="modal-body">
           <div className="row" style={{ marginBottom: 8 }}>
             <button
-              className={kind === "EVENT" ? "" : "secondary"}
-              onClick={() => setKind("EVENT")}
+              className={selection.kind === "EVENT" ? "" : "secondary"}
+              onClick={() => onChange({ ...selection, kind: "EVENT" })}
             >予定</button>
             <button
-              className={kind === "TIME_ENTRY" ? "" : "secondary"}
-              onClick={() => setKind("TIME_ENTRY")}
+              className={selection.kind === "TIME_ENTRY" ? "" : "secondary"}
+              onClick={() => onChange({ ...selection, kind: "TIME_ENTRY" })}
             >工数</button>
           </div>
 
@@ -478,7 +667,7 @@ function SelectionDialog({
             </span>
           </div>
 
-          {kind === "EVENT" ? (
+          {selection.kind === "EVENT" ? (
             <>
               <div className="row">
                 <input
@@ -519,7 +708,7 @@ function SelectionDialog({
                   style={{ flex: 1, minWidth: 280 }}
                   autoFocus
                 >
-                  <option value="">(チケット選択)</option>
+                  <option value="">(チケット紐付けなし)</option>
                   {tickets.map((t) => (
                     <option key={t.id} value={t.id}>[{t.type}] {t.title}</option>
                   ))}
@@ -546,7 +735,6 @@ function SelectionDialog({
   );
 }
 
-// 15-min stepped time picker (00:00 … 24:00)
 function TimeSelect({ minutes, onChange }: { minutes: number; onChange: (m: number) => void }) {
   const options = useMemo(() => {
     const opts: { v: number; label: string }[] = [];

@@ -52,10 +52,15 @@ export function useEvents() {
     await refresh();
   }, [refresh]);
 
+  const update = useCallback(async (id: string, e: Partial<CalendarEvent>) => {
+    await api.updateEvent(id, e);
+    await refresh();
+  }, [refresh]);
+
   const remove = useCallback(async (id: string) => {
     await api.deleteEvent(id);
     await refresh();
   }, [refresh]);
 
-  return { events, loading, error, refresh, create, remove };
+  return { events, loading, error, refresh, create, update, remove };
 }

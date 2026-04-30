@@ -31,9 +31,9 @@ export default function TimeEntriesPage() {
         className="panel"
         onSubmit={async (e) => {
           e.preventDefault();
-          if (!ticketId || !hours || !workDate) return;
+          if (!hours || !workDate) return;
           await create({
-            ticket_id: ticketId,
+            ticket_id: ticketId || null,
             hours: Number(hours),
             work_date: workDate,
             note,
@@ -45,8 +45,8 @@ export default function TimeEntriesPage() {
       >
         <h3 style={{ marginTop: 0 }}>工数登録</h3>
         <div className="row">
-          <select value={ticketId} onChange={(e) => setTicketId(e.target.value)} required style={{ minWidth: 300 }}>
-            <option value="">チケット選択</option>
+          <select value={ticketId} onChange={(e) => setTicketId(e.target.value)} style={{ minWidth: 300 }}>
+            <option value="">(チケット紐付けなし)</option>
             {tickets.map((t) => (
               <option key={t.id} value={t.id}>[{t.type}] {t.title}</option>
             ))}
@@ -76,7 +76,7 @@ export default function TimeEntriesPage() {
             {entries.map((e) => (
               <tr key={e.id}>
                 <td>{e.work_date}</td>
-                <td>{e.ticket_title || e.ticket_id}</td>
+                <td>{e.ticket_title || e.ticket_id || "-"}</td>
                 <td>{e.user || "-"}</td>
                 <td>{e.hours.toFixed(2)} h</td>
                 <td>{e.note}</td>
