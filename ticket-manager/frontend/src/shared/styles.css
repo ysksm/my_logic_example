@@ -1,0 +1,162 @@
+:root {
+  --bg: #f7f8fa;
+  --panel: #ffffff;
+  --border: #e3e6eb;
+  --text: #1d1f23;
+  --muted: #6b7280;
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --todo: #94a3b8;
+  --inprog: #f59e0b;
+  --done: #10b981;
+  --epic: #7c3aed;
+  --story: #2563eb;
+  --task: #0891b2;
+  --subtask: #6b7280;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--text); }
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+button {
+  background: var(--accent);
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+}
+button:hover { background: var(--accent-hover); }
+button.secondary { background: #e5e7eb; color: var(--text); }
+button.secondary:hover { background: #d1d5db; }
+button.danger { background: #dc2626; }
+button.danger:hover { background: #b91c1c; }
+
+input, select, textarea {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 13px;
+  font-family: inherit;
+  background: white;
+}
+
+.layout {
+  display: flex;
+  min-height: 100vh;
+}
+.sidebar {
+  width: 220px;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  padding: 20px 0;
+}
+.sidebar h2 { margin: 0 16px 16px; font-size: 16px; }
+.sidebar nav { display: flex; flex-direction: column; }
+.sidebar nav a {
+  padding: 10px 16px;
+  color: var(--text);
+  border-left: 3px solid transparent;
+}
+.sidebar nav a.active {
+  background: #eff6ff;
+  border-left-color: var(--accent);
+  color: var(--accent);
+}
+.main { flex: 1; padding: 24px; overflow: auto; }
+.main h1 { margin-top: 0; }
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  color: white;
+  font-weight: 500;
+}
+.badge.todo { background: var(--todo); }
+.badge.inprog { background: var(--inprog); }
+.badge.done { background: var(--done); }
+.badge.epic { background: var(--epic); }
+.badge.story { background: var(--story); }
+.badge.task { background: var(--task); }
+.badge.subtask { background: var(--subtask); }
+.badge.outline {
+  background: white;
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); }
+th { font-weight: 600; color: var(--muted); background: #f9fafb; }
+tr:hover { background: #f9fafb; }
+
+.muted { color: var(--muted); font-size: 12px; }
+
+.calendar {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+.calendar .cell {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  min-height: 90px;
+  padding: 4px;
+  font-size: 12px;
+}
+.calendar .cell .date { color: var(--muted); font-size: 11px; }
+.calendar .cell.today .date { color: var(--accent); font-weight: 600; }
+.calendar .cell.outside { background: #f3f4f6; opacity: 0.6; }
+.calendar .item { margin-top: 2px; padding: 2px 4px; border-radius: 3px; background: #eff6ff; color: var(--accent); }
+.calendar .item.event { background: #fef3c7; color: #92400e; }
+.calendar .item.time { background: #ecfdf5; color: #065f46; }
+
+.tag {
+  display: inline-block;
+  padding: 1px 6px;
+  background: #eef2ff;
+  color: #4338ca;
+  border-radius: 4px;
+  font-size: 11px;
+  margin-right: 4px;
+}
+.tag .x { margin-left: 4px; cursor: pointer; opacity: 0.6; }
+.tag .x:hover { opacity: 1; }
+
+.maintenance-banner {
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+  color: #92400e;
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin-bottom: 16px;
+}
+
+pre.dump {
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  overflow: auto;
+  max-height: 400px;
+}

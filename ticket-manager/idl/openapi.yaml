@@ -1,0 +1,558 @@
+openapi: 3.0.3
+info:
+  title: Ticket Manager API
+  version: 0.1.0
+  description: |
+    チケット管理 / カレンダー管理 / 工数管理 を提供する API。
+    リポジトリ管理 (Git ブランチ作成) と DB メンテナンスモードも含む。
+servers:
+  - url: http://localhost:8080
+    description: ローカル開発サーバー
+
+tags:
+  - name: tickets
+  - name: tags
+  - name: time-entries
+  - name: calendar
+  - name: repositories
+  - name: maintenance
+
+paths:
+  /api/health:
+    get:
+      tags: [maintenance]
+      summary: ヘルスチェック
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+
+  /api/tickets:
+    get:
+      tags: [tickets]
+      summary: チケット一覧
+      parameters:
+        - in: query
+          name: type
+          schema: { $ref: '#/components/schemas/TicketType' }
+        - in: query
+          name: status
+          schema: { $ref: '#/components/schemas/TicketStatus' }
+        - in: query
+          name: parent_id
+          schema: { type: string, nullable: true }
+        - in: query
+          name: tag
+          schema: { type: string }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Ticket' }
+    post:
+      tags: [tickets]
+      summary: チケット作成
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TicketCreate' }
+      responses:
+        '201':
+          description: created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ticket' }
+
+  /api/tickets/{id}:
+    get:
+      tags: [tickets]
+      summary: チケット詳細
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ticket' }
+        '404':
+          description: not found
+    put:
+      tags: [tickets]
+      summary: チケット更新
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TicketUpdate' }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ticket' }
+    delete:
+      tags: [tickets]
+      summary: チケット削除
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses:
+        '204':
+          description: deleted
+
+  /api/tickets/{id}/tags:
+    post:
+      tags: [tickets]
+      summary: チケットにタグ付与
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tag]
+              properties:
+                tag: { type: string }
+      responses:
+        '204':
+          description: ok
+    delete:
+      tags: [tickets]
+      summary: チケットのタグを外す
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+        - { in: query, name: tag, required: true, schema: { type: string } }
+      responses:
+        '204':
+          description: ok
+
+  /api/tags:
+    get:
+      tags: [tags]
+      summary: タグ一覧
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Tag' }
+
+  /api/time-entries:
+    get:
+      tags: [time-entries]
+      summary: 工数一覧
+      parameters:
+        - { in: query, name: ticket_id, schema: { type: string } }
+        - { in: query, name: from, schema: { type: string, format: date } }
+        - { in: query, name: to, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/TimeEntry' }
+    post:
+      tags: [time-entries]
+      summary: 工数登録
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TimeEntryCreate' }
+      responses:
+        '201':
+          description: created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TimeEntry' }
+
+  /api/time-entries/{id}:
+    delete:
+      tags: [time-entries]
+      summary: 工数削除
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses:
+        '204':
+          description: deleted
+
+  /api/calendar:
+    get:
+      tags: [calendar]
+      summary: カレンダー (チケット期日 + 工数 + イベント)
+      parameters:
+        - { in: query, name: from, required: true, schema: { type: string, format: date } }
+        - { in: query, name: to, required: true, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/CalendarItem' }
+
+  /api/calendar/events:
+    get:
+      tags: [calendar]
+      summary: 単独カレンダーイベント一覧
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/CalendarEvent' }
+    post:
+      tags: [calendar]
+      summary: カレンダーイベント作成
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CalendarEventCreate' }
+      responses:
+        '201':
+          description: created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CalendarEvent' }
+
+  /api/calendar/events/{id}:
+    delete:
+      tags: [calendar]
+      summary: カレンダーイベント削除
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses:
+        '204':
+          description: deleted
+
+  /api/repositories:
+    get:
+      tags: [repositories]
+      summary: 登録リポジトリ一覧
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Repository' }
+    post:
+      tags: [repositories]
+      summary: リポジトリ登録
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RepositoryCreate' }
+      responses:
+        '201':
+          description: created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Repository' }
+
+  /api/repositories/{id}:
+    delete:
+      tags: [repositories]
+      summary: リポジトリ削除
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses:
+        '204':
+          description: deleted
+
+  /api/repositories/{id}/branches:
+    get:
+      tags: [repositories]
+      summary: ブランチ一覧
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { type: string }
+    post:
+      tags: [repositories]
+      summary: ブランチ作成
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BranchCreate' }
+      responses:
+        '201':
+          description: created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  branch: { type: string }
+
+  /api/maintenance/status:
+    get:
+      tags: [maintenance]
+      summary: メンテナンスモード状態
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enabled: { type: boolean }
+
+  /api/maintenance/enable:
+    post:
+      tags: [maintenance]
+      summary: メンテナンスモード有効化
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token: { type: string }
+      responses:
+        '200':
+          description: ok
+
+  /api/maintenance/disable:
+    post:
+      tags: [maintenance]
+      summary: メンテナンスモード解除
+      responses:
+        '200':
+          description: ok
+
+  /api/maintenance/tables:
+    get:
+      tags: [maintenance]
+      summary: DBテーブル一覧 (メンテナンスモード時のみ)
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { type: string }
+
+  /api/maintenance/tables/{name}:
+    get:
+      tags: [maintenance]
+      summary: テーブル内容を取得 (メンテナンスモード時のみ)
+      parameters:
+        - { in: path, name: name, required: true, schema: { type: string } }
+        - { in: query, name: limit, schema: { type: integer, default: 200 } }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TableDump' }
+
+  /api/maintenance/query:
+    post:
+      tags: [maintenance]
+      summary: 任意 SQL を実行 (メンテナンスモード時のみ / 読み取り推奨)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sql]
+              properties:
+                sql: { type: string }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TableDump' }
+
+components:
+  schemas:
+    Health:
+      type: object
+      properties:
+        status: { type: string, example: ok }
+        maintenance: { type: boolean }
+
+    TicketType:
+      type: string
+      enum: [EPIC, STORY, TASK, SUBTASK]
+
+    TicketStatus:
+      type: string
+      enum: [TODO, IN_PROGRESS, DONE]
+
+    Ticket:
+      type: object
+      required: [id, title, type, status, created_at, updated_at]
+      properties:
+        id: { type: string }
+        parent_id: { type: string, nullable: true }
+        title: { type: string }
+        description: { type: string }
+        type: { $ref: '#/components/schemas/TicketType' }
+        status: { $ref: '#/components/schemas/TicketStatus' }
+        assignee: { type: string, nullable: true }
+        estimate_hours: { type: number, nullable: true }
+        due_date: { type: string, format: date, nullable: true }
+        repository_id: { type: string, nullable: true }
+        branch: { type: string, nullable: true }
+        tags:
+          type: array
+          items: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    TicketCreate:
+      type: object
+      required: [title, type]
+      properties:
+        parent_id: { type: string, nullable: true }
+        title: { type: string }
+        description: { type: string }
+        type: { $ref: '#/components/schemas/TicketType' }
+        status: { $ref: '#/components/schemas/TicketStatus' }
+        assignee: { type: string, nullable: true }
+        estimate_hours: { type: number, nullable: true }
+        due_date: { type: string, format: date, nullable: true }
+        repository_id: { type: string, nullable: true }
+        branch: { type: string, nullable: true }
+        tags:
+          type: array
+          items: { type: string }
+
+    TicketUpdate:
+      type: object
+      properties:
+        parent_id: { type: string, nullable: true }
+        title: { type: string }
+        description: { type: string }
+        type: { $ref: '#/components/schemas/TicketType' }
+        status: { $ref: '#/components/schemas/TicketStatus' }
+        assignee: { type: string, nullable: true }
+        estimate_hours: { type: number, nullable: true }
+        due_date: { type: string, format: date, nullable: true }
+        repository_id: { type: string, nullable: true }
+        branch: { type: string, nullable: true }
+
+    Tag:
+      type: object
+      properties:
+        name: { type: string }
+        usage_count: { type: integer }
+
+    TimeEntry:
+      type: object
+      required: [id, ticket_id, hours, work_date]
+      properties:
+        id: { type: string }
+        ticket_id: { type: string }
+        ticket_title: { type: string }
+        user: { type: string }
+        hours: { type: number }
+        work_date: { type: string, format: date }
+        note: { type: string }
+        created_at: { type: string, format: date-time }
+
+    TimeEntryCreate:
+      type: object
+      required: [ticket_id, hours, work_date]
+      properties:
+        ticket_id: { type: string }
+        user: { type: string }
+        hours: { type: number }
+        work_date: { type: string, format: date }
+        note: { type: string }
+
+    CalendarItem:
+      type: object
+      properties:
+        kind: { type: string, enum: [TICKET_DUE, TIME_ENTRY, EVENT] }
+        date: { type: string, format: date }
+        title: { type: string }
+        ticket_id: { type: string, nullable: true }
+        hours: { type: number, nullable: true }
+        status: { $ref: '#/components/schemas/TicketStatus' }
+        event_id: { type: string, nullable: true }
+
+    CalendarEvent:
+      type: object
+      required: [id, title, start_date]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        description: { type: string }
+        start_date: { type: string, format: date }
+        end_date: { type: string, format: date, nullable: true }
+
+    CalendarEventCreate:
+      type: object
+      required: [title, start_date]
+      properties:
+        title: { type: string }
+        description: { type: string }
+        start_date: { type: string, format: date }
+        end_date: { type: string, format: date, nullable: true }
+
+    Repository:
+      type: object
+      required: [id, name, path]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        path: { type: string }
+        default_branch: { type: string }
+        created_at: { type: string, format: date-time }
+
+    RepositoryCreate:
+      type: object
+      required: [name, path]
+      properties:
+        name: { type: string }
+        path: { type: string }
+        default_branch: { type: string }
+
+    BranchCreate:
+      type: object
+      required: [branch]
+      properties:
+        branch: { type: string }
+        from: { type: string, description: 起点ブランチ (省略時は default_branch) }
+        checkout: { type: boolean, default: false }
+
+    TableDump:
+      type: object
+      properties:
+        columns:
+          type: array
+          items: { type: string }
+        rows:
+          type: array
+          items:
+            type: array
+            items: {}
+        row_count: { type: integer }
