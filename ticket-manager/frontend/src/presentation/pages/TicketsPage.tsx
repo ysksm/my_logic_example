@@ -7,7 +7,7 @@ import { TICKET_STATUSES, TICKET_TYPES } from "@/domain/types";
 import { StatusBadge, TypeBadge } from "@/presentation/components/Badges";
 import TicketForm, { childTypeFor, type TicketFormPreset } from "@/presentation/components/TicketForm";
 
-type ViewMode = "list" | "tree";
+type ViewMode = "list" | "tree" | "mindmap";
 
 export default function TicketsPage() {
   const [filterType, setFilterType] = useState<TicketType | "">("");
@@ -134,6 +134,10 @@ export default function TicketsPage() {
               className={viewMode === "tree" ? "" : "secondary"}
               onClick={() => setViewMode("tree")}
             >ツリー</button>
+            <button
+              className={viewMode === "mindmap" ? "" : "secondary"}
+              onClick={() => setViewMode("mindmap")}
+            >マインドマップ</button>
             {viewMode === "tree" && collapsed.size > 0 && (
               <button className="secondary" onClick={() => setCollapsed(new Set())}>
                 すべて展開
@@ -144,44 +148,48 @@ export default function TicketsPage() {
 
         {error && <p style={{ color: "red" }}>{error}</p>}
 
-        <table>
-          <thead>
-            <tr>
-              <th>Type</th>
-              <th>Title</th>
-              <th>Status</th>
-              <th>Assignee</th>
-              <th>Due</th>
-              <th>Est.</th>
-              <th>Repo / Branch</th>
-              <th>Tags</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {visible.map(({ t, depth, hasChildren }) => (
-              <TicketRow
-                key={t.id}
-                t={t}
-                depth={viewMode === "tree" ? depth : 0}
-                isTree={viewMode === "tree"}
-                hasChildren={hasChildren}
-                isCollapsed={collapsed.has(t.id)}
-                onToggleCollapsed={() => toggleCollapsed(t.id)}
-                allRepos={repos}
-                childCount={childrenByParent.get(t.id)?.length ?? 0}
-                onChangeStatus={(s) => update(t.id, { status: s, type: t.type, title: t.title })}
-                onDelete={() => remove(t.id)}
-                onAddTag={(tag) => addTag(t.id, tag)}
-                onRemoveTag={(tag) => removeTag(t.id, tag)}
-                onAddChild={() => startChild(t)}
-              />
-            ))}
-            {visible.length === 0 && (
-              <tr><td colSpan={9} className="muted">該当なし</td></tr>
-            )}
-          </tbody>
-        </table>
+        {viewMode === "mindmap" ? (
+          <Mindmap tickets={tickets} onAddChild={startChild} />
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Title</th>
+                <th>Status</th>
+                <th>Assignee</th>
+                <th>Due</th>
+                <th>Est.</th>
+                <th>Repo / Branch</th>
+                <th>Tags</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {visible.map(({ t, depth, hasChildren }) => (
+                <TicketRow
+                  key={t.id}
+                  t={t}
+                  depth={viewMode === "tree" ? depth : 0}
+                  isTree={viewMode === "tree"}
+                  hasChildren={hasChildren}
+                  isCollapsed={collapsed.has(t.id)}
+                  onToggleCollapsed={() => toggleCollapsed(t.id)}
+                  allRepos={repos}
+                  childCount={childrenByParent.get(t.id)?.length ?? 0}
+                  onChangeStatus={(s) => update(t.id, { status: s, type: t.type, title: t.title })}
+                  onDelete={() => remove(t.id)}
+                  onAddTag={(tag) => addTag(t.id, tag)}
+                  onRemoveTag={(tag) => removeTag(t.id, tag)}
+                  onAddChild={() => startChild(t)}
+                />
+              ))}
+              {visible.length === 0 && (
+                <tr><td colSpan={9} className="muted">該当なし</td></tr>
+              )}
+            </tbody>
+          </table>
+        )}
       </div>
     </>
   );
@@ -201,6 +209,126 @@ interface RowProps {
   onAddTag: (tag: string) => void;
   onRemoveTag: (tag: string) => void;
   onAddChild: () => void;
+}
+
+// ===== Mindmap (SVG horizontal tree) =====
+const NODE_W = 180;
+const NODE_H = 36;
+const COL_W = 220;
+const ROW_H = 56;
+const PAD = 16;
+
+interface MindmapNode {
+  t: Ticket;
+  depth: number;
+  x: number;
+  y: number;
+  parentId: string | null;
+}
+
+function Mindmap({ tickets, onAddChild }: { tickets: Ticket[]; onAddChild: (t: Ticket) => void }) {
+  const { nodes, edges, width, height } = useMemo(() => layoutMindmap(tickets), [tickets]);
+
+  if (tickets.length === 0) {
+    return <div className="muted" style={{ padding: 20 }}>該当なし</div>;
+  }
+
+  return (
+    <div style={{ overflow: "auto", maxHeight: "70vh", border: "1px solid var(--border)", borderRadius: 4 }}>
+      <svg width={width + PAD * 2} height={height + PAD * 2} style={{ display: "block" }}>
+        <g transform={`translate(${PAD},${PAD})`}>
+          {edges.map((e, i) => {
+            const midX = (e.x1 + e.x2) / 2;
+            const d = `M${e.x1},${e.y1} C${midX},${e.y1} ${midX},${e.y2} ${e.x2},${e.y2}`;
+            return <path key={i} d={d} stroke="#cbd5e1" strokeWidth={1.5} fill="none" />;
+          })}
+          {nodes.map((n) => (
+            <g
+              key={n.t.id}
+              transform={`translate(${n.x},${n.y})`}
+              className={`mm-node mm-${n.t.type.toLowerCase()} mm-status-${n.t.status.toLowerCase()}`}
+              style={{ cursor: n.t.type !== "SUBTASK" ? "pointer" : "default" }}
+              onClick={() => n.t.type !== "SUBTASK" && onAddChild(n.t)}
+            >
+              <rect width={NODE_W} height={NODE_H} rx={6} ry={6} className="mm-rect" />
+              <text x={8} y={14} className="mm-type">[{n.t.type}]</text>
+              <text x={8} y={28} className="mm-title">{trim(n.t.title, 22)}</text>
+              {n.t.status !== "TODO" && (
+                <circle cx={NODE_W - 10} cy={10} r={4} className={`mm-dot status-${n.t.status.toLowerCase()}`} />
+              )}
+            </g>
+          ))}
+        </g>
+      </svg>
+    </div>
+  );
+}
+
+function trim(s: string, n: number) {
+  return s.length <= n ? s : s.slice(0, n - 1) + "…";
+}
+
+function layoutMindmap(tickets: Ticket[]): {
+  nodes: MindmapNode[];
+  edges: { x1: number; y1: number; x2: number; y2: number }[];
+  width: number;
+  height: number;
+} {
+  const idSet = new Set(tickets.map((t) => t.id));
+  const childMap = new Map<string | null, Ticket[]>();
+  for (const t of tickets) {
+    const k = t.parent_id && idSet.has(t.parent_id) ? t.parent_id : null;
+    const arr = childMap.get(k) ?? [];
+    arr.push(t);
+    childMap.set(k, arr);
+  }
+  const nodes: MindmapNode[] = [];
+  let cursorY = 0;
+  let maxDepth = 0;
+
+  const visit = (t: Ticket, depth: number, parentId: string | null, topY: number): { y: number; consumed: number } => {
+    maxDepth = Math.max(maxDepth, depth);
+    const kids = childMap.get(t.id) ?? [];
+    if (kids.length === 0) {
+      const y = topY;
+      cursorY = topY + ROW_H;
+      nodes.push({ t, depth, x: depth * COL_W, y, parentId });
+      return { y, consumed: ROW_H };
+    }
+    const ys: number[] = [];
+    let consumed = 0;
+    for (const k of kids) {
+      const r = visit(k, depth + 1, t.id, topY + consumed);
+      ys.push(r.y);
+      consumed += r.consumed;
+    }
+    const y = (ys[0] + ys[ys.length - 1]) / 2;
+    nodes.push({ t, depth, x: depth * COL_W, y, parentId });
+    return { y, consumed };
+  };
+
+  let topY = 0;
+  for (const root of childMap.get(null) ?? []) {
+    const r = visit(root, 0, null, topY);
+    topY += r.consumed;
+  }
+
+  const byId = new Map(nodes.map((n) => [n.t.id, n]));
+  const edges = nodes
+    .filter((n) => n.parentId && byId.has(n.parentId))
+    .map((n) => {
+      const p = byId.get(n.parentId!)!;
+      return {
+        x1: p.x + NODE_W,
+        y1: p.y + NODE_H / 2,
+        x2: n.x,
+        y2: n.y + NODE_H / 2,
+      };
+    });
+
+  const width = (maxDepth + 1) * COL_W;
+  const height = cursorY;
+  return { nodes, edges, width, height };
 }
 
 function TicketRow({

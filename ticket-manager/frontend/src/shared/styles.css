@@ -339,6 +339,32 @@ tr:hover { background: #f9fafb; }
   line-height: 1;
 }
 
+/* Mindmap (SVG) */
+.mm-node .mm-rect {
+  fill: white;
+  stroke: var(--border);
+  stroke-width: 1;
+  transition: fill 0.1s;
+}
+.mm-node:hover .mm-rect { fill: #f8fafc; stroke: var(--accent); }
+.mm-node .mm-type {
+  font-size: 10px;
+  fill: var(--muted);
+  font-weight: 600;
+}
+.mm-node .mm-title {
+  font-size: 12px;
+  fill: var(--text);
+}
+.mm-node.mm-epic .mm-rect { stroke: var(--epic); border-left: 4px solid var(--epic); }
+.mm-node.mm-story .mm-rect { stroke: var(--story); }
+.mm-node.mm-task .mm-rect { stroke: var(--task); }
+.mm-node.mm-subtask .mm-rect { stroke: var(--subtask); }
+.mm-dot.status-in_progress { fill: var(--inprog); }
+.mm-dot.status-done { fill: var(--done); }
+.mm-node.mm-status-done .mm-rect { fill: #f0fdf4; }
+.mm-node.mm-status-in_progress .mm-rect { fill: #fffbeb; }
+
 .tag {
   display: inline-block;
   padding: 1px 6px;
