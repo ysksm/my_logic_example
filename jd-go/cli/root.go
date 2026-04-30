@@ -52,6 +52,7 @@ func init() {
 	rootCmd.AddCommand(syncCmd)
 	rootCmd.AddCommand(queryCmd)
 	rootCmd.AddCommand(serveCmd)
+	rootCmd.AddCommand(desktopCmd)
 }
 
 // Execute runs the root command.

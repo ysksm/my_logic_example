@@ -101,6 +101,11 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc("GET /api/history/snapshot/{projectKey}", s.handleHistorySnapshot)
 }
 
+// Handler returns the HTTP handler for use with external servers (e.g., Wails).
+func (s *Server) Handler() http.Handler {
+	return s.mux
+}
+
 // Start starts the HTTP server.
 func (s *Server) Start(addr string) error {
 	slog.Info("Server starting", "addr", addr)
