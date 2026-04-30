@@ -2,11 +2,12 @@ package maintenance
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
 	"sync/atomic"
+
+	"github.com/ysksm/my_logic_example/ticket-manager/server/internal/infra/dbx"
 )
 
 var ErrDisabled = errors.New("maintenance mode is disabled")
@@ -16,10 +17,10 @@ var ErrDisabled = errors.New("maintenance mode is disabled")
 type Mode struct {
 	enabled atomic.Bool
 	token   string // optional shared secret for enable
-	db      *sql.DB
+	db      *dbx.DB
 }
 
-func New(db *sql.DB, token string) *Mode {
+func New(db *dbx.DB, token string) *Mode {
 	return &Mode{db: db, token: token}
 }
 
@@ -47,7 +48,7 @@ func (m *Mode) Tables(ctx context.Context) ([]string, error) {
 	if err := m.requireEnabled(); err != nil {
 		return nil, err
 	}
-	rows, err := m.db.QueryContext(ctx, `SELECT table_name FROM information_schema.tables WHERE table_schema = 'main' ORDER BY table_name`)
+	rows, err := m.db.QueryContext(ctx, dbx.ListTablesQuery(m.db.Driver))
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +97,7 @@ func (m *Mode) DumpTable(ctx context.Context, name string, limit int) (*Dump, er
 	if limit <= 0 || limit > 5000 {
 		limit = 200
 	}
-	q := fmt.Sprintf(`SELECT * FROM "%s" LIMIT %d`, name, limit)
+	q := fmt.Sprintf(`SELECT * FROM %s LIMIT %d`, quoteIdent(m.db.Driver, name), limit)
 	return m.runQuery(ctx, q)
 }
 
@@ -151,6 +152,15 @@ func normalizeValue(v any) any {
 	default:
 		return x
 	}
+}
+
+// quoteIdent quotes a previously-validated identifier for the active driver.
+// MySQL requires backticks; the others accept ANSI double quotes.
+func quoteIdent(d dbx.Driver, name string) string {
+	if d == dbx.DriverMySQL {
+		return "`" + name + "`"
+	}
+	return `"` + name + `"`
 }
 
 func validIdentifier(s string) bool {

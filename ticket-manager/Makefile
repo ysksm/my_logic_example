@@ -1,10 +1,11 @@
 SHELL := /bin/bash
 
-BIN      := bin/ticket-manager
-ADDR     ?= :8080
-DB       ?= ticket-manager.duckdb
-FRONTEND := frontend
-SERVER   := server
+BIN       := bin/ticket-manager
+ADDR      ?= :8080
+DB_DRIVER ?= duckdb
+DB        ?= ticket-manager.duckdb
+FRONTEND  := frontend
+SERVER    := server
 
 .PHONY: run build frontend backend dev clean help
 
@@ -17,7 +18,7 @@ help:
 
 # 1コマンドで全部: フロント build → embed → Go ビルド → 起動
 run: build
-	./$(BIN) -addr $(ADDR) -db $(DB)
+	./$(BIN) -addr $(ADDR) -db-driver $(DB_DRIVER) -db $(DB)
 
 build: frontend backend
 
@@ -42,7 +43,7 @@ dev:
 	@echo "==================================================="
 	@echo ""
 	@trap 'kill 0' EXIT INT TERM; \
-	  ( cd $(SERVER) && go run ./cmd/server -addr $(ADDR) -db $(DB) ) & \
+	  ( cd $(SERVER) && go run ./cmd/server -addr $(ADDR) -db-driver $(DB_DRIVER) -db $(DB) ) & \
 	  ( cd $(FRONTEND) && \
 	    if [ ! -d node_modules ]; then npm install; fi && \
 	    npm run dev ) & \

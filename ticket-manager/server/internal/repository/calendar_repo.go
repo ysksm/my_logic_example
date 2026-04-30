@@ -7,13 +7,14 @@ import (
 	"time"
 
 	"github.com/ysksm/my_logic_example/ticket-manager/server/internal/domain"
+	"github.com/ysksm/my_logic_example/ticket-manager/server/internal/infra/dbx"
 )
 
 type CalendarRepository struct {
-	db *sql.DB
+	db *dbx.DB
 }
 
-func NewCalendarRepository(db *sql.DB) *CalendarRepository {
+func NewCalendarRepository(db *dbx.DB) *CalendarRepository {
 	return &CalendarRepository{db: db}
 }
 

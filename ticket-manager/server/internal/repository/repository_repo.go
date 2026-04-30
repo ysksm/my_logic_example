@@ -6,13 +6,14 @@ import (
 	"time"
 
 	"github.com/ysksm/my_logic_example/ticket-manager/server/internal/domain"
+	"github.com/ysksm/my_logic_example/ticket-manager/server/internal/infra/dbx"
 )
 
 type RepoRepository struct {
-	db *sql.DB
+	db *dbx.DB
 }
 
-func NewRepoRepository(db *sql.DB) *RepoRepository {
+func NewRepoRepository(db *dbx.DB) *RepoRepository {
 	return &RepoRepository{db: db}
 }
 
