@@ -16,6 +16,7 @@ import (
 	"github.com/ysksm/my_logic_example/ticket-manager/server/internal/maintenance"
 	"github.com/ysksm/my_logic_example/ticket-manager/server/internal/repository"
 	"github.com/ysksm/my_logic_example/ticket-manager/server/internal/service"
+	"github.com/ysksm/my_logic_example/ticket-manager/server/internal/webui"
 )
 
 func main() {
@@ -63,6 +64,8 @@ func main() {
 	}))
 
 	h.Mount(r)
+
+	r.Handle("/*", webui.Handler())
 
 	log.Printf("ticket-manager listening on %s (db=%s)", *addr, *dbPath)
 	if err := http.ListenAndServe(*addr, r); err != nil {

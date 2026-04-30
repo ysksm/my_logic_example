@@ -42,29 +42,43 @@ OpenAPI 3.0 (`idl/openapi.yaml`) を Source of Truth として、サーバーと
 
 ## 実行
 
-### 1. サーバー (Go + DuckDB)
+### 1コマンドでビルド & 起動
 
 ```bash
-cd server
-go mod tidy
-go run ./cmd/server -addr :8080 -db ticket-manager.duckdb
+make run        # フロントを vite build → Go バイナリへ go:embed → :8080 で起動
 ```
 
-主な環境変数:
+http://localhost:8080 で UI と API が同一ポートから配信されます。
+オプション:
 
-| 変数 | 用途 |
-| --- | --- |
-| `MAINTENANCE_TOKEN` | メンテナンスモード有効化時に必要なトークン (未設定なら誰でも有効化可) |
+| 変数 | 用途 | デフォルト |
+| --- | --- | --- |
+| `ADDR` | listen アドレス | `:8080` |
+| `DB`   | DuckDB ファイルパス (`:memory:` 可) | `ticket-manager.duckdb` |
+| `MAINTENANCE_TOKEN` | メンテナンスモード有効化時に必要なトークン | (未設定: 誰でも有効化可) |
 
-### 2. フロントエンド (React + Vite)
+例: `make run ADDR=:9000 DB=:memory:`
+
+### その他のターゲット
 
 ```bash
-cd frontend
-npm install
-npm run dev    # http://localhost:5173 (API は :8080 にプロキシ)
+make build      # フロント + バイナリをビルドし bin/ticket-manager に出力
+make dev        # サーバ (:8080) と Vite dev (:5173, /api をプロキシ) を並走
+make clean      # ビルド成果物を削除
 ```
 
-本番ビルドは `npm run build`。
+### 個別に動かす場合
+
+```bash
+# サーバ単体
+cd server && go run ./cmd/server -addr :8080 -db ticket-manager.duckdb
+
+# フロントエンド単体 (HMR、API は :8080 にプロキシ)
+cd frontend && npm install && npm run dev
+```
+
+`make build` / `make run` は frontend の vite build を
+`server/internal/webui/static/` に出力し、`go:embed` でバイナリに同梱します。
 
 ## 主要 API
 

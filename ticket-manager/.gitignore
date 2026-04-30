@@ -2,6 +2,11 @@
 server/ticket-manager-server
 server/*.duckdb
 server/*.duckdb.wal
+bin/
+
+# Embedded frontend build (only .gitkeep is tracked; vite output is ignored)
+server/internal/webui/static/*
+!server/internal/webui/static/.gitkeep
 
 # Frontend
 frontend/node_modules/
