@@ -9,6 +9,7 @@ export const TICKET_STATUSES: TicketStatus[] = ["TODO", "IN_PROGRESS", "DONE"];
 
 export interface Ticket {
   id: string;
+  number: number;
   parent_id: string | null;
   title: string;
   description: string;
