@@ -2,7 +2,9 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 
@@ -16,6 +18,7 @@ import (
 	"github.com/ysksm/my_logic_example/ticket-manager/server/internal/maintenance"
 	"github.com/ysksm/my_logic_example/ticket-manager/server/internal/repository"
 	"github.com/ysksm/my_logic_example/ticket-manager/server/internal/service"
+	"github.com/ysksm/my_logic_example/ticket-manager/server/internal/webui"
 )
 
 func main() {
@@ -64,8 +67,34 @@ func main() {
 
 	h.Mount(r)
 
+	r.Handle("/*", webui.Handler())
+
+	url := accessURL(*addr)
+	fmt.Println()
+	fmt.Println("  ticket-manager is running.")
+	fmt.Println()
+	fmt.Println("  ▶ Open in your browser :", url)
+	fmt.Println("    Health check         :", url+"/api/health")
+	fmt.Println("    DB                   :", *dbPath)
+	fmt.Println("    Stop                 : Ctrl-C")
+	fmt.Println()
+
 	log.Printf("ticket-manager listening on %s (db=%s)", *addr, *dbPath)
 	if err := http.ListenAndServe(*addr, r); err != nil {
 		log.Fatal(err)
 	}
+}
+
+// accessURL turns a listen address (e.g. ":8080", "0.0.0.0:8080",
+// "127.0.0.1:8080") into a URL that a developer can open in a browser.
+func accessURL(addr string) string {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return "http://" + addr
+	}
+	switch host {
+	case "", "0.0.0.0", "::", "[::]":
+		host = "localhost"
+	}
+	return fmt.Sprintf("http://%s:%s", host, port)
 }

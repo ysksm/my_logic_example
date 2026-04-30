@@ -28,10 +28,15 @@ export function useTimeEntries(filter: { ticket_id?: string; from?: string; to?:
     await refresh();
   }, [refresh]);
 
+  const update = useCallback(async (id: string, e: Partial<TimeEntry>) => {
+    await api.updateTimeEntry(id, e);
+    await refresh();
+  }, [refresh]);
+
   const remove = useCallback(async (id: string) => {
     await api.deleteTimeEntry(id);
     await refresh();
   }, [refresh]);
 
-  return { entries, loading, error, refresh, create, remove };
+  return { entries, loading, error, refresh, create, update, remove };
 }
