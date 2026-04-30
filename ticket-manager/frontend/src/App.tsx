@@ -2,6 +2,7 @@ import { NavLink, Navigate, Route, Routes } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { api } from "@/infrastructure/api/client";
 import TicketsPage from "@/presentation/pages/TicketsPage";
+import TicketEditPage from "@/presentation/pages/TicketEditPage";
 import CalendarPage from "@/presentation/pages/CalendarPage";
 import TimeEntriesPage from "@/presentation/pages/TimeEntriesPage";
 import RepositoriesPage from "@/presentation/pages/RepositoriesPage";
@@ -51,7 +52,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Navigate to="/tickets" replace />} />
           <Route path="/tickets" element={<TicketsPage />} />
-          <Route path="/tickets/:id" element={<TicketsPage />} />
+          <Route path="/tickets/:id" element={<TicketEditPage />} />
           <Route path="/calendar" element={<CalendarPage />} />
           <Route path="/time" element={<TimeEntriesPage />} />
           <Route path="/sprints" element={<SprintsPage />} />

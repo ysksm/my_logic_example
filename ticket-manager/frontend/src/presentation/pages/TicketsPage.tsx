@@ -2,10 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import { useTickets } from "@/application/hooks/useTickets";
 import { useRepositories } from "@/application/hooks/useRepositories";
 import { useTags } from "@/application/hooks/useTags";
+import { useSprints } from "@/application/hooks/useSprints";
 import type { Ticket, TicketCreate, TicketStatus, TicketType } from "@/domain/types";
 import { TICKET_STATUSES, TICKET_TYPES } from "@/domain/types";
 import { StatusBadge, TypeBadge } from "@/presentation/components/Badges";
 import TicketForm, { childTypeFor, type TicketFormPreset } from "@/presentation/components/TicketForm";
+import EditTicketDialog from "@/presentation/components/EditTicketDialog";
 
 type ViewMode = "list" | "tree" | "mindmap" | "kanban";
 
@@ -27,6 +29,7 @@ export default function TicketsPage() {
   });
   const { repos } = useRepositories();
   const { tags } = useTags();
+  const { sprints } = useSprints();
 
   const parents = useMemo(
     () => tickets.filter((t) => t.type !== "SUBTASK").map((t) => ({ id: t.id, title: `[${t.type}] ${t.title}` })),
@@ -244,6 +247,7 @@ export default function TicketsPage() {
               if (!t) return;
               update(id, { ...t, status: s });
             }}
+            onEdit={(t) => setEditing(t)}
           />
         ) : viewMode === "mindmap" ? (
           <Mindmap
@@ -257,6 +261,7 @@ export default function TicketsPage() {
           <table>
             <thead>
               <tr>
+                <th></th>
                 <th>Type</th>
                 <th>Title</th>
                 <th>Status</th>
@@ -265,7 +270,6 @@ export default function TicketsPage() {
                 <th>Est.</th>
                 <th>Repo / Branch</th>
                 <th>Tags</th>
-                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -285,6 +289,7 @@ export default function TicketsPage() {
                   onAddTag={(tag) => addTag(t.id, tag)}
                   onRemoveTag={(tag) => removeTag(t.id, tag)}
                   onAddChild={() => startChild(t)}
+                  onEdit={() => setEditing(t)}
                 />
               ))}
               {visible.length === 0 && (
@@ -307,8 +312,9 @@ export default function TicketsPage() {
       )}
 
       {editing && (
-        <EditTicketModal
+        <EditTicketDialog
           ticket={editing}
+          sprints={sprints}
           onCancel={() => setEditing(null)}
           onSave={async (patch) => {
             await update(editing.id, patch);
@@ -334,13 +340,19 @@ interface RowProps {
   onAddTag: (tag: string) => void;
   onRemoveTag: (tag: string) => void;
   onAddChild: () => void;
+  onEdit: () => void;
 }
 
 // ===== Kanban (status columns) =====
 function Kanban({
   tickets,
   onChangeStatus,
-}: { tickets: Ticket[]; onChangeStatus: (id: string, status: TicketStatus) => void }) {
+  onEdit,
+}: {
+  tickets: Ticket[];
+  onChangeStatus: (id: string, status: TicketStatus) => void;
+  onEdit: (t: Ticket) => void;
+}) {
   const cols: { status: TicketStatus; label: string }[] = [
     { status: "TODO", label: "TODO" },
     { status: "IN_PROGRESS", label: "進行中" },
@@ -361,6 +373,7 @@ function Kanban({
           label={c.label}
           tickets={byStatus.get(c.status) ?? []}
           onDropTicket={(id) => onChangeStatus(id, c.status)}
+          onEdit={onEdit}
         />
       ))}
     </div>
@@ -368,12 +381,13 @@ function Kanban({
 }
 
 function KanbanColumn({
-  status, label, tickets, onDropTicket,
+  status, label, tickets, onDropTicket, onEdit,
 }: {
   status: TicketStatus;
   label: string;
   tickets: Ticket[];
   onDropTicket: (id: string) => void;
+  onEdit: (t: Ticket) => void;
 }) {
   const [over, setOver] = useState(false);
   return (
@@ -397,7 +411,7 @@ function KanbanColumn({
       </div>
       <div className="ticket-list">
         {tickets.map((t) => (
-          <KCard key={t.id} t={t} />
+          <KCard key={t.id} t={t} onEdit={() => onEdit(t)} />
         ))}
         {tickets.length === 0 && (
           <div className="muted ticket-list-empty">(空)</div>
@@ -407,7 +421,7 @@ function KanbanColumn({
   );
 }
 
-function KCard({ t }: { t: Ticket }) {
+function KCard({ t, onEdit }: { t: Ticket; onEdit: () => void }) {
   return (
     <div
       className="ticket-card"
@@ -417,92 +431,25 @@ function KCard({ t }: { t: Ticket }) {
         e.dataTransfer.effectAllowed = "move";
       }}
     >
-      <div className="row" style={{ justifyContent: "space-between", marginBottom: 4 }}>
+      <div className="row" style={{ marginBottom: 4, gap: 6 }}>
+        <a
+          href={`/tickets/${t.id}`}
+          target="_blank"
+          rel="noopener"
+          className="btn-link"
+          onMouseDown={(e) => e.stopPropagation()}
+          title="別タブで詳細編集"
+        >↗</a>
         <TypeBadge value={t.type} />
       </div>
-      <div className="ticket-card-title">{t.title}</div>
+      <div
+        className="ticket-card-title title-link"
+        onClick={(e) => { e.stopPropagation(); onEdit(); }}
+        onMouseDown={(e) => e.stopPropagation()}
+        title="クリックで編集"
+      >{t.title}</div>
       {t.assignee && <div className="muted" style={{ fontSize: 11 }}>👤 {t.assignee}</div>}
       {t.due_date && <div className="muted" style={{ fontSize: 11 }}>📅 {t.due_date}</div>}
-    </div>
-  );
-}
-
-// ===== Edit ticket modal (Enter on focused node) =====
-function EditTicketModal({
-  ticket,
-  onCancel,
-  onSave,
-}: {
-  ticket: Ticket;
-  onCancel: () => void;
-  onSave: (patch: Partial<TicketCreate>) => Promise<void>;
-}) {
-  const [title, setTitle] = useState(ticket.title);
-  const [type, setType] = useState<TicketType>(ticket.type);
-  const [status, setStatus] = useState<TicketStatus>(ticket.status);
-  const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onCancel();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onCancel]);
-
-  async function save() {
-    if (!title.trim() || submitting) return;
-    setSubmitting(true);
-    try {
-      await onSave({ title: title.trim(), type, status });
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <div className="modal-backdrop" onMouseDown={onCancel}>
-      <div className="modal-card" onMouseDown={(e) => e.stopPropagation()}>
-        <div className="modal-head">
-          <h3 style={{ margin: 0 }}>チケット編集</h3>
-          <button className="secondary modal-close" onClick={onCancel} aria-label="閉じる">×</button>
-        </div>
-        <div className="modal-body">
-          <div className="row">
-            <input
-              placeholder="タイトル"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  save();
-                }
-              }}
-              style={{ flex: 1 }}
-              autoFocus
-              onFocus={(e) => e.currentTarget.select()}
-            />
-            <select value={type} onChange={(e) => setType(e.target.value as TicketType)}>
-              {TICKET_TYPES.map((t) => (
-                <option key={t} value={t}>{t}</option>
-              ))}
-            </select>
-            <select value={status} onChange={(e) => setStatus(e.target.value as TicketStatus)}>
-              {TICKET_STATUSES.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-          </div>
-          <p className="muted" style={{ marginTop: 6, fontSize: 11 }}>
-            Enter: 保存 / ESC: キャンセル
-          </p>
-        </div>
-        <div className="modal-foot">
-          <button className="secondary" onClick={onCancel}>キャンセル</button>
-          <button onClick={save} disabled={!title.trim() || submitting}>保存</button>
-        </div>
-      </div>
     </div>
   );
 }
@@ -774,13 +721,30 @@ function layoutMindmap(tickets: Ticket[]): {
 
 function TicketRow({
   t, depth, isTree, hasChildren, isCollapsed, onToggleCollapsed,
-  allRepos, childCount, onChangeStatus, onDelete, onAddTag, onRemoveTag, onAddChild,
+  allRepos, childCount, onChangeStatus, onDelete, onAddTag, onRemoveTag, onAddChild, onEdit,
 }: RowProps) {
   const [newTag, setNewTag] = useState("");
   const repo = allRepos.find((r) => r.id === t.repository_id);
   const canAddChild = t.type !== "SUBTASK";
   return (
     <tr>
+      <td className="row-actions" style={{ whiteSpace: "nowrap" }}>
+        <a
+          href={`/tickets/${t.id}`}
+          target="_blank"
+          rel="noopener"
+          className="btn-link"
+          title="別タブで詳細編集"
+        >↗</a>
+        {canAddChild && (
+          <button
+            className="secondary"
+            onClick={onAddChild}
+            title="この行を親として子チケットを作成"
+          >+ 子</button>
+        )}
+        <button className="danger" onClick={onDelete} title="削除">×</button>
+      </td>
       <td><TypeBadge value={t.type} /></td>
       <td>
         <div style={{ paddingLeft: isTree ? depth * 18 : 0, display: "flex", alignItems: "flex-start" }}>
@@ -802,7 +766,11 @@ function TicketRow({
             t.parent_id && <span className="muted">↳ </span>
           )}
           <div style={{ flex: 1 }}>
-            {t.title}
+            <span
+              className="title-link"
+              onClick={onEdit}
+              title="クリックで編集"
+            >{t.title}</span>
             {childCount > 0 && (
               <span className="muted" style={{ marginLeft: 6, fontSize: 11 }}>(子 {childCount})</span>
             )}
@@ -848,19 +816,6 @@ function TicketRow({
             }
           }}
         />
-      </td>
-      <td>
-        {canAddChild && (
-          <button
-            className="secondary"
-            style={{ marginRight: 4, padding: "2px 8px" }}
-            onClick={onAddChild}
-            title="この行を親として子チケットを作成"
-          >
-            + 子
-          </button>
-        )}
-        <button className="danger" onClick={onDelete}>削除</button>
       </td>
     </tr>
   );
