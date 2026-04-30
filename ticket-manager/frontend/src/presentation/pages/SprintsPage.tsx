@@ -5,6 +5,7 @@ import type { Sprint, SprintState, Ticket } from "@/domain/types";
 import { SPRINT_STATES } from "@/domain/types";
 import { StatusBadge, TypeBadge } from "@/presentation/components/Badges";
 import EditTicketDialog from "@/presentation/components/EditTicketDialog";
+import TicketDetailLink from "@/presentation/components/TicketDetailLink";
 
 export default function SprintsPage() {
   const { sprints, create, update, remove } = useSprints();
@@ -221,14 +222,7 @@ export function TicketCard({ t, onEdit }: { t: Ticket; onEdit: () => void }) {
       }}
     >
       <div className="row" style={{ marginBottom: 4, gap: 6 }}>
-        <a
-          href={`/tickets/${t.id}`}
-          target="_blank"
-          rel="noopener"
-          className="btn-link"
-          onMouseDown={(e) => e.stopPropagation()}
-          title="別タブで詳細編集"
-        >↗</a>
+        <TicketDetailLink id={t.id} />
         <TypeBadge value={t.type} />
         <span style={{ marginLeft: "auto" }}>
           <StatusBadge value={t.status} />
