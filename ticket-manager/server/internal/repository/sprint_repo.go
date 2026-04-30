@@ -3,17 +3,19 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/ysksm/my_logic_example/ticket-manager/server/internal/domain"
+	"github.com/ysksm/my_logic_example/ticket-manager/server/internal/infra/dbx"
 )
 
 type SprintRepository struct {
-	db *sql.DB
+	db *dbx.DB
 }
 
-func NewSprintRepository(db *sql.DB) *SprintRepository {
+func NewSprintRepository(db *dbx.DB) *SprintRepository {
 	return &SprintRepository{db: db}
 }
 
@@ -44,7 +46,7 @@ func (r *SprintRepository) Get(ctx context.Context, id string) (*domain.Sprint, 
         SELECT id, name, goal, state, start_date, end_date, created_at
         FROM sprints WHERE id = ?`, id)
 	s, err := scanSprint(row)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -97,10 +99,10 @@ func (r *SprintRepository) Delete(ctx context.Context, id string) error {
 
 func scanSprint(s rowScanner) (domain.Sprint, error) {
 	var (
-		out                       domain.Sprint
-		state                     string
-		startDate, endDate        sql.NullTime
-		goal                      sql.NullString
+		out                domain.Sprint
+		state              string
+		startDate, endDate sql.NullTime
+		goal               sql.NullString
 	)
 	if err := s.Scan(&out.ID, &out.Name, &goal, &state, &startDate, &endDate, &out.CreatedAt); err != nil {
 		return out, err

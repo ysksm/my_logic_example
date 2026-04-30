@@ -8,6 +8,7 @@ import { TICKET_STATUSES, TICKET_TYPES } from "@/domain/types";
 import { StatusBadge, TypeBadge } from "@/presentation/components/Badges";
 import TicketForm, { childTypeFor, type TicketFormPreset } from "@/presentation/components/TicketForm";
 import EditTicketDialog from "@/presentation/components/EditTicketDialog";
+import TicketDetailLink from "@/presentation/components/TicketDetailLink";
 
 type ViewMode = "list" | "tree" | "mindmap" | "kanban";
 
@@ -432,14 +433,7 @@ function KCard({ t, onEdit }: { t: Ticket; onEdit: () => void }) {
       }}
     >
       <div className="row" style={{ marginBottom: 4, gap: 6 }}>
-        <a
-          href={`/tickets/${t.id}`}
-          target="_blank"
-          rel="noopener"
-          className="btn-link"
-          onMouseDown={(e) => e.stopPropagation()}
-          title="別タブで詳細編集"
-        >↗</a>
+        <TicketDetailLink id={t.id} />
         <TypeBadge value={t.type} />
       </div>
       <div
@@ -729,13 +723,7 @@ function TicketRow({
   return (
     <tr>
       <td className="row-actions" style={{ whiteSpace: "nowrap" }}>
-        <a
-          href={`/tickets/${t.id}`}
-          target="_blank"
-          rel="noopener"
-          className="btn-link"
-          title="別タブで詳細編集"
-        >↗</a>
+        <TicketDetailLink id={t.id} />
         {canAddChild && (
           <button
             className="secondary"
