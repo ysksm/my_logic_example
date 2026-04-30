@@ -261,6 +261,7 @@ export default function TicketsPage() {
           <table>
             <thead>
               <tr>
+                <th></th>
                 <th>Type</th>
                 <th>Title</th>
                 <th>Status</th>
@@ -269,7 +270,6 @@ export default function TicketsPage() {
                 <th>Est.</th>
                 <th>Repo / Branch</th>
                 <th>Tags</th>
-                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -431,26 +431,23 @@ function KCard({ t, onEdit }: { t: Ticket; onEdit: () => void }) {
         e.dataTransfer.effectAllowed = "move";
       }}
     >
-      <div className="row" style={{ justifyContent: "space-between", marginBottom: 4 }}>
+      <div className="row" style={{ marginBottom: 4, gap: 6 }}>
+        <a
+          href={`/tickets/${t.id}`}
+          target="_blank"
+          rel="noopener"
+          className="btn-link"
+          onMouseDown={(e) => e.stopPropagation()}
+          title="別タブで詳細編集"
+        >↗</a>
         <TypeBadge value={t.type} />
-        <span className="card-actions">
-          <button
-            className="secondary"
-            onClick={(e) => { e.stopPropagation(); onEdit(); }}
-            onMouseDown={(e) => e.stopPropagation()}
-            title="ダイアログで編集"
-          >編集</button>
-          <a
-            href={`/tickets/${t.id}`}
-            target="_blank"
-            rel="noopener"
-            className="secondary btn-link"
-            onMouseDown={(e) => e.stopPropagation()}
-            title="別タブで詳細編集"
-          >↗</a>
-        </span>
       </div>
-      <div className="ticket-card-title">{t.title}</div>
+      <div
+        className="ticket-card-title title-link"
+        onClick={(e) => { e.stopPropagation(); onEdit(); }}
+        onMouseDown={(e) => e.stopPropagation()}
+        title="クリックで編集"
+      >{t.title}</div>
       {t.assignee && <div className="muted" style={{ fontSize: 11 }}>👤 {t.assignee}</div>}
       {t.due_date && <div className="muted" style={{ fontSize: 11 }}>📅 {t.due_date}</div>}
     </div>
@@ -731,6 +728,23 @@ function TicketRow({
   const canAddChild = t.type !== "SUBTASK";
   return (
     <tr>
+      <td className="row-actions" style={{ whiteSpace: "nowrap" }}>
+        <a
+          href={`/tickets/${t.id}`}
+          target="_blank"
+          rel="noopener"
+          className="btn-link"
+          title="別タブで詳細編集"
+        >↗</a>
+        {canAddChild && (
+          <button
+            className="secondary"
+            onClick={onAddChild}
+            title="この行を親として子チケットを作成"
+          >+ 子</button>
+        )}
+        <button className="danger" onClick={onDelete} title="削除">×</button>
+      </td>
       <td><TypeBadge value={t.type} /></td>
       <td>
         <div style={{ paddingLeft: isTree ? depth * 18 : 0, display: "flex", alignItems: "flex-start" }}>
@@ -752,7 +766,11 @@ function TicketRow({
             t.parent_id && <span className="muted">↳ </span>
           )}
           <div style={{ flex: 1 }}>
-            {t.title}
+            <span
+              className="title-link"
+              onClick={onEdit}
+              title="クリックで編集"
+            >{t.title}</span>
             {childCount > 0 && (
               <span className="muted" style={{ marginLeft: 6, fontSize: 11 }}>(子 {childCount})</span>
             )}
@@ -798,33 +816,6 @@ function TicketRow({
             }
           }}
         />
-      </td>
-      <td style={{ whiteSpace: "nowrap" }}>
-        <button
-          className="secondary"
-          style={{ marginRight: 4, padding: "2px 8px" }}
-          onClick={onEdit}
-          title="ダイアログで編集"
-        >編集</button>
-        <a
-          href={`/tickets/${t.id}`}
-          target="_blank"
-          rel="noopener"
-          className="secondary btn-link"
-          style={{ marginRight: 4, padding: "2px 8px" }}
-          title="別タブで詳細編集"
-        >↗</a>
-        {canAddChild && (
-          <button
-            className="secondary"
-            style={{ marginRight: 4, padding: "2px 8px" }}
-            onClick={onAddChild}
-            title="この行を親として子チケットを作成"
-          >
-            + 子
-          </button>
-        )}
-        <button className="danger" onClick={onDelete}>削除</button>
       </td>
     </tr>
   );

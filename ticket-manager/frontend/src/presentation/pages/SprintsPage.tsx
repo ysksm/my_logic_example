@@ -220,27 +220,26 @@ export function TicketCard({ t, onEdit }: { t: Ticket; onEdit: () => void }) {
         e.dataTransfer.effectAllowed = "move";
       }}
     >
-      <div className="row" style={{ justifyContent: "space-between", marginBottom: 4 }}>
+      <div className="row" style={{ marginBottom: 4, gap: 6 }}>
+        <a
+          href={`/tickets/${t.id}`}
+          target="_blank"
+          rel="noopener"
+          className="btn-link"
+          onMouseDown={(e) => e.stopPropagation()}
+          title="別タブで詳細編集"
+        >↗</a>
         <TypeBadge value={t.type} />
-        <span className="card-actions">
-          <button
-            className="secondary"
-            onClick={(e) => { e.stopPropagation(); onEdit(); }}
-            onMouseDown={(e) => e.stopPropagation()}
-            title="ダイアログで編集"
-          >編集</button>
-          <a
-            href={`/tickets/${t.id}`}
-            target="_blank"
-            rel="noopener"
-            className="secondary btn-link"
-            onMouseDown={(e) => e.stopPropagation()}
-            title="別タブで詳細編集"
-          >↗</a>
+        <span style={{ marginLeft: "auto" }}>
           <StatusBadge value={t.status} />
         </span>
       </div>
-      <div className="ticket-card-title">{t.title}</div>
+      <div
+        className="ticket-card-title title-link"
+        onClick={(e) => { e.stopPropagation(); onEdit(); }}
+        onMouseDown={(e) => e.stopPropagation()}
+        title="クリックで編集"
+      >{t.title}</div>
       {t.assignee && <div className="muted" style={{ fontSize: 11 }}>👤 {t.assignee}</div>}
       {t.due_date && <div className="muted" style={{ fontSize: 11 }}>📅 {t.due_date}</div>}
     </div>

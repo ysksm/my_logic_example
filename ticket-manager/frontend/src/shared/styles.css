@@ -469,9 +469,33 @@ a.btn-link {
   text-decoration: none;
   display: inline-flex;
   align-items: center;
-  font-size: 13px;
+  font-size: 12px;
+  padding: 2px 6px;
+  line-height: 1;
 }
 a.btn-link:hover { background: #d1d5db; text-decoration: none; }
+
+/* Table action cell (leftmost in tickets table) */
+.row-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.row-actions button,
+.row-actions .btn-link {
+  padding: 2px 6px !important;
+  font-size: 11px !important;
+}
+
+/* Clickable title (table cell or card) — opens edit dialog */
+.title-link {
+  cursor: pointer;
+  font-weight: 500;
+}
+.title-link:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
 
 /* Sprint blocks on /sprints */
 .sprint-block { padding: 14px; }
