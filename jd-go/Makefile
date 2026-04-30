@@ -35,7 +35,15 @@ dev:
 test:
 	CGO_ENABLED=1 go test ./...
 
+# Desktop app (Wails) - development mode
+desktop: vendor-js
+	CGO_ENABLED=1 go run -tags dev . desktop
+
+# Build desktop app binary (production)
+build-desktop: vendor-js
+	CGO_ENABLED=1 go build -tags production -ldflags "-s -w -X main.version=$(VERSION)" -o $(BINARY)-desktop .
+
 # Clean build artifacts
 clean:
-	rm -f $(BINARY)
+	rm -f $(BINARY) $(BINARY)-desktop
 	rm -rf web/static/vendor/
