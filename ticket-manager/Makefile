@@ -34,6 +34,13 @@ backend:
 # 開発モード: バックを :8080、Vite dev を :5173 で並走
 # Ctrl-C で両方落ちる
 dev:
+	@echo ""
+	@echo "==================================================="
+	@echo "  Dev mode (Ctrl-C で両方停止)"
+	@echo "  ▶ Open: http://localhost:5173  (Vite dev, HMR)"
+	@echo "    API : http://localhost$(ADDR)  (バックエンド)"
+	@echo "==================================================="
+	@echo ""
 	@trap 'kill 0' EXIT INT TERM; \
 	  ( cd $(SERVER) && go run ./cmd/server -addr $(ADDR) -db $(DB) ) & \
 	  ( cd $(FRONTEND) && \
