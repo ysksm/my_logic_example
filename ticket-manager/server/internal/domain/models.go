@@ -78,6 +78,8 @@ type CalendarEvent struct {
 	EndDate     *string    `json:"end_date"`
 	StartAt     *time.Time `json:"start_at,omitempty"`
 	EndAt       *time.Time `json:"end_at,omitempty"`
+	TicketID    *string    `json:"ticket_id,omitempty"`
+	TicketTitle *string    `json:"ticket_title,omitempty"`
 	CreatedAt   time.Time  `json:"created_at"`
 }
 

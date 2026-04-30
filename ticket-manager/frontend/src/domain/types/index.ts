@@ -86,6 +86,8 @@ export interface CalendarEvent {
   end_date: string | null;
   start_at?: string | null;
   end_at?: string | null;
+  ticket_id?: string | null;
+  ticket_title?: string | null;
 }
 
 export interface CalendarEventCreate {
@@ -95,6 +97,7 @@ export interface CalendarEventCreate {
   end_date?: string | null;
   start_at?: string | null;
   end_at?: string | null;
+  ticket_id?: string | null;
 }
 
 export interface Repository {

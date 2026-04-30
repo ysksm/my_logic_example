@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useCalendarRange, useEvents } from "@/application/hooks/useCalendar";
 import { useTimeEntries } from "@/application/hooks/useTimeEntries";
 import { useTickets } from "@/application/hooks/useTickets";
@@ -32,11 +32,13 @@ function isoWithZone(d: Date) {
   // converts to local time for display.
   return d.toISOString();
 }
+function pad(n: number) { return String(n).padStart(2, "0"); }
 
 // ===== week view layout constants =====
 const SLOT_MIN = 15;          // each clickable slot is 15 minutes
 const SLOT_PX = 12;           // visual height of a 15-min slot
 const HOUR_PX = SLOT_PX * 4;  // = 48
+const SLOTS_PER_DAY = 24 * 4; // = 96
 const DAY_PX = HOUR_PX * 24;  // = 1152
 
 export default function CalendarPage() {
@@ -48,14 +50,8 @@ export default function CalendarPage() {
       <h1>カレンダー</h1>
       <div className="panel row" style={{ justifyContent: "space-between" }}>
         <div className="row">
-          <button
-            className={view === "week" ? "" : "secondary"}
-            onClick={() => setView("week")}
-          >週</button>
-          <button
-            className={view === "month" ? "" : "secondary"}
-            onClick={() => setView("month")}
-          >月</button>
+          <button className={view === "week" ? "" : "secondary"} onClick={() => setView("week")}>週</button>
+          <button className={view === "month" ? "" : "secondary"} onClick={() => setView("month")}>月</button>
         </div>
         <div className="row">
           {view === "week" ? (
@@ -77,6 +73,11 @@ export default function CalendarPage() {
       </div>
 
       {view === "week" ? <WeekView cursor={cursor} /> : <MonthView cursor={cursor} />}
+      {view === "week" && (
+        <p className="muted" style={{ marginTop: 8 }}>
+          ヒント: スロットをドラッグして範囲を選択 (15分単位) → ダイアログで予定 / 工数を入力。クリックだけでも 15 分の項目を作成できます。
+        </p>
+      )}
     </>
   );
 }
@@ -142,10 +143,17 @@ function MonthView({ cursor }: { cursor: Date }) {
   );
 }
 
-// ===== Week view with 15-min slots =====
-interface AddSlot {
-  date: Date;       // local date+time at the click point (15-min snapped)
-  durationMin: number;
+// ===== Week view with drag-to-select 15-min slots =====
+interface DragState {
+  dayIdx: number;
+  anchorSlot: number;   // slot at mousedown
+  currentSlot: number;  // slot under cursor right now
+}
+
+interface Selection {
+  date: Date;       // local midnight of the selected day
+  startMin: number; // minutes from midnight
+  endMin: number;   // exclusive end minutes
 }
 
 function WeekView({ cursor }: { cursor: Date }) {
@@ -159,34 +167,56 @@ function WeekView({ cursor }: { cursor: Date }) {
   const { create: createTime } = useTimeEntries({ from, to });
   const { tickets } = useTickets();
 
-  const [slot, setSlot] = useState<AddSlot | null>(null);
+  const [drag, setDrag] = useState<DragState | null>(null);
+  const [selection, setSelection] = useState<Selection | null>(null);
 
-  const onSlotClick = (day: Date, slotIndex: number) => {
-    const d = new Date(day);
-    d.setHours(0, slotIndex * SLOT_MIN, 0, 0);
-    setSlot({ date: d, durationMin: 30 });
-  };
+  // Commit drag on global mouseup; cancel with ESC.
+  useEffect(() => {
+    if (!drag) return;
+    const onUp = () => {
+      const startSlot = Math.min(drag.anchorSlot, drag.currentSlot);
+      const endSlot = Math.max(drag.anchorSlot, drag.currentSlot) + 1; // inclusive → exclusive
+      setSelection({
+        date: days[drag.dayIdx],
+        startMin: startSlot * SLOT_MIN,
+        endMin: endSlot * SLOT_MIN,
+      });
+      setDrag(null);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setDrag(null);
+    };
+    window.addEventListener("mouseup", onUp);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [drag, days]);
 
-  async function submitEvent(title: string, description: string) {
-    if (!slot || !title.trim()) return;
-    const start = slot.date;
-    const end = new Date(start.getTime() + slot.durationMin * 60 * 1000);
+  async function submitEvent(
+    title: string,
+    description: string,
+    ticketId: string | null,
+    start: Date,
+    end: Date,
+  ) {
+    if (!title.trim()) return;
     await createEvent({
       title,
       description,
       start_date: fmtDate(start),
       start_at: isoWithZone(start),
       end_at: isoWithZone(end),
+      ticket_id: ticketId,
     });
-    setSlot(null);
+    setSelection(null);
     await refreshItems();
   }
 
-  async function submitTime(ticketId: string, note: string) {
-    if (!slot || !ticketId) return;
-    const start = slot.date;
-    const end = new Date(start.getTime() + slot.durationMin * 60 * 1000);
-    const hours = slot.durationMin / 60;
+  async function submitTime(ticketId: string, note: string, start: Date, end: Date) {
+    if (!ticketId) return;
+    const hours = (end.getTime() - start.getTime()) / 3600000;
     await createTime({
       ticket_id: ticketId,
       hours,
@@ -195,7 +225,7 @@ function WeekView({ cursor }: { cursor: Date }) {
       end_at: isoWithZone(end),
       note,
     });
-    setSlot(null);
+    setSelection(null);
     await refreshItems();
   }
 
@@ -215,9 +245,9 @@ function WeekView({ cursor }: { cursor: Date }) {
 
   return (
     <>
-      <div className="week-view panel" style={{ padding: 0 }}>
+      <div className={`week-view panel ${drag ? "dragging" : ""}`} style={{ padding: 0 }}>
         <div className="week-grid">
-          {/* header row: blank gutter + 7 day headers */}
+          {/* header row */}
           <div className="week-gutter week-header" />
           {days.map((d) => {
             const isToday = fmtDate(d) === todayStr;
@@ -229,7 +259,7 @@ function WeekView({ cursor }: { cursor: Date }) {
             );
           })}
 
-          {/* All-day strip: items without start_at (TICKET_DUE, legacy) */}
+          {/* All-day strip: items without start_at */}
           <div className="week-gutter all-day-label muted">all-day</div>
           {days.map((d) => {
             const ds = fmtDate(d);
@@ -253,25 +283,46 @@ function WeekView({ cursor }: { cursor: Date }) {
           {/* Hour gutter (24 rows) */}
           <div className="week-gutter time-gutter">
             {Array.from({ length: 24 }, (_, h) => (
-              <div key={h} className="hour-label">{String(h).padStart(2, "0")}:00</div>
+              <div key={h} className="hour-label">{pad(h)}:00</div>
             ))}
           </div>
 
           {/* 7 day columns */}
-          {days.map((d) => {
+          {days.map((d, dayIdx) => {
             const ds = fmtDate(d);
             const timed = (itemsByDay.get(ds) ?? []).filter((it) => !!it.start_at);
             return (
-              <div key={"col-" + ds} className="day-col" style={{ height: DAY_PX }}>
-                {/* 15-min clickable slots: 24 * 4 = 96 */}
-                {Array.from({ length: 24 * 4 }, (_, i) => (
+              <div
+                key={"col-" + ds}
+                className="day-col"
+                style={{ height: DAY_PX }}
+                onMouseLeave={() => {
+                  // Clamp current to dayIdx's bounds: leaving the column shouldn't
+                  // expand the selection further; do nothing to keep current value.
+                }}
+              >
+                {Array.from({ length: SLOTS_PER_DAY }, (_, i) => (
                   <div
                     key={i}
                     className={`slot ${i % 4 === 0 ? "hour-start" : ""}`}
                     style={{ height: SLOT_PX }}
-                    onClick={() => onSlotClick(d, i)}
+                    onMouseDown={(e) => {
+                      e.preventDefault(); // no text selection
+                      setDrag({ dayIdx, anchorSlot: i, currentSlot: i });
+                    }}
+                    onMouseEnter={() => {
+                      if (drag && drag.dayIdx === dayIdx) {
+                        setDrag({ ...drag, currentSlot: i });
+                      }
+                    }}
                   />
                 ))}
+
+                {/* Drag preview overlay */}
+                {drag && drag.dayIdx === dayIdx && (
+                  <DragPreview drag={drag} />
+                )}
+
                 {/* Positioned items */}
                 {timed.map((it, idx) => <PositionedItem key={idx} item={it} />)}
               </div>
@@ -280,17 +331,35 @@ function WeekView({ cursor }: { cursor: Date }) {
         </div>
       </div>
 
-      {slot && (
-        <SlotForm
-          slot={slot}
+      {selection && (
+        <SelectionDialog
+          selection={selection}
           tickets={tickets}
-          onChangeDuration={(min) => setSlot({ ...slot, durationMin: min })}
-          onCancel={() => setSlot(null)}
+          onChange={setSelection}
+          onCancel={() => setSelection(null)}
           onSubmitEvent={submitEvent}
           onSubmitTime={submitTime}
         />
       )}
     </>
+  );
+}
+
+function DragPreview({ drag }: { drag: DragState }) {
+  const start = Math.min(drag.anchorSlot, drag.currentSlot);
+  const end = Math.max(drag.anchorSlot, drag.currentSlot) + 1;
+  const top = start * SLOT_PX;
+  const height = (end - start) * SLOT_PX;
+  const startMin = start * SLOT_MIN;
+  const endMin = end * SLOT_MIN;
+  return (
+    <div className="drag-preview" style={{ top, height }}>
+      <div className="drag-preview-label">
+        {pad(Math.floor(startMin / 60))}:{pad(startMin % 60)}
+        {" – "}
+        {pad(Math.floor(endMin / 60))}:{pad(endMin % 60)}
+      </div>
+    </div>
   );
 }
 
@@ -312,92 +381,185 @@ function PositionedItem({ item }: { item: CalendarItem }) {
     </div>
   );
 }
-function pad(n: number) { return String(n).padStart(2, "0"); }
 
-// ===== Slot form (event or time entry) =====
-function SlotForm({
-  slot,
+// ===== Modal dialog =====
+function SelectionDialog({
+  selection,
   tickets,
-  onChangeDuration,
+  onChange,
   onCancel,
   onSubmitEvent,
   onSubmitTime,
 }: {
-  slot: AddSlot;
+  selection: Selection;
   tickets: { id: string; title: string; type: string }[];
-  onChangeDuration: (min: number) => void;
+  onChange: (s: Selection) => void;
   onCancel: () => void;
-  onSubmitEvent: (title: string, description: string) => Promise<void>;
-  onSubmitTime: (ticketId: string, note: string) => Promise<void>;
+  onSubmitEvent: (title: string, description: string, ticketId: string | null, start: Date, end: Date) => Promise<void>;
+  onSubmitTime: (ticketId: string, note: string, start: Date, end: Date) => Promise<void>;
 }) {
   const [kind, setKind] = useState<"EVENT" | "TIME_ENTRY">("EVENT");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [ticketId, setTicketId] = useState("");
+  const [eventTicketId, setEventTicketId] = useState("");
   const [note, setNote] = useState("");
 
-  const slotLabel = `${fmtDate(slot.date)} ${pad(slot.date.getHours())}:${pad(slot.date.getMinutes())}`;
+  // Close on ESC
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCancel();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onCancel]);
+
+  const startDate = useMemo(() => {
+    const d = new Date(selection.date);
+    d.setHours(0, selection.startMin, 0, 0);
+    return d;
+  }, [selection]);
+  const endDate = useMemo(() => {
+    const d = new Date(selection.date);
+    d.setHours(0, selection.endMin, 0, 0);
+    return d;
+  }, [selection]);
+  const durationMin = selection.endMin - selection.startMin;
+
+  function fmtDayHeader() {
+    const d = selection.date;
+    const wn = ["日", "月", "火", "水", "木", "金", "土"][d.getDay()];
+    return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} (${wn})`;
+  }
+
+  async function onAdd() {
+    if (kind === "EVENT") {
+      await onSubmitEvent(title, description, eventTicketId || null, startDate, endDate);
+    } else {
+      await onSubmitTime(ticketId, note, startDate, endDate);
+    }
+  }
 
   return (
-    <div className="panel" style={{ marginTop: 12 }}>
-      <h3 style={{ marginTop: 0 }}>{slotLabel} に追加</h3>
-      <div className="row" style={{ marginBottom: 8 }}>
-        <button className={kind === "EVENT" ? "" : "secondary"} onClick={() => setKind("EVENT")}>予定</button>
-        <button className={kind === "TIME_ENTRY" ? "" : "secondary"} onClick={() => setKind("TIME_ENTRY")}>工数</button>
-        <span className="muted">所要時間:</span>
-        <select value={slot.durationMin} onChange={(e) => onChangeDuration(Number(e.target.value))}>
-          {[15, 30, 45, 60, 90, 120, 180, 240].map((m) => (
-            <option key={m} value={m}>{m < 60 ? `${m} 分` : `${m / 60} 時間`}</option>
-          ))}
-        </select>
-      </div>
+    <div className="modal-backdrop" onMouseDown={onCancel}>
+      <div className="modal-card" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h3 style={{ margin: 0 }}>新規追加</h3>
+          <button className="secondary modal-close" onClick={onCancel} aria-label="閉じる">×</button>
+        </div>
 
-      {kind === "EVENT" ? (
-        <div>
-          <div className="row">
-            <input
-              placeholder="タイトル"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              style={{ flex: 1 }}
-              autoFocus
+        <div className="modal-body">
+          <div className="row" style={{ marginBottom: 8 }}>
+            <button
+              className={kind === "EVENT" ? "" : "secondary"}
+              onClick={() => setKind("EVENT")}
+            >予定</button>
+            <button
+              className={kind === "TIME_ENTRY" ? "" : "secondary"}
+              onClick={() => setKind("TIME_ENTRY")}
+            >工数</button>
+          </div>
+
+          <div className="muted" style={{ marginBottom: 8 }}>{fmtDayHeader()}</div>
+
+          <div className="row" style={{ marginBottom: 12 }}>
+            <label className="muted" style={{ width: 50 }}>開始</label>
+            <TimeSelect
+              minutes={selection.startMin}
+              onChange={(m) => onChange({ ...selection, startMin: Math.min(m, selection.endMin - SLOT_MIN) })}
             />
-          </div>
-          <div className="row" style={{ marginTop: 6 }}>
-            <input
-              placeholder="メモ (任意)"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              style={{ flex: 1 }}
+            <label className="muted" style={{ width: 30, textAlign: "right" }}>終了</label>
+            <TimeSelect
+              minutes={selection.endMin}
+              onChange={(m) => onChange({ ...selection, endMin: Math.max(m, selection.startMin + SLOT_MIN) })}
             />
+            <span className="muted">
+              ({durationMin < 60 ? `${durationMin}分` : `${(durationMin / 60).toFixed(durationMin % 60 === 0 ? 0 : 2)}時間`})
+            </span>
           </div>
-          <div className="row" style={{ marginTop: 8 }}>
-            <button onClick={() => onSubmitEvent(title, description)}>追加</button>
-            <button className="secondary" onClick={onCancel}>キャンセル</button>
-          </div>
+
+          {kind === "EVENT" ? (
+            <>
+              <div className="row">
+                <input
+                  placeholder="タイトル"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  style={{ flex: 1 }}
+                  autoFocus
+                />
+              </div>
+              <div className="row" style={{ marginTop: 6 }}>
+                <select
+                  value={eventTicketId}
+                  onChange={(e) => setEventTicketId(e.target.value)}
+                  style={{ flex: 1, minWidth: 280 }}
+                >
+                  <option value="">(関連チケットなし)</option>
+                  {tickets.map((t) => (
+                    <option key={t.id} value={t.id}>[{t.type}] {t.title}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="row" style={{ marginTop: 6 }}>
+                <input
+                  placeholder="メモ (任意)"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  style={{ flex: 1 }}
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="row">
+                <select
+                  value={ticketId}
+                  onChange={(e) => setTicketId(e.target.value)}
+                  style={{ flex: 1, minWidth: 280 }}
+                  autoFocus
+                >
+                  <option value="">(チケット選択)</option>
+                  {tickets.map((t) => (
+                    <option key={t.id} value={t.id}>[{t.type}] {t.title}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="row" style={{ marginTop: 6 }}>
+                <input
+                  placeholder="メモ (任意)"
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  style={{ flex: 1 }}
+                />
+              </div>
+            </>
+          )}
         </div>
-      ) : (
-        <div>
-          <div className="row">
-            <select value={ticketId} onChange={(e) => setTicketId(e.target.value)} style={{ minWidth: 280 }} autoFocus>
-              <option value="">(チケット選択)</option>
-              {tickets.map((t) => (
-                <option key={t.id} value={t.id}>[{t.type}] {t.title}</option>
-              ))}
-            </select>
-            <input
-              placeholder="メモ (任意)"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              style={{ flex: 1 }}
-            />
-          </div>
-          <div className="row" style={{ marginTop: 8 }}>
-            <button onClick={() => onSubmitTime(ticketId, note)}>追加</button>
-            <button className="secondary" onClick={onCancel}>キャンセル</button>
-          </div>
+
+        <div className="modal-foot">
+          <button className="secondary" onClick={onCancel}>キャンセル</button>
+          <button onClick={onAdd}>追加</button>
         </div>
-      )}
+      </div>
     </div>
+  );
+}
+
+// 15-min stepped time picker (00:00 … 24:00)
+function TimeSelect({ minutes, onChange }: { minutes: number; onChange: (m: number) => void }) {
+  const options = useMemo(() => {
+    const opts: { v: number; label: string }[] = [];
+    for (let m = 0; m <= 24 * 60; m += SLOT_MIN) {
+      opts.push({ v: m, label: `${pad(Math.floor(m / 60))}:${pad(m % 60)}` });
+    }
+    return opts;
+  }, []);
+  return (
+    <select value={minutes} onChange={(e) => onChange(Number(e.target.value))}>
+      {options.map((o) => (
+        <option key={o.v} value={o.v}>{o.label}</option>
+      ))}
+    </select>
   );
 }

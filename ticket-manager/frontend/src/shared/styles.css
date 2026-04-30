@@ -229,6 +229,75 @@ tr:hover { background: #f9fafb; }
   text-overflow: ellipsis;
 }
 
+/* Drag selection preview overlay */
+.week-view.dragging { cursor: ns-resize; }
+.week-view.dragging .slot { cursor: ns-resize; }
+.drag-preview {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  background: rgba(37, 99, 235, 0.18);
+  border: 1px dashed var(--accent);
+  border-radius: 3px;
+  pointer-events: none;
+  z-index: 1;
+}
+.drag-preview-label {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  font-size: 11px;
+  color: var(--accent);
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 0 4px;
+  border-radius: 2px;
+}
+
+/* Modal dialog */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 12vh;
+  z-index: 100;
+}
+.modal-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: min(560px, 92vw);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+}
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.modal-body { padding: 14px 16px; }
+.modal-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  background: #f9fafb;
+  border-bottom-left-radius: 8px;
+  border-bottom-right-radius: 8px;
+}
+.modal-close {
+  padding: 2px 8px !important;
+  font-size: 16px !important;
+  line-height: 1;
+}
+
 .tag {
   display: inline-block;
   padding: 1px 6px;
