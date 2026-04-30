@@ -18,7 +18,10 @@ func NewCalendarRepository(db *sql.DB) *CalendarRepository {
 }
 
 func (r *CalendarRepository) ListEvents(ctx context.Context) ([]domain.CalendarEvent, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT id, title, description, start_date, end_date, created_at FROM calendar_events ORDER BY start_date`)
+	rows, err := r.db.QueryContext(ctx, `
+        SELECT id, title, description, start_date, end_date, start_at, end_at, created_at
+        FROM calendar_events
+        ORDER BY start_date, start_at`)
 	if err != nil {
 		return nil, err
 	}
@@ -28,13 +31,22 @@ func (r *CalendarRepository) ListEvents(ctx context.Context) ([]domain.CalendarE
 		var e domain.CalendarEvent
 		var start time.Time
 		var end sql.NullTime
-		if err := rows.Scan(&e.ID, &e.Title, &e.Description, &start, &end, &e.CreatedAt); err != nil {
+		var startAt, endAt sql.NullTime
+		if err := rows.Scan(&e.ID, &e.Title, &e.Description, &start, &end, &startAt, &endAt, &e.CreatedAt); err != nil {
 			return nil, err
 		}
 		e.StartDate = start.Format("2006-01-02")
 		if end.Valid {
 			s := end.Time.Format("2006-01-02")
 			e.EndDate = &s
+		}
+		if startAt.Valid {
+			t := startAt.Time
+			e.StartAt = &t
+		}
+		if endAt.Valid {
+			t := endAt.Time
+			e.EndAt = &t
 		}
 		out = append(out, e)
 	}
@@ -44,9 +56,11 @@ func (r *CalendarRepository) ListEvents(ctx context.Context) ([]domain.CalendarE
 func (r *CalendarRepository) CreateEvent(ctx context.Context, e *domain.CalendarEvent) error {
 	e.CreatedAt = time.Now().UTC()
 	_, err := r.db.ExecContext(ctx, `
-        INSERT INTO calendar_events (id, title, description, start_date, end_date, created_at)
-        VALUES (?, ?, ?, ?, ?, ?)`,
-		e.ID, e.Title, e.Description, e.StartDate, e.EndDate, e.CreatedAt,
+        INSERT INTO calendar_events (id, title, description, start_date, end_date, start_at, end_at, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		e.ID, e.Title, e.Description, e.StartDate, e.EndDate,
+		nullTime(e.StartAt), nullTime(e.EndAt),
+		e.CreatedAt,
 	)
 	return err
 }
@@ -70,7 +84,8 @@ func (r *CalendarRepository) RangeItems(ctx context.Context, from, to string) ([
 	{
 		rows, err := r.db.QueryContext(ctx, `
             SELECT id, title, status, due_date FROM tickets
-            WHERE due_date IS NOT NULL AND due_date >= ? AND due_date <= ?`,
+            WHERE due_date IS NOT NULL
+              AND due_date >= CAST(? AS DATE) AND due_date <= CAST(? AS DATE)`,
 			from, to)
 		if err != nil {
 			return nil, fmt.Errorf("ticket dues: %w", err)
@@ -95,9 +110,9 @@ func (r *CalendarRepository) RangeItems(ctx context.Context, from, to string) ([
 	// Time entries
 	{
 		rows, err := r.db.QueryContext(ctx, `
-            SELECT te.id, te.ticket_id, t.title, te.hours, te.work_date
+            SELECT te.id, te.ticket_id, t.title, te.hours, te.work_date, te.start_at, te.end_at
             FROM time_entries te LEFT JOIN tickets t ON t.id = te.ticket_id
-            WHERE te.work_date >= ? AND te.work_date <= ?`,
+            WHERE te.work_date >= CAST(? AS DATE) AND te.work_date <= CAST(? AS DATE)`,
 			from, to)
 		if err != nil {
 			return nil, fmt.Errorf("time entries: %w", err)
@@ -107,7 +122,8 @@ func (r *CalendarRepository) RangeItems(ctx context.Context, from, to string) ([
 			var title sql.NullString
 			var hours float64
 			var date time.Time
-			if err := rows.Scan(&id, &ticketID, &title, &hours, &date); err != nil {
+			var startAt, endAt sql.NullTime
+			if err := rows.Scan(&id, &ticketID, &title, &hours, &date, &startAt, &endAt); err != nil {
 				rows.Close()
 				return nil, err
 			}
@@ -117,10 +133,19 @@ func (r *CalendarRepository) RangeItems(ctx context.Context, from, to string) ([
 			}
 			tid := ticketID
 			h := hours
-			out = append(out, domain.CalendarItem{
+			item := domain.CalendarItem{
 				Kind: "TIME_ENTRY", Date: date.Format("2006-01-02"),
 				Title: t, TicketID: &tid, Hours: &h,
-			})
+			}
+			if startAt.Valid {
+				v := startAt.Time
+				item.StartAt = &v
+			}
+			if endAt.Valid {
+				v := endAt.Time
+				item.EndAt = &v
+			}
+			out = append(out, item)
 		}
 		rows.Close()
 	}
@@ -128,8 +153,8 @@ func (r *CalendarRepository) RangeItems(ctx context.Context, from, to string) ([
 	// Calendar events
 	{
 		rows, err := r.db.QueryContext(ctx, `
-            SELECT id, title, start_date FROM calendar_events
-            WHERE start_date >= ? AND start_date <= ?`,
+            SELECT id, title, start_date, start_at, end_at FROM calendar_events
+            WHERE start_date >= CAST(? AS DATE) AND start_date <= CAST(? AS DATE)`,
 			from, to)
 		if err != nil {
 			return nil, fmt.Errorf("events: %w", err)
@@ -137,14 +162,24 @@ func (r *CalendarRepository) RangeItems(ctx context.Context, from, to string) ([
 		for rows.Next() {
 			var id, title string
 			var start time.Time
-			if err := rows.Scan(&id, &title, &start); err != nil {
+			var startAt, endAt sql.NullTime
+			if err := rows.Scan(&id, &title, &start, &startAt, &endAt); err != nil {
 				rows.Close()
 				return nil, err
 			}
 			eid := id
-			out = append(out, domain.CalendarItem{
+			item := domain.CalendarItem{
 				Kind: "EVENT", Date: start.Format("2006-01-02"), Title: title, EventID: &eid,
-			})
+			}
+			if startAt.Valid {
+				v := startAt.Time
+				item.StartAt = &v
+			}
+			if endAt.Valid {
+				v := endAt.Time
+				item.EndAt = &v
+			}
+			out = append(out, item)
 		}
 		rows.Close()
 	}

@@ -58,33 +58,39 @@ type Tag struct {
 }
 
 type TimeEntry struct {
-	ID          string    `json:"id"`
-	TicketID    string    `json:"ticket_id"`
-	TicketTitle string    `json:"ticket_title,omitempty"`
-	User        string    `json:"user"`
-	Hours       float64   `json:"hours"`
-	WorkDate    string    `json:"work_date"`
-	Note        string    `json:"note"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID          string     `json:"id"`
+	TicketID    string     `json:"ticket_id"`
+	TicketTitle string     `json:"ticket_title,omitempty"`
+	User        string     `json:"user"`
+	Hours       float64    `json:"hours"`
+	WorkDate    string     `json:"work_date"`
+	StartAt     *time.Time `json:"start_at,omitempty"`
+	EndAt       *time.Time `json:"end_at,omitempty"`
+	Note        string     `json:"note"`
+	CreatedAt   time.Time  `json:"created_at"`
 }
 
 type CalendarEvent struct {
-	ID          string    `json:"id"`
-	Title       string    `json:"title"`
-	Description string    `json:"description"`
-	StartDate   string    `json:"start_date"`
-	EndDate     *string   `json:"end_date"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID          string     `json:"id"`
+	Title       string     `json:"title"`
+	Description string     `json:"description"`
+	StartDate   string     `json:"start_date"`
+	EndDate     *string    `json:"end_date"`
+	StartAt     *time.Time `json:"start_at,omitempty"`
+	EndAt       *time.Time `json:"end_at,omitempty"`
+	CreatedAt   time.Time  `json:"created_at"`
 }
 
 type CalendarItem struct {
-	Kind     string  `json:"kind"`
-	Date     string  `json:"date"`
-	Title    string  `json:"title"`
-	TicketID *string `json:"ticket_id,omitempty"`
-	Hours    *float64 `json:"hours,omitempty"`
-	Status   *string `json:"status,omitempty"`
-	EventID  *string `json:"event_id,omitempty"`
+	Kind     string     `json:"kind"`
+	Date     string     `json:"date"`
+	Title    string     `json:"title"`
+	TicketID *string    `json:"ticket_id,omitempty"`
+	Hours    *float64   `json:"hours,omitempty"`
+	Status   *string    `json:"status,omitempty"`
+	EventID  *string    `json:"event_id,omitempty"`
+	StartAt  *time.Time `json:"start_at,omitempty"`
+	EndAt    *time.Time `json:"end_at,omitempty"`
 }
 
 type Repository struct {

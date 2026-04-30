@@ -130,6 +130,105 @@ tr:hover { background: #f9fafb; }
 .calendar .item.event { background: #fef3c7; color: #92400e; }
 .calendar .item.time { background: #ecfdf5; color: #065f46; }
 
+/* ===== Week view ===== */
+.week-view {
+  overflow: auto;
+  max-height: calc(100vh - 220px);
+}
+.week-grid {
+  display: grid;
+  grid-template-columns: 64px repeat(7, 1fr);
+  font-size: 12px;
+}
+.week-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  padding: 8px 6px;
+  text-align: center;
+}
+.week-header.today { background: #eff6ff; color: var(--accent); }
+.week-gutter { background: var(--panel); }
+.all-day-label {
+  position: sticky;
+  left: 0;
+  padding: 4px 6px;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+}
+.all-day-cell {
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 2px 4px;
+  min-height: 24px;
+}
+.all-day-cell .item {
+  display: block;
+  margin: 1px 0;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 11px;
+  background: #eff6ff;
+  color: var(--accent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.all-day-cell .item.event { background: #fef3c7; color: #92400e; }
+.all-day-cell .item.time { background: #ecfdf5; color: #065f46; }
+.all-day-cell .item.due { background: #fee2e2; color: #991b1b; }
+
+.time-gutter {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  border-right: 1px solid var(--border);
+}
+.hour-label {
+  height: 48px;
+  padding: 0 6px;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--muted);
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding-top: 2px;
+}
+
+.day-col {
+  position: relative;
+  border-right: 1px solid var(--border);
+}
+.slot {
+  border-bottom: 1px dashed #f1f3f6;
+  cursor: pointer;
+}
+.slot.hour-start { border-bottom-color: #e3e6eb; border-bottom-style: solid; }
+.slot:hover { background: #f1f5f9; }
+
+.positioned-item {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  border-radius: 3px;
+  font-size: 11px;
+  padding: 2px 4px;
+  overflow: hidden;
+  cursor: default;
+  pointer-events: none;
+}
+.positioned-item.event { background: #fef3c7; color: #92400e; border: 1px solid #fbbf24; }
+.positioned-item.time  { background: #ecfdf5; color: #065f46; border: 1px solid #34d399; }
+.positioned-item .ttl {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .tag {
   display: inline-block;
   padding: 1px 6px;

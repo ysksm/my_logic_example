@@ -50,6 +50,8 @@ export interface TimeEntry {
   user: string;
   hours: number;
   work_date: string;
+  start_at?: string | null;
+  end_at?: string | null;
   note: string;
   created_at: string;
 }
@@ -59,6 +61,8 @@ export interface TimeEntryCreate {
   user?: string;
   hours: number;
   work_date: string;
+  start_at?: string | null;
+  end_at?: string | null;
   note?: string;
 }
 
@@ -70,6 +74,8 @@ export interface CalendarItem {
   hours?: number | null;
   status?: TicketStatus;
   event_id?: string | null;
+  start_at?: string | null;
+  end_at?: string | null;
 }
 
 export interface CalendarEvent {
@@ -78,6 +84,8 @@ export interface CalendarEvent {
   description: string;
   start_date: string;
   end_date: string | null;
+  start_at?: string | null;
+  end_at?: string | null;
 }
 
 export interface CalendarEventCreate {
@@ -85,6 +93,8 @@ export interface CalendarEventCreate {
   description?: string;
   start_date: string;
   end_date?: string | null;
+  start_at?: string | null;
+  end_at?: string | null;
 }
 
 export interface Repository {

@@ -1,16 +1,17 @@
 import { useMemo, useState } from "react";
 import { useTickets } from "@/application/hooks/useTickets";
-import { useRepositories, useBranches } from "@/application/hooks/useRepositories";
+import { useRepositories } from "@/application/hooks/useRepositories";
 import { useTags } from "@/application/hooks/useTags";
 import type { Ticket, TicketStatus, TicketType } from "@/domain/types";
 import { TICKET_STATUSES, TICKET_TYPES } from "@/domain/types";
 import { StatusBadge, TypeBadge } from "@/presentation/components/Badges";
-import TicketForm from "@/presentation/components/TicketForm";
+import TicketForm, { childTypeFor, type TicketFormPreset } from "@/presentation/components/TicketForm";
 
 export default function TicketsPage() {
   const [filterType, setFilterType] = useState<TicketType | "">("");
   const [filterStatus, setFilterStatus] = useState<TicketStatus | "">("");
   const [filterTag, setFilterTag] = useState<string>("");
+  const [preset, setPreset] = useState<TicketFormPreset | null>(null);
 
   const { tickets, error, create, update, remove, addTag, removeTag } = useTickets({
     type: filterType || undefined,
@@ -25,11 +26,41 @@ export default function TicketsPage() {
     [tickets],
   );
 
+  // index children by parent_id for quick lookup
+  const childrenByParent = useMemo(() => {
+    const m = new Map<string, Ticket[]>();
+    for (const t of tickets) {
+      if (!t.parent_id) continue;
+      const arr = m.get(t.parent_id) ?? [];
+      arr.push(t);
+      m.set(t.parent_id, arr);
+    }
+    return m;
+  }, [tickets]);
+
+  function startChild(parent: Ticket) {
+    setPreset({
+      parent_id: parent.id,
+      parent_label: `[${parent.type}] ${parent.title}`,
+      child_type: childTypeFor(parent.type),
+    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   return (
     <>
       <h1>チケット</h1>
 
-      <TicketForm parents={parents} repositories={repos} onSubmit={create} />
+      <TicketForm
+        parents={parents}
+        repositories={repos}
+        onSubmit={async (t) => {
+          await create(t);
+          // Don't auto-clear preset: enables rapid sibling creation.
+        }}
+        preset={preset}
+        onClearPreset={() => setPreset(null)}
+      />
 
       <div className="panel">
         <div className="row" style={{ marginBottom: 8 }}>
@@ -76,10 +107,12 @@ export default function TicketsPage() {
                 key={t.id}
                 t={t}
                 allRepos={repos}
+                childCount={childrenByParent.get(t.id)?.length ?? 0}
                 onChangeStatus={(s) => update(t.id, { status: s, type: t.type, title: t.title })}
                 onDelete={() => remove(t.id)}
                 onAddTag={(tag) => addTag(t.id, tag)}
                 onRemoveTag={(tag) => removeTag(t.id, tag)}
+                onAddChild={() => startChild(t)}
               />
             ))}
             {tickets.length === 0 && (
@@ -95,21 +128,27 @@ export default function TicketsPage() {
 interface RowProps {
   t: Ticket;
   allRepos: { id: string; name: string; default_branch: string }[];
+  childCount: number;
   onChangeStatus: (s: TicketStatus) => void;
   onDelete: () => void;
   onAddTag: (tag: string) => void;
   onRemoveTag: (tag: string) => void;
+  onAddChild: () => void;
 }
 
-function TicketRow({ t, allRepos, onChangeStatus, onDelete, onAddTag, onRemoveTag }: RowProps) {
+function TicketRow({ t, allRepos, childCount, onChangeStatus, onDelete, onAddTag, onRemoveTag, onAddChild }: RowProps) {
   const [newTag, setNewTag] = useState("");
   const repo = allRepos.find((r) => r.id === t.repository_id);
+  const canAddChild = t.type !== "SUBTASK";
   return (
     <tr>
       <td><TypeBadge value={t.type} /></td>
       <td>
         {t.parent_id && <span className="muted">↳ </span>}
         {t.title}
+        {childCount > 0 && (
+          <span className="muted" style={{ marginLeft: 6, fontSize: 11 }}>(子 {childCount})</span>
+        )}
         {t.description && <div className="muted" style={{ marginTop: 4 }}>{t.description}</div>}
       </td>
       <td>
@@ -152,6 +191,16 @@ function TicketRow({ t, allRepos, onChangeStatus, onDelete, onAddTag, onRemoveTa
         />
       </td>
       <td>
+        {canAddChild && (
+          <button
+            className="secondary"
+            style={{ marginRight: 4, padding: "2px 8px" }}
+            onClick={onAddChild}
+            title="この行を親として子チケットを作成"
+          >
+            + 子
+          </button>
+        )}
         <button className="danger" onClick={onDelete}>削除</button>
       </td>
     </tr>

@@ -1,14 +1,23 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { TicketCreate, TicketStatus, TicketType, Repository } from "@/domain/types";
 import { TICKET_STATUSES, TICKET_TYPES } from "@/domain/types";
+
+export interface TicketFormPreset {
+  parent_id: string;
+  parent_label: string;
+  // child type to default to (computed from parent type)
+  child_type?: TicketType;
+}
 
 interface Props {
   parents: { id: string; title: string }[];
   repositories: Repository[];
   onSubmit: (t: TicketCreate) => Promise<void>;
+  preset?: TicketFormPreset | null;
+  onClearPreset?: () => void;
 }
 
-export default function TicketForm({ parents, repositories, onSubmit }: Props) {
+export default function TicketForm({ parents, repositories, onSubmit, preset, onClearPreset }: Props) {
   const [title, setTitle] = useState("");
   const [type, setType] = useState<TicketType>("TASK");
   const [status, setStatus] = useState<TicketStatus>("TODO");
@@ -21,6 +30,16 @@ export default function TicketForm({ parents, repositories, onSubmit }: Props) {
   const [repositoryId, setRepositoryId] = useState("");
   const [branch, setBranch] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  const titleRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (preset) {
+      setParentId(preset.parent_id);
+      if (preset.child_type) setType(preset.child_type);
+      titleRef.current?.focus();
+    }
+  }, [preset]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -51,6 +70,7 @@ export default function TicketForm({ parents, repositories, onSubmit }: Props) {
       setEstimate("");
       setTagsText("");
       setBranch("");
+      // Keep parentId so user can rapidly add multiple children of the same parent.
     } finally {
       setSubmitting(false);
     }
@@ -58,9 +78,30 @@ export default function TicketForm({ parents, repositories, onSubmit }: Props) {
 
   return (
     <form className="panel" onSubmit={submit}>
-      <h3 style={{ marginTop: 0 }}>チケット作成</h3>
+      <h3 style={{ marginTop: 0 }}>
+        {preset ? `子チケット作成 (親: ${preset.parent_label})` : "チケット作成"}
+      </h3>
+      {preset && (
+        <div className="muted" style={{ marginBottom: 8 }}>
+          ↳ 親: <strong>{preset.parent_label}</strong>
+          {onClearPreset && (
+            <button
+              type="button"
+              className="secondary"
+              style={{ marginLeft: 8, padding: "2px 8px", fontSize: 11 }}
+              onClick={() => {
+                setParentId("");
+                onClearPreset();
+              }}
+            >
+              親を解除
+            </button>
+          )}
+        </div>
+      )}
       <div className="row">
         <input
+          ref={titleRef}
           placeholder="タイトル"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
@@ -131,4 +172,14 @@ export default function TicketForm({ parents, repositories, onSubmit }: Props) {
       </div>
     </form>
   );
+}
+
+// Default child type given a parent's type.
+export function childTypeFor(parent: TicketType): TicketType {
+  switch (parent) {
+    case "EPIC": return "STORY";
+    case "STORY": return "TASK";
+    case "TASK": return "SUBTASK";
+    case "SUBTASK": return "SUBTASK";
+  }
 }
