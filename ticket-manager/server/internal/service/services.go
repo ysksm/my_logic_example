@@ -87,17 +87,34 @@ func (s *TimeEntryService) List(ctx context.Context, f repository.TimeEntryFilte
 }
 
 func (s *TimeEntryService) Create(ctx context.Context, e *domain.TimeEntry) error {
-	if e.TicketID == "" {
-		return errors.New("ticket_id required")
-	}
 	if e.Hours <= 0 {
 		return errors.New("hours must be > 0")
 	}
 	if e.WorkDate == "" {
 		return errors.New("work_date required")
 	}
+	if e.TicketID != nil && *e.TicketID == "" {
+		e.TicketID = nil
+	}
 	e.ID = uuid.NewString()
 	return s.repo.Create(ctx, e)
+}
+
+func (s *TimeEntryService) Get(ctx context.Context, id string) (*domain.TimeEntry, error) {
+	return s.repo.Get(ctx, id)
+}
+
+func (s *TimeEntryService) Update(ctx context.Context, e *domain.TimeEntry) error {
+	if e.Hours <= 0 {
+		return errors.New("hours must be > 0")
+	}
+	if e.WorkDate == "" {
+		return errors.New("work_date required")
+	}
+	if e.TicketID != nil && *e.TicketID == "" {
+		e.TicketID = nil
+	}
+	return s.repo.Update(ctx, e)
 }
 
 func (s *TimeEntryService) Delete(ctx context.Context, id string) error {
@@ -130,8 +147,28 @@ func (s *CalendarService) CreateEvent(ctx context.Context, e *domain.CalendarEve
 	if e.StartDate == "" {
 		return errors.New("start_date required")
 	}
+	if e.TicketID != nil && *e.TicketID == "" {
+		e.TicketID = nil
+	}
 	e.ID = uuid.NewString()
 	return s.repo.CreateEvent(ctx, e)
+}
+
+func (s *CalendarService) GetEvent(ctx context.Context, id string) (*domain.CalendarEvent, error) {
+	return s.repo.GetEvent(ctx, id)
+}
+
+func (s *CalendarService) UpdateEvent(ctx context.Context, e *domain.CalendarEvent) error {
+	if e.Title == "" {
+		return errors.New("title required")
+	}
+	if e.StartDate == "" {
+		return errors.New("start_date required")
+	}
+	if e.TicketID != nil && *e.TicketID == "" {
+		e.TicketID = nil
+	}
+	return s.repo.UpdateEvent(ctx, e)
 }
 
 func (s *CalendarService) DeleteEvent(ctx context.Context, id string) error {

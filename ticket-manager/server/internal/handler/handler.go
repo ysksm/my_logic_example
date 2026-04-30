@@ -40,6 +40,7 @@ func (h *Handlers) Mount(r chi.Router) {
 	r.Route("/api/time-entries", func(r chi.Router) {
 		r.Get("/", h.listTimeEntries)
 		r.Post("/", h.createTimeEntry)
+		r.Put("/{id}", h.updateTimeEntry)
 		r.Delete("/{id}", h.deleteTimeEntry)
 	})
 
@@ -47,6 +48,7 @@ func (h *Handlers) Mount(r chi.Router) {
 		r.Get("/", h.calendarRange)
 		r.Get("/events", h.listEvents)
 		r.Post("/events", h.createEvent)
+		r.Put("/events/{id}", h.updateEvent)
 		r.Delete("/events/{id}", h.deleteEvent)
 	})
 
@@ -272,6 +274,30 @@ func (h *Handlers) createTimeEntry(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, e)
 }
 
+func (h *Handlers) updateTimeEntry(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	var e domain.TimeEntry
+	if err := json.NewDecoder(r.Body).Decode(&e); err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	e.ID = id
+	if err := h.Times.Update(r.Context(), &e); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			writeErr(w, http.StatusNotFound, err)
+			return
+		}
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	out, err := h.Times.Get(r.Context(), id)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
 func (h *Handlers) deleteTimeEntry(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if err := h.Times.Delete(r.Context(), id); err != nil {
@@ -318,6 +344,30 @@ func (h *Handlers) createEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, e)
+}
+
+func (h *Handlers) updateEvent(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	var e domain.CalendarEvent
+	if err := json.NewDecoder(r.Body).Decode(&e); err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	e.ID = id
+	if err := h.Cal.UpdateEvent(r.Context(), &e); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			writeErr(w, http.StatusNotFound, err)
+			return
+		}
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	out, err := h.Cal.GetEvent(r.Context(), id)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 func (h *Handlers) deleteEvent(w http.ResponseWriter, r *http.Request) {

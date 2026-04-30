@@ -130,6 +130,241 @@ tr:hover { background: #f9fafb; }
 .calendar .item.event { background: #fef3c7; color: #92400e; }
 .calendar .item.time { background: #ecfdf5; color: #065f46; }
 
+/* ===== Week view ===== */
+.week-view {
+  overflow: auto;
+  max-height: calc(100vh - 220px);
+}
+.week-grid {
+  display: grid;
+  grid-template-columns: 64px repeat(7, 1fr);
+  font-size: 12px;
+}
+.week-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  padding: 8px 6px;
+  text-align: center;
+}
+.week-header.today { background: #eff6ff; color: var(--accent); }
+.week-gutter { background: var(--panel); }
+.all-day-label {
+  position: sticky;
+  left: 0;
+  padding: 4px 6px;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+}
+.all-day-cell {
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 2px 4px;
+  min-height: 24px;
+}
+.all-day-cell .item {
+  display: block;
+  margin: 1px 0;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 11px;
+  background: #eff6ff;
+  color: var(--accent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.all-day-cell .item.event { background: #fef3c7; color: #92400e; }
+.all-day-cell .item.time { background: #ecfdf5; color: #065f46; }
+.all-day-cell .item.due { background: #fee2e2; color: #991b1b; }
+
+.time-gutter {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  border-right: 1px solid var(--border);
+}
+.hour-label {
+  height: 48px;
+  padding: 0 6px;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--muted);
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding-top: 2px;
+}
+
+.day-col {
+  position: relative;
+  border-right: 1px solid var(--border);
+}
+/* Vertical divider splitting the day-col into 予定 (left) | 工数 (right) */
+.day-col::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: #f1f3f6;
+  pointer-events: none;
+}
+.col-split-label {
+  font-size: 10px;
+  margin-top: 2px;
+}
+.slot {
+  border-bottom: 1px dashed #f1f3f6;
+  cursor: pointer;
+}
+/* The last 15-min slot of each hour gets a solid line so it aligns with the
+   hour-label's bottom border in the time gutter (both are at y=N*48 - 1px). */
+.slot.hour-end { border-bottom-color: #e3e6eb; border-bottom-style: solid; }
+.slot:hover { background: #f1f5f9; }
+
+.positioned-item {
+  position: absolute;
+  border-radius: 3px;
+  font-size: 11px;
+  padding: 2px 4px;
+  overflow: hidden;
+  cursor: grab;
+  pointer-events: auto;
+  user-select: none;
+}
+.positioned-item:active { cursor: grabbing; }
+.positioned-item.ghosted { opacity: 0.35; }
+.positioned-item.event { background: #fef3c7; color: #92400e; border: 1px solid #fbbf24; }
+.positioned-item.time  { background: #ecfdf5; color: #065f46; border: 1px solid #34d399; }
+.positioned-item .ttl {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.positioned-item .resize-handle {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 6px;
+  cursor: ns-resize;
+  background: linear-gradient(to bottom, transparent, rgba(0,0,0,0.05));
+}
+.positioned-item .resize-handle:hover { background: rgba(0,0,0,0.1); }
+.week-view.dragging .positioned-item { pointer-events: none; }
+.week-view.dragging .positioned-item.ghosted { pointer-events: none; }
+
+/* ghost preview when an item is being moved across columns */
+.ghost-block {
+  position: absolute;
+  border-radius: 3px;
+  pointer-events: none;
+  border: 1px dashed;
+  z-index: 2;
+}
+.ghost-block.ev { background: rgba(251, 191, 36, 0.25); border-color: #fbbf24; }
+.ghost-block.tm { background: rgba(52, 211, 153, 0.25); border-color: #34d399; }
+
+/* Drag selection preview overlay */
+.week-view.dragging { cursor: ns-resize; }
+.week-view.dragging .slot { cursor: ns-resize; }
+.drag-preview {
+  position: absolute;
+  background: rgba(37, 99, 235, 0.18);
+  border: 1px dashed var(--accent);
+  border-radius: 3px;
+  pointer-events: none;
+  z-index: 1;
+}
+.drag-preview.ev { background: rgba(251, 191, 36, 0.25); border-color: #fbbf24; }
+.drag-preview.tm { background: rgba(52, 211, 153, 0.25); border-color: #34d399; }
+.drag-preview-label {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  font-size: 11px;
+  color: var(--accent);
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 0 4px;
+  border-radius: 2px;
+}
+
+/* Modal dialog */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 12vh;
+  z-index: 100;
+}
+.modal-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: min(560px, 92vw);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+}
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.modal-body { padding: 14px 16px; }
+.modal-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  background: #f9fafb;
+  border-bottom-left-radius: 8px;
+  border-bottom-right-radius: 8px;
+}
+.modal-close {
+  padding: 2px 8px !important;
+  font-size: 16px !important;
+  line-height: 1;
+}
+
+/* Mindmap (SVG) */
+.mm-node .mm-rect {
+  fill: white;
+  stroke: var(--border);
+  stroke-width: 1;
+  transition: fill 0.1s;
+}
+.mm-node:hover .mm-rect { fill: #f8fafc; stroke: var(--accent); }
+.mm-node .mm-type {
+  font-size: 10px;
+  fill: var(--muted);
+  font-weight: 600;
+}
+.mm-node .mm-title {
+  font-size: 12px;
+  fill: var(--text);
+}
+.mm-node.mm-epic .mm-rect { stroke: var(--epic); border-left: 4px solid var(--epic); }
+.mm-node.mm-story .mm-rect { stroke: var(--story); }
+.mm-node.mm-task .mm-rect { stroke: var(--task); }
+.mm-node.mm-subtask .mm-rect { stroke: var(--subtask); }
+.mm-dot.status-in_progress { fill: var(--inprog); }
+.mm-dot.status-done { fill: var(--done); }
+.mm-node.mm-status-done .mm-rect { fill: #f0fdf4; }
+.mm-node.mm-status-in_progress .mm-rect { fill: #fffbeb; }
+
 .tag {
   display: inline-block;
   padding: 1px 6px;
