@@ -449,6 +449,30 @@ tr:hover { background: #f9fafb; }
 .ticket-card:active { cursor: grabbing; }
 .ticket-card-title { font-weight: 500; line-height: 1.3; }
 
+/* Inline actions inside ticket cards / table rows */
+.card-actions {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+.card-actions button,
+.card-actions .btn-link {
+  padding: 1px 6px !important;
+  font-size: 11px !important;
+}
+a.btn-link {
+  background: #e5e7eb;
+  color: var(--text);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  font-size: 13px;
+}
+a.btn-link:hover { background: #d1d5db; text-decoration: none; }
+
 /* Sprint blocks on /sprints */
 .sprint-block { padding: 14px; }
 .sprint-block.drop-over { border-color: var(--accent); background: #eff6ff; }

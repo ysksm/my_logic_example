@@ -4,10 +4,12 @@ import { useTickets } from "@/application/hooks/useTickets";
 import type { Sprint, SprintState, Ticket } from "@/domain/types";
 import { SPRINT_STATES } from "@/domain/types";
 import { StatusBadge, TypeBadge } from "@/presentation/components/Badges";
+import EditTicketDialog from "@/presentation/components/EditTicketDialog";
 
 export default function SprintsPage() {
   const { sprints, create, update, remove } = useSprints();
   const { tickets, update: updateTicket } = useTickets();
+  const [editing, setEditing] = useState<Ticket | null>(null);
 
   const [name, setName] = useState("");
   const [goal, setGoal] = useState("");
@@ -89,25 +91,40 @@ export default function SprintsPage() {
           onUpdate={(patch) => update(s.id, { ...s, ...patch })}
           onDelete={() => remove(s.id)}
           onDropTicket={(ticketId) => moveTicket(ticketId, s.id)}
+          onEditTicket={(t) => setEditing(t)}
         />
       ))}
 
       <BacklogBlock
         tickets={backlog}
         onDropTicket={(ticketId) => moveTicket(ticketId, null)}
+        onEditTicket={(t) => setEditing(t)}
       />
+
+      {editing && (
+        <EditTicketDialog
+          ticket={editing}
+          sprints={sprints}
+          onCancel={() => setEditing(null)}
+          onSave={async (patch) => {
+            await updateTicket(editing.id, patch);
+            setEditing(null);
+          }}
+        />
+      )}
     </>
   );
 }
 
 function SprintBlock({
-  sprint, tickets, onUpdate, onDelete, onDropTicket,
+  sprint, tickets, onUpdate, onDelete, onDropTicket, onEditTicket,
 }: {
   sprint: Sprint;
   tickets: Ticket[];
   onUpdate: (patch: Partial<Sprint>) => Promise<void>;
   onDelete: () => Promise<void>;
   onDropTicket: (ticketId: string) => Promise<void>;
+  onEditTicket: (t: Ticket) => void;
 }) {
   const [over, setOver] = useState(false);
   return (
@@ -145,7 +162,7 @@ function SprintBlock({
       </div>
 
       <div className="ticket-list">
-        {tickets.map((t) => <TicketCard key={t.id} t={t} />)}
+        {tickets.map((t) => <TicketCard key={t.id} t={t} onEdit={() => onEditTicket(t)} />)}
         {tickets.length === 0 && (
           <div className="muted ticket-list-empty">
             (バックログからチケットをドロップ)
@@ -157,8 +174,12 @@ function SprintBlock({
 }
 
 function BacklogBlock({
-  tickets, onDropTicket,
-}: { tickets: Ticket[]; onDropTicket: (ticketId: string) => Promise<void> }) {
+  tickets, onDropTicket, onEditTicket,
+}: {
+  tickets: Ticket[];
+  onDropTicket: (ticketId: string) => Promise<void>;
+  onEditTicket: (t: Ticket) => void;
+}) {
   const [over, setOver] = useState(false);
   return (
     <div
@@ -180,7 +201,7 @@ function BacklogBlock({
         <span className="muted">{tickets.length} 件</span>
       </div>
       <div className="ticket-list">
-        {tickets.map((t) => <TicketCard key={t.id} t={t} />)}
+        {tickets.map((t) => <TicketCard key={t.id} t={t} onEdit={() => onEditTicket(t)} />)}
         {tickets.length === 0 && (
           <div className="muted ticket-list-empty">バックログは空です</div>
         )}
@@ -189,7 +210,7 @@ function BacklogBlock({
   );
 }
 
-export function TicketCard({ t }: { t: Ticket }) {
+export function TicketCard({ t, onEdit }: { t: Ticket; onEdit: () => void }) {
   return (
     <div
       className="ticket-card"
@@ -201,7 +222,23 @@ export function TicketCard({ t }: { t: Ticket }) {
     >
       <div className="row" style={{ justifyContent: "space-between", marginBottom: 4 }}>
         <TypeBadge value={t.type} />
-        <StatusBadge value={t.status} />
+        <span className="card-actions">
+          <button
+            className="secondary"
+            onClick={(e) => { e.stopPropagation(); onEdit(); }}
+            onMouseDown={(e) => e.stopPropagation()}
+            title="ダイアログで編集"
+          >編集</button>
+          <a
+            href={`/tickets/${t.id}`}
+            target="_blank"
+            rel="noopener"
+            className="secondary btn-link"
+            onMouseDown={(e) => e.stopPropagation()}
+            title="別タブで詳細編集"
+          >↗</a>
+          <StatusBadge value={t.status} />
+        </span>
       </div>
       <div className="ticket-card-title">{t.title}</div>
       {t.assignee && <div className="muted" style={{ fontSize: 11 }}>👤 {t.assignee}</div>}
