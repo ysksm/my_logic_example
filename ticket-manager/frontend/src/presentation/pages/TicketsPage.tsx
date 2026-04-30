@@ -17,6 +17,8 @@ export default function TicketsPage() {
   const [preset, setPreset] = useState<TicketFormPreset | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [quickAdd, setQuickAdd] = useState<{ parent: Ticket } | null>(null);
+  const [focusedId, setFocusedId] = useState<string | null>(null);
+  const [editing, setEditing] = useState<Ticket | null>(null);
 
   const { tickets, error, create, update, remove, addTag, removeTag } = useTickets({
     type: filterType || undefined,
@@ -88,6 +90,86 @@ export default function TicketsPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  // ===== Mindmap keyboard navigation =====
+  // When in mindmap mode and no modal is open, capture arrow / Tab / Enter
+  // for focus movement, child creation, and edit.
+  useEffect(() => {
+    if (viewMode !== "mindmap") return;
+    if (quickAdd || editing) return;
+
+    // If nothing focused, anchor to the first root ticket
+    if (focusedId === null && tickets.length > 0) {
+      const idSet = new Set(tickets.map((t) => t.id));
+      const root = tickets.find((t) => !t.parent_id || !idSet.has(t.parent_id)) ?? tickets[0];
+      setFocusedId(root.id);
+      return;
+    }
+    if (focusedId !== null && !tickets.some((t) => t.id === focusedId)) {
+      // Focused ticket disappeared (deleted / filtered out)
+      setFocusedId(tickets[0]?.id ?? null);
+      return;
+    }
+
+    const onKey = (e: KeyboardEvent) => {
+      // Don't intercept while editing form fields elsewhere on the page
+      const tgt = e.target as HTMLElement;
+      if (
+        tgt &&
+        (tgt.tagName === "INPUT" || tgt.tagName === "TEXTAREA" ||
+         tgt.tagName === "SELECT" || tgt.isContentEditable)
+      ) {
+        return;
+      }
+      if (focusedId === null) return;
+      const focused = tickets.find((t) => t.id === focusedId);
+      if (!focused) return;
+
+      const idSet = new Set(tickets.map((t) => t.id));
+      const parentKey = (t: Ticket) =>
+        t.parent_id && idSet.has(t.parent_id) ? t.parent_id : null;
+      const siblings = tickets.filter((t) => parentKey(t) === parentKey(focused));
+      const idx = siblings.findIndex((t) => t.id === focused.id);
+
+      switch (e.key) {
+        case "Tab":
+          e.preventDefault();
+          if (focused.type !== "SUBTASK") setQuickAdd({ parent: focused });
+          break;
+        case "Enter":
+          e.preventDefault();
+          setEditing(focused);
+          break;
+        case "ArrowLeft": {
+          e.preventDefault();
+          const pid = parentKey(focused);
+          if (pid) setFocusedId(pid);
+          break;
+        }
+        case "ArrowRight": {
+          e.preventDefault();
+          const kids = tickets.filter((t) => parentKey(t) === focused.id);
+          if (kids.length > 0) setFocusedId(kids[0].id);
+          break;
+        }
+        case "ArrowUp":
+          e.preventDefault();
+          if (idx > 0) setFocusedId(siblings[idx - 1].id);
+          break;
+        case "ArrowDown":
+          e.preventDefault();
+          if (idx >= 0 && idx < siblings.length - 1) setFocusedId(siblings[idx + 1].id);
+          break;
+        case "Escape":
+          e.preventDefault();
+          setFocusedId(null);
+          break;
+      }
+    };
+
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [viewMode, focusedId, tickets, quickAdd, editing]);
+
   return (
     <>
       <h1>チケット</h1>
@@ -95,6 +177,7 @@ export default function TicketsPage() {
       <TicketForm
         parents={parents}
         repositories={repos}
+        tagSuggestions={tags.map((t) => t.name)}
         onSubmit={async (t) => {
           await create(t);
           // Don't auto-clear preset: enables rapid sibling creation.
@@ -152,7 +235,10 @@ export default function TicketsPage() {
         {viewMode === "mindmap" ? (
           <Mindmap
             tickets={tickets}
+            focusedId={focusedId}
+            onFocus={setFocusedId}
             onAddChild={(t) => setQuickAdd({ parent: t })}
+            onEdit={(t) => setEditing(t)}
           />
         ) : (
           <table>
@@ -206,6 +292,17 @@ export default function TicketsPage() {
           }}
         />
       )}
+
+      {editing && (
+        <EditTicketModal
+          ticket={editing}
+          onCancel={() => setEditing(null)}
+          onSave={async (patch) => {
+            await update(editing.id, patch);
+            setEditing(null);
+          }}
+        />
+      )}
     </>
   );
 }
@@ -224,6 +321,86 @@ interface RowProps {
   onAddTag: (tag: string) => void;
   onRemoveTag: (tag: string) => void;
   onAddChild: () => void;
+}
+
+// ===== Edit ticket modal (Enter on focused node) =====
+function EditTicketModal({
+  ticket,
+  onCancel,
+  onSave,
+}: {
+  ticket: Ticket;
+  onCancel: () => void;
+  onSave: (patch: Partial<TicketCreate>) => Promise<void>;
+}) {
+  const [title, setTitle] = useState(ticket.title);
+  const [type, setType] = useState<TicketType>(ticket.type);
+  const [status, setStatus] = useState<TicketStatus>(ticket.status);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCancel();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onCancel]);
+
+  async function save() {
+    if (!title.trim() || submitting) return;
+    setSubmitting(true);
+    try {
+      await onSave({ title: title.trim(), type, status });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onMouseDown={onCancel}>
+      <div className="modal-card" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h3 style={{ margin: 0 }}>チケット編集</h3>
+          <button className="secondary modal-close" onClick={onCancel} aria-label="閉じる">×</button>
+        </div>
+        <div className="modal-body">
+          <div className="row">
+            <input
+              placeholder="タイトル"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  save();
+                }
+              }}
+              style={{ flex: 1 }}
+              autoFocus
+              onFocus={(e) => e.currentTarget.select()}
+            />
+            <select value={type} onChange={(e) => setType(e.target.value as TicketType)}>
+              {TICKET_TYPES.map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+            <select value={status} onChange={(e) => setStatus(e.target.value as TicketStatus)}>
+              {TICKET_STATUSES.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+          <p className="muted" style={{ marginTop: 6, fontSize: 11 }}>
+            Enter: 保存 / ESC: キャンセル
+          </p>
+        </div>
+        <div className="modal-foot">
+          <button className="secondary" onClick={onCancel}>キャンセル</button>
+          <button onClick={save} disabled={!title.trim() || submitting}>保存</button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ===== Quick add modal (mindmap node click) =====
@@ -341,7 +518,19 @@ interface MindmapNode {
   parentId: string | null;
 }
 
-function Mindmap({ tickets, onAddChild }: { tickets: Ticket[]; onAddChild: (t: Ticket) => void }) {
+function Mindmap({
+  tickets,
+  focusedId,
+  onFocus,
+  onAddChild,
+  onEdit,
+}: {
+  tickets: Ticket[];
+  focusedId: string | null;
+  onFocus: (id: string) => void;
+  onAddChild: (t: Ticket) => void;
+  onEdit: (t: Ticket) => void;
+}) {
   const { nodes, edges, width, height } = useMemo(() => layoutMindmap(tickets), [tickets]);
 
   if (tickets.length === 0) {
@@ -349,49 +538,58 @@ function Mindmap({ tickets, onAddChild }: { tickets: Ticket[]; onAddChild: (t: T
   }
 
   return (
-    <div style={{ overflow: "auto", maxHeight: "70vh", border: "1px solid var(--border)", borderRadius: 4 }}>
-      <svg width={width + PAD * 2} height={height + PAD * 2} style={{ display: "block" }}>
-        <g transform={`translate(${PAD},${PAD})`}>
-          {edges.map((e, i) => {
-            const midX = (e.x1 + e.x2) / 2;
-            const d = `M${e.x1},${e.y1} C${midX},${e.y1} ${midX},${e.y2} ${e.x2},${e.y2}`;
-            return <path key={i} d={d} stroke="#cbd5e1" strokeWidth={1.5} fill="none" />;
-          })}
-          {nodes.map((n) => {
-            const canAddChild = n.t.type !== "SUBTASK";
-            return (
-              <g
-                key={n.t.id}
-                transform={`translate(${n.x},${n.y})`}
-                className={`mm-node mm-${n.t.type.toLowerCase()} mm-status-${n.t.status.toLowerCase()}`}
-              >
-                <rect width={NODE_W} height={NODE_H} rx={6} ry={6} className="mm-rect" />
-                <text x={8} y={14} className="mm-type">[{n.t.type}]</text>
-                <text x={8} y={28} className="mm-title">{trim(n.t.title, 22)}</text>
-                {n.t.status !== "TODO" && (
-                  <circle cx={8} cy={NODE_H - 6} r={3} className={`mm-dot status-${n.t.status.toLowerCase()}`} />
-                )}
-                {canAddChild && (
-                  <g
-                    className="mm-plus"
-                    transform={`translate(${NODE_W - 14}, 14)`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onAddChild(n.t);
-                    }}
-                    style={{ cursor: "pointer" }}
-                  >
-                    <title>子チケットを追加</title>
-                    <circle r={9} className="mm-plus-circle" />
-                    <text textAnchor="middle" y={4} className="mm-plus-text">+</text>
-                  </g>
-                )}
-              </g>
-            );
-          })}
-        </g>
-      </svg>
-    </div>
+    <>
+      <p className="muted" style={{ fontSize: 11, margin: "0 0 6px" }}>
+        ↑↓←→ で移動 / Tab で子追加 / Enter で編集 / クリックで選択 / + バッジで子追加
+      </p>
+      <div style={{ overflow: "auto", maxHeight: "70vh", border: "1px solid var(--border)", borderRadius: 4 }}>
+        <svg width={width + PAD * 2} height={height + PAD * 2} style={{ display: "block" }}>
+          <g transform={`translate(${PAD},${PAD})`}>
+            {edges.map((e, i) => {
+              const midX = (e.x1 + e.x2) / 2;
+              const d = `M${e.x1},${e.y1} C${midX},${e.y1} ${midX},${e.y2} ${e.x2},${e.y2}`;
+              return <path key={i} d={d} stroke="#cbd5e1" strokeWidth={1.5} fill="none" />;
+            })}
+            {nodes.map((n) => {
+              const canAddChild = n.t.type !== "SUBTASK";
+              const isFocused = focusedId === n.t.id;
+              return (
+                <g
+                  key={n.t.id}
+                  transform={`translate(${n.x},${n.y})`}
+                  className={`mm-node mm-${n.t.type.toLowerCase()} mm-status-${n.t.status.toLowerCase()} ${isFocused ? "focused" : ""}`}
+                  style={{ cursor: "pointer" }}
+                  onClick={() => onFocus(n.t.id)}
+                  onDoubleClick={() => onEdit(n.t)}
+                >
+                  <rect width={NODE_W} height={NODE_H} rx={6} ry={6} className="mm-rect" />
+                  <text x={8} y={14} className="mm-type">[{n.t.type}]</text>
+                  <text x={8} y={28} className="mm-title">{trim(n.t.title, 22)}</text>
+                  {n.t.status !== "TODO" && (
+                    <circle cx={8} cy={NODE_H - 6} r={3} className={`mm-dot status-${n.t.status.toLowerCase()}`} />
+                  )}
+                  {canAddChild && (
+                    <g
+                      className="mm-plus"
+                      transform={`translate(${NODE_W - 14}, 14)`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onAddChild(n.t);
+                      }}
+                      style={{ cursor: "pointer" }}
+                    >
+                      <title>子チケットを追加 (またはフォーカス中に Tab)</title>
+                      <circle r={9} className="mm-plus-circle" />
+                      <text textAnchor="middle" y={4} className="mm-plus-text">+</text>
+                    </g>
+                  )}
+                </g>
+              );
+            })}
+          </g>
+        </svg>
+      </div>
+    </>
   );
 }
 

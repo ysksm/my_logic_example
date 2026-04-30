@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { TicketCreate, TicketStatus, TicketType, Repository } from "@/domain/types";
 import { TICKET_STATUSES, TICKET_TYPES } from "@/domain/types";
+import TagInput from "@/presentation/components/TagInput";
 
 export interface TicketFormPreset {
   parent_id: string;
@@ -12,12 +13,13 @@ export interface TicketFormPreset {
 interface Props {
   parents: { id: string; title: string }[];
   repositories: Repository[];
+  tagSuggestions?: string[];
   onSubmit: (t: TicketCreate) => Promise<void>;
   preset?: TicketFormPreset | null;
   onClearPreset?: () => void;
 }
 
-export default function TicketForm({ parents, repositories, onSubmit, preset, onClearPreset }: Props) {
+export default function TicketForm({ parents, repositories, tagSuggestions = [], onSubmit, preset, onClearPreset }: Props) {
   const [title, setTitle] = useState("");
   const [type, setType] = useState<TicketType>("TASK");
   const [status, setStatus] = useState<TicketStatus>("TODO");
@@ -26,7 +28,7 @@ export default function TicketForm({ parents, repositories, onSubmit, preset, on
   const [assignee, setAssignee] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [estimate, setEstimate] = useState("");
-  const [tagsText, setTagsText] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
   const [repositoryId, setRepositoryId] = useState("");
   const [branch, setBranch] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -46,10 +48,6 @@ export default function TicketForm({ parents, repositories, onSubmit, preset, on
     if (!title) return;
     setSubmitting(true);
     try {
-      const tags = tagsText
-        .split(",")
-        .map((t) => t.trim())
-        .filter(Boolean);
       await onSubmit({
         title,
         type,
@@ -68,7 +66,7 @@ export default function TicketForm({ parents, repositories, onSubmit, preset, on
       setAssignee("");
       setDueDate("");
       setEstimate("");
-      setTagsText("");
+      setTags([]);
       setBranch("");
       // Keep parentId so user can rapidly add multiple children of the same parent.
     } finally {
@@ -140,12 +138,9 @@ export default function TicketForm({ parents, repositories, onSubmit, preset, on
           onChange={(e) => setEstimate(e.target.value)}
           style={{ width: 100 }}
         />
-        <input
-          placeholder="タグ (カンマ区切り)"
-          value={tagsText}
-          onChange={(e) => setTagsText(e.target.value)}
-          style={{ flex: 1, minWidth: 200 }}
-        />
+        <div style={{ flex: 1, minWidth: 240 }}>
+          <TagInput value={tags} onChange={setTags} suggestions={tagSuggestions} placeholder="タグ (Enter で追加)" />
+        </div>
       </div>
       <div className="row" style={{ marginTop: 8 }}>
         <select value={repositoryId} onChange={(e) => setRepositoryId(e.target.value)}>

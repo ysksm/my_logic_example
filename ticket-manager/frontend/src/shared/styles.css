@@ -364,6 +364,11 @@ tr:hover { background: #f9fafb; }
 .mm-dot.status-done { fill: var(--done); }
 .mm-node.mm-status-done .mm-rect { fill: #f0fdf4; }
 .mm-node.mm-status-in_progress .mm-rect { fill: #fffbeb; }
+.mm-node.focused .mm-rect {
+  stroke: var(--accent);
+  stroke-width: 2.5;
+  filter: drop-shadow(0 0 6px rgba(37, 99, 235, 0.4));
+}
 
 /* "+" badge that opens the quick-add modal */
 .mm-plus-circle {
@@ -382,6 +387,59 @@ tr:hover { background: #f9fafb; }
 }
 .mm-node:hover .mm-plus-circle { opacity: 1; }
 .mm-plus:hover .mm-plus-circle { fill: var(--accent-hover); opacity: 1; }
+
+/* Jira-style chip tag input */
+.tag-input {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 6px;
+  background: white;
+  min-height: 32px;
+  cursor: text;
+}
+.tag-input:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+.tag-input .tag-input-field {
+  border: none !important;
+  outline: none;
+  padding: 2px 4px !important;
+  font-size: 13px;
+  min-width: 80px;
+  width: 100%;
+  background: transparent;
+}
+.tag-suggestions {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  z-index: 50;
+  max-height: 220px;
+  overflow: auto;
+}
+.tag-suggestions li {
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.tag-suggestions li:hover,
+.tag-suggestions li.active {
+  background: #eff6ff;
+  color: var(--accent);
+}
 
 .tag {
   display: inline-block;
