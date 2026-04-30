@@ -26,6 +26,7 @@ type TicketFilter struct {
 	Status   string
 	ParentID *string // nil = no filter; pointer-to-empty-string => parent_id IS NULL
 	Tag      string
+	SprintID *string // nil = no filter; pointer-to-empty-string => sprint_id IS NULL (=backlog)
 }
 
 func (r *TicketRepository) List(ctx context.Context, f TicketFilter) ([]domain.Ticket, error) {
@@ -53,9 +54,17 @@ func (r *TicketRepository) List(ctx context.Context, f TicketFilter) ([]domain.T
 		conds = append(conds, "EXISTS (SELECT 1 FROM ticket_tags tt WHERE tt.ticket_id = t.id AND tt.tag_name = ?)")
 		args = append(args, f.Tag)
 	}
+	if f.SprintID != nil {
+		if *f.SprintID == "" {
+			conds = append(conds, "t.sprint_id IS NULL")
+		} else {
+			conds = append(conds, "t.sprint_id = ?")
+			args = append(args, *f.SprintID)
+		}
+	}
 	q := `SELECT t.id, t.parent_id, t.title, t.description, t.type, t.status,
                  t.assignee, t.estimate_hours, t.due_date, t.repository_id, t.branch,
-                 t.created_at, t.updated_at
+                 t.sprint_id, t.created_at, t.updated_at
           FROM tickets t`
 	if len(conds) > 0 {
 		q += " WHERE " + strings.Join(conds, " AND ")
@@ -88,7 +97,8 @@ func (r *TicketRepository) List(ctx context.Context, f TicketFilter) ([]domain.T
 func (r *TicketRepository) Get(ctx context.Context, id string) (*domain.Ticket, error) {
 	row := r.db.QueryRowContext(ctx, `
         SELECT id, parent_id, title, description, type, status, assignee,
-               estimate_hours, due_date, repository_id, branch, created_at, updated_at
+               estimate_hours, due_date, repository_id, branch, sprint_id,
+               created_at, updated_at
         FROM tickets WHERE id = ?`, id)
 	t, err := scanTicket(row)
 	if err != nil {
@@ -113,11 +123,11 @@ func (r *TicketRepository) Create(ctx context.Context, t *domain.Ticket, tags []
 	_, err := r.db.ExecContext(ctx, `
         INSERT INTO tickets (id, parent_id, title, description, type, status,
                              assignee, estimate_hours, due_date, repository_id, branch,
-                             created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                             sprint_id, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		t.ID, t.ParentID, t.Title, t.Description, string(t.Type), string(t.Status),
 		t.Assignee, t.EstimateHours, t.DueDate, t.RepositoryID, t.Branch,
-		t.CreatedAt, t.UpdatedAt,
+		t.SprintID, t.CreatedAt, t.UpdatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("insert ticket: %w", err)
@@ -135,10 +145,12 @@ func (r *TicketRepository) Update(ctx context.Context, t *domain.Ticket) error {
 	t.UpdatedAt = time.Now().UTC()
 	res, err := r.db.ExecContext(ctx, `
         UPDATE tickets SET parent_id=?, title=?, description=?, type=?, status=?,
-            assignee=?, estimate_hours=?, due_date=?, repository_id=?, branch=?, updated_at=?
+            assignee=?, estimate_hours=?, due_date=?, repository_id=?, branch=?,
+            sprint_id=?, updated_at=?
         WHERE id = ?`,
 		t.ParentID, t.Title, t.Description, string(t.Type), string(t.Status),
-		t.Assignee, t.EstimateHours, t.DueDate, t.RepositoryID, t.Branch, t.UpdatedAt,
+		t.Assignee, t.EstimateHours, t.DueDate, t.RepositoryID, t.Branch,
+		t.SprintID, t.UpdatedAt,
 		t.ID,
 	)
 	if err != nil {
@@ -259,10 +271,12 @@ func scanTicket(s rowScanner) (domain.Ticket, error) {
 		dueDate     sql.NullTime
 		repoID      sql.NullString
 		branch      sql.NullString
+		sprintID    sql.NullString
 		typ, status string
 	)
 	if err := s.Scan(&t.ID, &parentID, &t.Title, &t.Description, &typ, &status,
-		&assignee, &estimate, &dueDate, &repoID, &branch, &t.CreatedAt, &t.UpdatedAt); err != nil {
+		&assignee, &estimate, &dueDate, &repoID, &branch, &sprintID,
+		&t.CreatedAt, &t.UpdatedAt); err != nil {
 		return t, err
 	}
 	t.Type = domain.TicketType(typ)
@@ -290,6 +304,10 @@ func scanTicket(s rowScanner) (domain.Ticket, error) {
 	if branch.Valid {
 		v := branch.String
 		t.Branch = &v
+	}
+	if sprintID.Valid {
+		v := sprintID.String
+		t.SprintID = &v
 	}
 	t.Tags = []string{}
 	return t, nil

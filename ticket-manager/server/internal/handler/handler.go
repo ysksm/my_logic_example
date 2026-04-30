@@ -19,6 +19,7 @@ type Handlers struct {
 	Times   *service.TimeEntryService
 	Cal     *service.CalendarService
 	Repos   *service.RepositoryService
+	Sprints *service.SprintService
 	Maint   *maintenance.Mode
 }
 
@@ -60,6 +61,14 @@ func (h *Handlers) Mount(r chi.Router) {
 		r.Post("/{id}/branches", h.createBranch)
 	})
 
+	r.Route("/api/sprints", func(r chi.Router) {
+		r.Get("/", h.listSprints)
+		r.Post("/", h.createSprint)
+		r.Get("/{id}", h.getSprint)
+		r.Put("/{id}", h.updateSprint)
+		r.Delete("/{id}", h.deleteSprint)
+	})
+
 	r.Route("/api/maintenance", func(r chi.Router) {
 		r.Get("/status", h.maintStatus)
 		r.Post("/enable", h.maintEnable)
@@ -90,6 +99,10 @@ func (h *Handlers) listTickets(w http.ResponseWriter, r *http.Request) {
 		v := q.Get("parent_id")
 		f.ParentID = &v
 	}
+	if q.Has("sprint_id") {
+		v := q.Get("sprint_id")
+		f.SprintID = &v
+	}
 	out, err := h.Tickets.List(r.Context(), f)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err)
@@ -109,6 +122,7 @@ type ticketCreateReq struct {
 	DueDate       *string  `json:"due_date"`
 	RepositoryID  *string  `json:"repository_id"`
 	Branch        *string  `json:"branch"`
+	SprintID      *string  `json:"sprint_id"`
 	Tags          []string `json:"tags"`
 }
 
@@ -129,6 +143,7 @@ func (h *Handlers) createTicket(w http.ResponseWriter, r *http.Request) {
 		DueDate:       req.DueDate,
 		RepositoryID:  req.RepositoryID,
 		Branch:        req.Branch,
+		SprintID:      req.SprintID,
 	}
 	if err := h.Tickets.Create(r.Context(), t, req.Tags); err != nil {
 		writeErr(w, http.StatusBadRequest, err)
@@ -188,6 +203,7 @@ func (h *Handlers) updateTicket(w http.ResponseWriter, r *http.Request) {
 	current.DueDate = req.DueDate
 	current.RepositoryID = req.RepositoryID
 	current.Branch = req.Branch
+	current.SprintID = req.SprintID
 	if err := h.Tickets.Update(r.Context(), current); err != nil {
 		writeErr(w, http.StatusBadRequest, err)
 		return
@@ -511,6 +527,77 @@ func (h *Handlers) maintQuery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+// --- sprints ---
+
+func (h *Handlers) listSprints(w http.ResponseWriter, r *http.Request) {
+	out, err := h.Sprints.List(r.Context())
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (h *Handlers) getSprint(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	out, err := h.Sprints.Get(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			writeErr(w, http.StatusNotFound, err)
+			return
+		}
+		writeErr(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (h *Handlers) createSprint(w http.ResponseWriter, r *http.Request) {
+	var s domain.Sprint
+	if err := json.NewDecoder(r.Body).Decode(&s); err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	if err := h.Sprints.Create(r.Context(), &s); err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, s)
+}
+
+func (h *Handlers) updateSprint(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	var s domain.Sprint
+	if err := json.NewDecoder(r.Body).Decode(&s); err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	s.ID = id
+	if err := h.Sprints.Update(r.Context(), &s); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			writeErr(w, http.StatusNotFound, err)
+			return
+		}
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	out, _ := h.Sprints.Get(r.Context(), id)
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (h *Handlers) deleteSprint(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if err := h.Sprints.Delete(r.Context(), id); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			writeErr(w, http.StatusNotFound, err)
+			return
+		}
+		writeErr(w, http.StatusInternalServerError, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // helpers

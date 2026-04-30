@@ -175,6 +175,49 @@ func (s *CalendarService) DeleteEvent(ctx context.Context, id string) error {
 	return s.repo.DeleteEvent(ctx, id)
 }
 
+type SprintService struct {
+	repo *repository.SprintRepository
+}
+
+func NewSprintService(repo *repository.SprintRepository) *SprintService {
+	return &SprintService{repo: repo}
+}
+
+func (s *SprintService) List(ctx context.Context) ([]domain.Sprint, error) {
+	return s.repo.List(ctx)
+}
+
+func (s *SprintService) Get(ctx context.Context, id string) (*domain.Sprint, error) {
+	return s.repo.Get(ctx, id)
+}
+
+func (s *SprintService) Create(ctx context.Context, sp *domain.Sprint) error {
+	if sp.Name == "" {
+		return errors.New("name required")
+	}
+	if sp.State == "" {
+		sp.State = domain.SprintStatePlanned
+	} else if !sp.State.Valid() {
+		return errors.New("invalid state")
+	}
+	sp.ID = uuid.NewString()
+	return s.repo.Create(ctx, sp)
+}
+
+func (s *SprintService) Update(ctx context.Context, sp *domain.Sprint) error {
+	if sp.Name == "" {
+		return errors.New("name required")
+	}
+	if !sp.State.Valid() {
+		return errors.New("invalid state")
+	}
+	return s.repo.Update(ctx, sp)
+}
+
+func (s *SprintService) Delete(ctx context.Context, id string) error {
+	return s.repo.Delete(ctx, id)
+}
+
 type RepositoryService struct {
 	repo *repository.RepoRepository
 	git  *git.Client

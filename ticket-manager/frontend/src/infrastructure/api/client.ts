@@ -13,6 +13,8 @@ import type {
   Repository,
   RepositoryCreate,
   BranchCreate,
+  Sprint,
+  SprintCreate,
   TableDump,
 } from "@/domain/types";
 
@@ -50,7 +52,7 @@ export const api = {
   health: () => request<{ status: string; maintenance: boolean }>("GET", "/api/health"),
 
   // tickets
-  listTickets: (params: { type?: string; status?: string; parent_id?: string; tag?: string } = {}) =>
+  listTickets: (params: { type?: string; status?: string; parent_id?: string; tag?: string; sprint_id?: string } = {}) =>
     request<Ticket[]>("GET", "/api/tickets" + qs(params)),
   getTicket: (id: string) => request<Ticket>("GET", `/api/tickets/${id}`),
   createTicket: (t: TicketCreate) => request<Ticket>("POST", "/api/tickets", t),
@@ -83,6 +85,13 @@ export const api = {
   updateEvent: (id: string, e: Partial<CalendarEvent>) =>
     request<CalendarEvent>("PUT", `/api/calendar/events/${id}`, e),
   deleteEvent: (id: string) => request<void>("DELETE", `/api/calendar/events/${id}`),
+
+  // sprints
+  listSprints: () => request<Sprint[]>("GET", "/api/sprints"),
+  createSprint: (s: SprintCreate) => request<Sprint>("POST", "/api/sprints", s),
+  updateSprint: (id: string, s: Partial<Sprint>) =>
+    request<Sprint>("PUT", `/api/sprints/${id}`, s),
+  deleteSprint: (id: string) => request<void>("DELETE", `/api/sprints/${id}`),
 
   // repositories
   listRepositories: () => request<Repository[]>("GET", "/api/repositories"),
