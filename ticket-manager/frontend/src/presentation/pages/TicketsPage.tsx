@@ -7,11 +7,15 @@ import { TICKET_STATUSES, TICKET_TYPES } from "@/domain/types";
 import { StatusBadge, TypeBadge } from "@/presentation/components/Badges";
 import TicketForm, { childTypeFor, type TicketFormPreset } from "@/presentation/components/TicketForm";
 
+type ViewMode = "list" | "tree";
+
 export default function TicketsPage() {
   const [filterType, setFilterType] = useState<TicketType | "">("");
   const [filterStatus, setFilterStatus] = useState<TicketStatus | "">("");
   const [filterTag, setFilterTag] = useState<string>("");
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [preset, setPreset] = useState<TicketFormPreset | null>(null);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   const { tickets, error, create, update, remove, addTag, removeTag } = useTickets({
     type: filterType || undefined,
@@ -38,6 +42,42 @@ export default function TicketsPage() {
     return m;
   }, [tickets]);
 
+  // Visible rows in display order. List mode: server order. Tree mode: pre-order
+  // DFS from roots (parents not present in the filtered set are demoted to roots).
+  const visible = useMemo<Array<{ t: Ticket; depth: number; hasChildren: boolean }>>(() => {
+    if (viewMode === "list") {
+      return tickets.map((t) => ({ t, depth: 0, hasChildren: false }));
+    }
+    const idSet = new Set(tickets.map((t) => t.id));
+    const childMap = new Map<string | null, Ticket[]>();
+    for (const t of tickets) {
+      const key = t.parent_id && idSet.has(t.parent_id) ? t.parent_id : null;
+      const arr = childMap.get(key) ?? [];
+      arr.push(t);
+      childMap.set(key, arr);
+    }
+    const out: Array<{ t: Ticket; depth: number; hasChildren: boolean }> = [];
+    const walk = (parentKey: string | null, depth: number) => {
+      const kids = childMap.get(parentKey) ?? [];
+      for (const k of kids) {
+        const has = (childMap.get(k.id) ?? []).length > 0;
+        out.push({ t: k, depth, hasChildren: has });
+        if (!collapsed.has(k.id)) walk(k.id, depth + 1);
+      }
+    };
+    walk(null, 0);
+    return out;
+  }, [tickets, viewMode, collapsed]);
+
+  function toggleCollapsed(id: string) {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
   function startChild(parent: Ticket) {
     setPreset({
       parent_id: parent.id,
@@ -63,26 +103,43 @@ export default function TicketsPage() {
       />
 
       <div className="panel">
-        <div className="row" style={{ marginBottom: 8 }}>
-          <strong>フィルタ:</strong>
-          <select value={filterType} onChange={(e) => setFilterType(e.target.value as TicketType | "")}>
-            <option value="">All Types</option>
-            {TICKET_TYPES.map((t) => (
-              <option key={t}>{t}</option>
-            ))}
-          </select>
-          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as TicketStatus | "")}>
-            <option value="">All Status</option>
-            {TICKET_STATUSES.map((s) => (
-              <option key={s}>{s}</option>
-            ))}
-          </select>
-          <select value={filterTag} onChange={(e) => setFilterTag(e.target.value)}>
-            <option value="">All Tags</option>
-            {tags.map((t) => (
-              <option key={t.name}>{t.name}</option>
-            ))}
-          </select>
+        <div className="row" style={{ marginBottom: 8, justifyContent: "space-between" }}>
+          <div className="row">
+            <strong>フィルタ:</strong>
+            <select value={filterType} onChange={(e) => setFilterType(e.target.value as TicketType | "")}>
+              <option value="">All Types</option>
+              {TICKET_TYPES.map((t) => (
+                <option key={t}>{t}</option>
+              ))}
+            </select>
+            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as TicketStatus | "")}>
+              <option value="">All Status</option>
+              {TICKET_STATUSES.map((s) => (
+                <option key={s}>{s}</option>
+              ))}
+            </select>
+            <select value={filterTag} onChange={(e) => setFilterTag(e.target.value)}>
+              <option value="">All Tags</option>
+              {tags.map((t) => (
+                <option key={t.name}>{t.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="row">
+            <button
+              className={viewMode === "list" ? "" : "secondary"}
+              onClick={() => setViewMode("list")}
+            >一覧</button>
+            <button
+              className={viewMode === "tree" ? "" : "secondary"}
+              onClick={() => setViewMode("tree")}
+            >ツリー</button>
+            {viewMode === "tree" && collapsed.size > 0 && (
+              <button className="secondary" onClick={() => setCollapsed(new Set())}>
+                すべて展開
+              </button>
+            )}
+          </div>
         </div>
 
         {error && <p style={{ color: "red" }}>{error}</p>}
@@ -102,10 +159,15 @@ export default function TicketsPage() {
             </tr>
           </thead>
           <tbody>
-            {tickets.map((t) => (
+            {visible.map(({ t, depth, hasChildren }) => (
               <TicketRow
                 key={t.id}
                 t={t}
+                depth={viewMode === "tree" ? depth : 0}
+                isTree={viewMode === "tree"}
+                hasChildren={hasChildren}
+                isCollapsed={collapsed.has(t.id)}
+                onToggleCollapsed={() => toggleCollapsed(t.id)}
                 allRepos={repos}
                 childCount={childrenByParent.get(t.id)?.length ?? 0}
                 onChangeStatus={(s) => update(t.id, { status: s, type: t.type, title: t.title })}
@@ -115,7 +177,7 @@ export default function TicketsPage() {
                 onAddChild={() => startChild(t)}
               />
             ))}
-            {tickets.length === 0 && (
+            {visible.length === 0 && (
               <tr><td colSpan={9} className="muted">該当なし</td></tr>
             )}
           </tbody>
@@ -127,6 +189,11 @@ export default function TicketsPage() {
 
 interface RowProps {
   t: Ticket;
+  depth: number;
+  isTree: boolean;
+  hasChildren: boolean;
+  isCollapsed: boolean;
+  onToggleCollapsed: () => void;
   allRepos: { id: string; name: string; default_branch: string }[];
   childCount: number;
   onChangeStatus: (s: TicketStatus) => void;
@@ -136,7 +203,10 @@ interface RowProps {
   onAddChild: () => void;
 }
 
-function TicketRow({ t, allRepos, childCount, onChangeStatus, onDelete, onAddTag, onRemoveTag, onAddChild }: RowProps) {
+function TicketRow({
+  t, depth, isTree, hasChildren, isCollapsed, onToggleCollapsed,
+  allRepos, childCount, onChangeStatus, onDelete, onAddTag, onRemoveTag, onAddChild,
+}: RowProps) {
   const [newTag, setNewTag] = useState("");
   const repo = allRepos.find((r) => r.id === t.repository_id);
   const canAddChild = t.type !== "SUBTASK";
@@ -144,12 +214,32 @@ function TicketRow({ t, allRepos, childCount, onChangeStatus, onDelete, onAddTag
     <tr>
       <td><TypeBadge value={t.type} /></td>
       <td>
-        {t.parent_id && <span className="muted">↳ </span>}
-        {t.title}
-        {childCount > 0 && (
-          <span className="muted" style={{ marginLeft: 6, fontSize: 11 }}>(子 {childCount})</span>
-        )}
-        {t.description && <div className="muted" style={{ marginTop: 4 }}>{t.description}</div>}
+        <div style={{ paddingLeft: isTree ? depth * 18 : 0, display: "flex", alignItems: "flex-start" }}>
+          {isTree ? (
+            <span
+              style={{
+                display: "inline-block",
+                width: 16,
+                cursor: hasChildren ? "pointer" : "default",
+                color: "var(--muted)",
+                userSelect: "none",
+              }}
+              onClick={hasChildren ? onToggleCollapsed : undefined}
+              title={hasChildren ? (isCollapsed ? "展開" : "折りたたみ") : undefined}
+            >
+              {hasChildren ? (isCollapsed ? "▶" : "▼") : ""}
+            </span>
+          ) : (
+            t.parent_id && <span className="muted">↳ </span>
+          )}
+          <div style={{ flex: 1 }}>
+            {t.title}
+            {childCount > 0 && (
+              <span className="muted" style={{ marginLeft: 6, fontSize: 11 }}>(子 {childCount})</span>
+            )}
+            {t.description && <div className="muted" style={{ marginTop: 4 }}>{t.description}</div>}
+          </div>
+        </div>
       </td>
       <td>
         <select
