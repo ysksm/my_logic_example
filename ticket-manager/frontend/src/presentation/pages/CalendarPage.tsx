@@ -187,6 +187,17 @@ function WeekView({ cursor }: { cursor: Date }) {
   const [selection, setSelection] = useState<Selection | null>(null);
   const [itemDrag, setItemDrag] = useState<ItemDrag | null>(null);
 
+  // Current time, refreshed every minute, drives the "now" line.
+  const [now, setNow] = useState<Date>(() => new Date());
+  useEffect(() => {
+    const tick = () => setNow(new Date());
+    tick();
+    const t = setInterval(tick, 60_000);
+    return () => clearInterval(t);
+  }, []);
+  const nowDateStr = fmtDate(now);
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
   // Commit "drag to create" on global mouseup
   useEffect(() => {
     if (!drag) return;
@@ -449,6 +460,16 @@ function WeekView({ cursor }: { cursor: Date }) {
                 ))}
 
                 {drag && drag.dayIdx === dayIdx && <DragPreview drag={drag} />}
+
+                {ds === nowDateStr && (
+                  <div
+                    className="now-line"
+                    style={{ top: (nowMinutes / SLOT_MIN) * SLOT_PX }}
+                    title={`現在: ${pad(now.getHours())}:${pad(now.getMinutes())}`}
+                  >
+                    <span className="now-dot" />
+                  </div>
+                )}
 
                 {timed.map((it) => {
                   const key = (it.kind === "EVENT" ? it.event_id : it.entry_id) ?? "";

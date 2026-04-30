@@ -62,7 +62,7 @@ func (r *TicketRepository) List(ctx context.Context, f TicketFilter) ([]domain.T
 			args = append(args, *f.SprintID)
 		}
 	}
-	q := `SELECT t.id, t.parent_id, t.title, t.description, t.type, t.status,
+	q := `SELECT t.id, t.number, t.parent_id, t.title, t.description, t.type, t.status,
                  t.assignee, t.estimate_hours, t.due_date, t.repository_id, t.branch,
                  t.sprint_id, t.created_at, t.updated_at
           FROM tickets t`
@@ -96,7 +96,7 @@ func (r *TicketRepository) List(ctx context.Context, f TicketFilter) ([]domain.T
 
 func (r *TicketRepository) Get(ctx context.Context, id string) (*domain.Ticket, error) {
 	row := r.db.QueryRowContext(ctx, `
-        SELECT id, parent_id, title, description, type, status, assignee,
+        SELECT id, number, parent_id, title, description, type, status, assignee,
                estimate_hours, due_date, repository_id, branch, sprint_id,
                created_at, updated_at
         FROM tickets WHERE id = ?`, id)
@@ -120,12 +120,19 @@ func (r *TicketRepository) Create(ctx context.Context, t *domain.Ticket, tags []
 	now := time.Now().UTC()
 	t.CreatedAt = now
 	t.UpdatedAt = now
+	// Allocate next sequential number. Safe because db is single-connection.
+	var next int64
+	if err := r.db.QueryRowContext(ctx,
+		`SELECT COALESCE(MAX(number), 0) + 1 FROM tickets`).Scan(&next); err != nil {
+		return fmt.Errorf("alloc number: %w", err)
+	}
+	t.Number = next
 	_, err := r.db.ExecContext(ctx, `
-        INSERT INTO tickets (id, parent_id, title, description, type, status,
+        INSERT INTO tickets (id, number, parent_id, title, description, type, status,
                              assignee, estimate_hours, due_date, repository_id, branch,
                              sprint_id, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		t.ID, t.ParentID, t.Title, t.Description, string(t.Type), string(t.Status),
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		t.ID, t.Number, t.ParentID, t.Title, t.Description, string(t.Type), string(t.Status),
 		t.Assignee, t.EstimateHours, t.DueDate, t.RepositoryID, t.Branch,
 		t.SprintID, t.CreatedAt, t.UpdatedAt,
 	)
@@ -265,6 +272,7 @@ type rowScanner interface {
 func scanTicket(s rowScanner) (domain.Ticket, error) {
 	var (
 		t           domain.Ticket
+		number      sql.NullInt64
 		parentID    sql.NullString
 		assignee    sql.NullString
 		estimate    sql.NullFloat64
@@ -274,10 +282,13 @@ func scanTicket(s rowScanner) (domain.Ticket, error) {
 		sprintID    sql.NullString
 		typ, status string
 	)
-	if err := s.Scan(&t.ID, &parentID, &t.Title, &t.Description, &typ, &status,
+	if err := s.Scan(&t.ID, &number, &parentID, &t.Title, &t.Description, &typ, &status,
 		&assignee, &estimate, &dueDate, &repoID, &branch, &sprintID,
 		&t.CreatedAt, &t.UpdatedAt); err != nil {
 		return t, err
+	}
+	if number.Valid {
+		t.Number = number.Int64
 	}
 	t.Type = domain.TicketType(typ)
 	t.Status = domain.TicketStatus(status)

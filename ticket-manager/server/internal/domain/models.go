@@ -37,6 +37,7 @@ func (s TicketStatus) Valid() bool {
 
 type Ticket struct {
 	ID            string       `json:"id"`
+	Number        int64        `json:"number"`
 	ParentID      *string      `json:"parent_id"`
 	Title         string       `json:"title"`
 	Description   string       `json:"description"`

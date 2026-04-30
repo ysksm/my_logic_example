@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { api } from "@/infrastructure/api/client";
 import { useSprints } from "@/application/hooks/useSprints";
-import { useRepositories } from "@/application/hooks/useRepositories";
+import { useRepositories, useBranches } from "@/application/hooks/useRepositories";
 import { useTags } from "@/application/hooks/useTags";
 import type { Repository, Ticket, TicketStatus, TicketType } from "@/domain/types";
 import { TICKET_STATUSES, TICKET_TYPES } from "@/domain/types";
@@ -128,7 +128,8 @@ export default function TicketEditPage() {
       </div>
       <h1 style={{ display: "flex", gap: 12, alignItems: "center" }}>
         <TypeBadge value={ticket.type} />
-        チケット編集
+        <span className="muted" style={{ fontSize: 18 }}>TICKET-{ticket.number}</span>
+        <span style={{ fontSize: 22 }}>{ticket.title}</span>
         <StatusBadge value={ticket.status} />
       </h1>
 
@@ -215,11 +216,165 @@ export default function TicketEditPage() {
         </div>
       </div>
 
+      <BranchCreator
+        ticket={ticket}
+        repos={repos}
+        repositoryId={repositoryId}
+        currentTitle={title}
+        onCreated={async (repoId, branchName) => {
+          await api.updateTicket(id, {
+            title,
+            description,
+            type,
+            status,
+            parent_id: parentId || null,
+            assignee: assignee.trim() || null,
+            estimate_hours: estimate ? Number(estimate) : null,
+            due_date: dueDate || null,
+            repository_id: repoId,
+            branch: branchName,
+            sprint_id: sprintId || null,
+          });
+          setRepositoryId(repoId);
+          setBranch(branchName);
+          const fresh = await api.getTicket(id);
+          setTicket(fresh);
+        }}
+      />
+
       <div className="panel">
         <p className="muted" style={{ margin: 0, fontSize: 11 }}>
           作成: {new Date(ticket.created_at).toLocaleString()} ・ 更新: {new Date(ticket.updated_at).toLocaleString()}
         </p>
       </div>
     </>
+  );
+}
+
+// ===== Branch creator =====
+function slugify(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[^\w぀-ヿ㐀-䶿一-鿿-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-{2,}/g, "-")
+    .slice(0, 60);
+}
+
+function BranchCreator({
+  ticket,
+  repos,
+  repositoryId,
+  currentTitle,
+  onCreated,
+}: {
+  ticket: Ticket;
+  repos: Repository[];
+  repositoryId: string;
+  currentTitle: string;
+  onCreated: (repoId: string, branchName: string) => Promise<void>;
+}) {
+  const [chosenRepo, setChosenRepo] = useState<string>(repositoryId);
+  // Keep in sync if user changed repository in the main form
+  useEffect(() => { setChosenRepo(repositoryId); }, [repositoryId]);
+
+  const repo = repos.find((r) => r.id === chosenRepo);
+  const { branches, createBranch } = useBranches(chosenRepo || null);
+  const [from, setFrom] = useState("");
+  const [checkout, setCheckout] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  const defaultName = useMemo(
+    () => `TICKET-${ticket.number}-${slugify(currentTitle || ticket.title)}`,
+    [ticket.number, currentTitle, ticket.title],
+  );
+  const [name, setName] = useState(defaultName);
+  // Re-sync name when default changes (only if user hasn't customised)
+  const [touched, setTouched] = useState(false);
+  useEffect(() => {
+    if (!touched) setName(defaultName);
+  }, [defaultName, touched]);
+
+  // Default source branch = repo's default
+  useEffect(() => {
+    if (!repo) return;
+    if (!from) setFrom(repo.default_branch);
+  }, [repo, from]);
+
+  if (repos.length === 0) {
+    return (
+      <div className="panel">
+        <h3 style={{ marginTop: 0 }}>ブランチ作成</h3>
+        <p className="muted" style={{ margin: 0 }}>
+          リポジトリが登録されていません。先に <Link to="/repositories">リポジトリ管理</Link> から追加してください。
+        </p>
+      </div>
+    );
+  }
+
+  async function create() {
+    if (!chosenRepo || !name.trim() || busy) return;
+    setBusy(true);
+    setErr(null);
+    setMsg(null);
+    try {
+      await createBranch({ branch: name.trim(), from: from.trim() || undefined, checkout });
+      await onCreated(chosenRepo, name.trim());
+      setMsg(`ブランチ "${name.trim()}" を作成しました${checkout ? " (チェックアウト済み)" : ""}`);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="panel">
+      <h3 style={{ marginTop: 0 }}>ブランチ作成</h3>
+      <div className="row">
+        <select value={chosenRepo} onChange={(e) => setChosenRepo(e.target.value)} style={{ minWidth: 200 }}>
+          <option value="">(リポジトリ選択)</option>
+          {repos.map((r) => (
+            <option key={r.id} value={r.id}>{r.name}</option>
+          ))}
+        </select>
+        <input
+          value={name}
+          onChange={(e) => { setName(e.target.value); setTouched(true); }}
+          onBlur={() => { if (!name.trim()) { setName(defaultName); setTouched(false); } }}
+          style={{ flex: 1, minWidth: 280, fontFamily: "monospace" }}
+          placeholder="branch name"
+        />
+        <button
+          className="secondary"
+          onClick={() => { setName(defaultName); setTouched(false); }}
+          title="既定 (TICKET-番号-タイトル) に戻す"
+          type="button"
+        >既定に戻す</button>
+      </div>
+      <div className="row" style={{ marginTop: 6 }}>
+        <span className="muted" style={{ width: 60 }}>分岐元:</span>
+        {branches.length > 0 ? (
+          <select value={from} onChange={(e) => setFrom(e.target.value)} style={{ minWidth: 200 }}>
+            {branches.map((b) => (
+              <option key={b} value={b}>{b}</option>
+            ))}
+          </select>
+        ) : (
+          <input value={from} onChange={(e) => setFrom(e.target.value)} placeholder={repo?.default_branch ?? "main"} />
+        )}
+        <label className="row" style={{ gap: 4 }}>
+          <input type="checkbox" checked={checkout} onChange={(e) => setCheckout(e.target.checked)} />
+          作成後にチェックアウト
+        </label>
+        <button onClick={create} disabled={!chosenRepo || !name.trim() || busy}>
+          ブランチ作成
+        </button>
+      </div>
+      {msg && <p className="muted" style={{ marginTop: 6, color: "var(--done)" }}>{msg}</p>}
+      {err && <p style={{ marginTop: 6, color: "red" }}>{err}</p>}
+    </div>
   );
 }

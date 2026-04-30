@@ -270,6 +270,26 @@ tr:hover { background: #f9fafb; }
 .ghost-block.ev { background: rgba(251, 191, 36, 0.25); border-color: #fbbf24; }
 .ghost-block.tm { background: rgba(52, 211, 153, 0.25); border-color: #34d399; }
 
+/* Current-time horizontal line in the week view */
+.now-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 2px solid #ef4444;
+  pointer-events: none;
+  z-index: 3;
+}
+.now-line .now-dot {
+  position: absolute;
+  left: -3px;
+  top: -5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ef4444;
+}
+
 /* Drag selection preview overlay */
 .week-view.dragging { cursor: ns-resize; }
 .week-view.dragging .slot { cursor: ns-resize; }
