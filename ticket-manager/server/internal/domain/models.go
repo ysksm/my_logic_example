@@ -47,9 +47,36 @@ type Ticket struct {
 	DueDate       *string      `json:"due_date"`
 	RepositoryID  *string      `json:"repository_id"`
 	Branch        *string      `json:"branch"`
+	SprintID      *string      `json:"sprint_id"`
 	Tags          []string     `json:"tags"`
 	CreatedAt     time.Time    `json:"created_at"`
 	UpdatedAt     time.Time    `json:"updated_at"`
+}
+
+type SprintState string
+
+const (
+	SprintStatePlanned SprintState = "PLANNED"
+	SprintStateActive  SprintState = "ACTIVE"
+	SprintStateClosed  SprintState = "CLOSED"
+)
+
+func (s SprintState) Valid() bool {
+	switch s {
+	case SprintStatePlanned, SprintStateActive, SprintStateClosed:
+		return true
+	}
+	return false
+}
+
+type Sprint struct {
+	ID        string      `json:"id"`
+	Name      string      `json:"name"`
+	Goal      string      `json:"goal"`
+	State     SprintState `json:"state"`
+	StartDate *string     `json:"start_date"`
+	EndDate   *string     `json:"end_date"`
+	CreatedAt time.Time   `json:"created_at"`
 }
 
 type Tag struct {

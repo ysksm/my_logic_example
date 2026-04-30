@@ -19,6 +19,7 @@ export interface Ticket {
   due_date: string | null;
   repository_id: string | null;
   branch: string | null;
+  sprint_id: string | null;
   tags: string[];
   created_at: string;
   updated_at: string;
@@ -35,7 +36,29 @@ export interface TicketCreate {
   due_date?: string | null;
   repository_id?: string | null;
   branch?: string | null;
+  sprint_id?: string | null;
   tags?: string[];
+}
+
+export type SprintState = "PLANNED" | "ACTIVE" | "CLOSED";
+export const SPRINT_STATES: SprintState[] = ["PLANNED", "ACTIVE", "CLOSED"];
+
+export interface Sprint {
+  id: string;
+  name: string;
+  goal: string;
+  state: SprintState;
+  start_date: string | null;
+  end_date: string | null;
+  created_at: string;
+}
+
+export interface SprintCreate {
+  name: string;
+  goal?: string;
+  state?: SprintState;
+  start_date?: string | null;
+  end_date?: string | null;
 }
 
 export interface Tag {

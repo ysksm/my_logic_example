@@ -51,6 +51,7 @@ func main() {
 	timeRepo := repository.NewTimeEntryRepository(db)
 	calRepo := repository.NewCalendarRepository(db)
 	repoRepo := repository.NewRepoRepository(db)
+	sprintRepo := repository.NewSprintRepository(db)
 
 	gitClient := git.New()
 
@@ -59,6 +60,7 @@ func main() {
 		Times:   service.NewTimeEntryService(timeRepo),
 		Cal:     service.NewCalendarService(calRepo),
 		Repos:   service.NewRepositoryService(repoRepo, gitClient),
+		Sprints: service.NewSprintService(sprintRepo),
 		Maint:   maintenance.New(db, maintToken),
 	}
 

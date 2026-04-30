@@ -5,6 +5,7 @@ import TicketsPage from "@/presentation/pages/TicketsPage";
 import CalendarPage from "@/presentation/pages/CalendarPage";
 import TimeEntriesPage from "@/presentation/pages/TimeEntriesPage";
 import RepositoriesPage from "@/presentation/pages/RepositoriesPage";
+import SprintsPage from "@/presentation/pages/SprintsPage";
 import MaintenancePage from "@/presentation/pages/MaintenancePage";
 
 export default function App() {
@@ -34,6 +35,7 @@ export default function App() {
         <h2>Ticket Manager</h2>
         <nav>
           <NavLink to="/tickets" className={({ isActive }) => (isActive ? "active" : "")}>チケット</NavLink>
+          <NavLink to="/sprints" className={({ isActive }) => (isActive ? "active" : "")}>スプリント / バックログ</NavLink>
           <NavLink to="/calendar" className={({ isActive }) => (isActive ? "active" : "")}>カレンダー</NavLink>
           <NavLink to="/time" className={({ isActive }) => (isActive ? "active" : "")}>工数</NavLink>
           <NavLink to="/repositories" className={({ isActive }) => (isActive ? "active" : "")}>リポジトリ</NavLink>
@@ -52,6 +54,7 @@ export default function App() {
           <Route path="/tickets/:id" element={<TicketsPage />} />
           <Route path="/calendar" element={<CalendarPage />} />
           <Route path="/time" element={<TimeEntriesPage />} />
+          <Route path="/sprints" element={<SprintsPage />} />
           <Route path="/repositories" element={<RepositoriesPage />} />
           <Route path="/maintenance" element={<MaintenancePage />} />
         </Routes>

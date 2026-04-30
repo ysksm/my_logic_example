@@ -7,7 +7,7 @@ import { TICKET_STATUSES, TICKET_TYPES } from "@/domain/types";
 import { StatusBadge, TypeBadge } from "@/presentation/components/Badges";
 import TicketForm, { childTypeFor, type TicketFormPreset } from "@/presentation/components/TicketForm";
 
-type ViewMode = "list" | "tree" | "mindmap";
+type ViewMode = "list" | "tree" | "mindmap" | "kanban";
 
 export default function TicketsPage() {
   const [filterType, setFilterType] = useState<TicketType | "">("");
@@ -222,6 +222,10 @@ export default function TicketsPage() {
               className={viewMode === "mindmap" ? "" : "secondary"}
               onClick={() => setViewMode("mindmap")}
             >マインドマップ</button>
+            <button
+              className={viewMode === "kanban" ? "" : "secondary"}
+              onClick={() => setViewMode("kanban")}
+            >看板</button>
             {viewMode === "tree" && collapsed.size > 0 && (
               <button className="secondary" onClick={() => setCollapsed(new Set())}>
                 すべて展開
@@ -232,7 +236,16 @@ export default function TicketsPage() {
 
         {error && <p style={{ color: "red" }}>{error}</p>}
 
-        {viewMode === "mindmap" ? (
+        {viewMode === "kanban" ? (
+          <Kanban
+            tickets={tickets}
+            onChangeStatus={(id, s) => {
+              const t = tickets.find((x) => x.id === id);
+              if (!t) return;
+              update(id, { ...t, status: s });
+            }}
+          />
+        ) : viewMode === "mindmap" ? (
           <Mindmap
             tickets={tickets}
             focusedId={focusedId}
@@ -321,6 +334,97 @@ interface RowProps {
   onAddTag: (tag: string) => void;
   onRemoveTag: (tag: string) => void;
   onAddChild: () => void;
+}
+
+// ===== Kanban (status columns) =====
+function Kanban({
+  tickets,
+  onChangeStatus,
+}: { tickets: Ticket[]; onChangeStatus: (id: string, status: TicketStatus) => void }) {
+  const cols: { status: TicketStatus; label: string }[] = [
+    { status: "TODO", label: "TODO" },
+    { status: "IN_PROGRESS", label: "進行中" },
+    { status: "DONE", label: "完了" },
+  ];
+  const byStatus = new Map<TicketStatus, Ticket[]>();
+  for (const t of tickets) {
+    const arr = byStatus.get(t.status) ?? [];
+    arr.push(t);
+    byStatus.set(t.status, arr);
+  }
+  return (
+    <div className="kanban">
+      {cols.map((c) => (
+        <KanbanColumn
+          key={c.status}
+          status={c.status}
+          label={c.label}
+          tickets={byStatus.get(c.status) ?? []}
+          onDropTicket={(id) => onChangeStatus(id, c.status)}
+        />
+      ))}
+    </div>
+  );
+}
+
+function KanbanColumn({
+  status, label, tickets, onDropTicket,
+}: {
+  status: TicketStatus;
+  label: string;
+  tickets: Ticket[];
+  onDropTicket: (id: string) => void;
+}) {
+  const [over, setOver] = useState(false);
+  return (
+    <div
+      className={`kanban-col status-${status.toLowerCase()} ${over ? "drop-over" : ""}`}
+      onDragOver={(e) => {
+        e.preventDefault();
+        setOver(true);
+      }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setOver(false);
+        const id = e.dataTransfer.getData("text/plain");
+        if (id) onDropTicket(id);
+      }}
+    >
+      <div className="kanban-col-head">
+        <strong>{label}</strong>
+        <span className="muted">{tickets.length}</span>
+      </div>
+      <div className="ticket-list">
+        {tickets.map((t) => (
+          <KCard key={t.id} t={t} />
+        ))}
+        {tickets.length === 0 && (
+          <div className="muted ticket-list-empty">(空)</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function KCard({ t }: { t: Ticket }) {
+  return (
+    <div
+      className="ticket-card"
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData("text/plain", t.id);
+        e.dataTransfer.effectAllowed = "move";
+      }}
+    >
+      <div className="row" style={{ justifyContent: "space-between", marginBottom: 4 }}>
+        <TypeBadge value={t.type} />
+      </div>
+      <div className="ticket-card-title">{t.title}</div>
+      {t.assignee && <div className="muted" style={{ fontSize: 11 }}>👤 {t.assignee}</div>}
+      {t.due_date && <div className="muted" style={{ fontSize: 11 }}>📅 {t.due_date}</div>}
+    </div>
+  );
 }
 
 // ===== Edit ticket modal (Enter on focused node) =====
@@ -504,10 +608,10 @@ function QuickAddChildModal({
 }
 
 // ===== Mindmap (SVG horizontal tree) =====
-const NODE_W = 180;
-const NODE_H = 36;
-const COL_W = 220;
-const ROW_H = 56;
+const NODE_W = 200;
+const NODE_H = 50;
+const COL_W = 240;
+const ROW_H = 66;
 const PAD = 16;
 
 interface MindmapNode {
@@ -564,10 +668,14 @@ function Mindmap({
                 >
                   <rect width={NODE_W} height={NODE_H} rx={6} ry={6} className="mm-rect" />
                   <text x={8} y={14} className="mm-type">[{n.t.type}]</text>
-                  <text x={8} y={28} className="mm-title">{trim(n.t.title, 22)}</text>
-                  {n.t.status !== "TODO" && (
-                    <circle cx={8} cy={NODE_H - 6} r={3} className={`mm-dot status-${n.t.status.toLowerCase()}`} />
-                  )}
+                  <text x={8} y={28} className="mm-title">{trim(n.t.title, 20)}</text>
+                  <g
+                    className={`mm-status-pill status-${n.t.status.toLowerCase()}`}
+                    transform={`translate(${NODE_W / 2 - 22}, ${NODE_H - 14})`}
+                  >
+                    <rect width={44} height={11} rx={5.5} ry={5.5} />
+                    <text x={22} y={8} textAnchor="middle">{statusShort(n.t.status)}</text>
+                  </g>
                   {canAddChild && (
                     <g
                       className="mm-plus"
@@ -595,6 +703,10 @@ function Mindmap({
 
 function trim(s: string, n: number) {
   return s.length <= n ? s : s.slice(0, n - 1) + "…";
+}
+
+function statusShort(s: TicketStatus): string {
+  return s === "IN_PROGRESS" ? "進行中" : s === "DONE" ? "完了" : "TODO";
 }
 
 function layoutMindmap(tickets: Ticket[]): {

@@ -362,6 +362,16 @@ tr:hover { background: #f9fafb; }
 .mm-node.mm-subtask .mm-rect { stroke: var(--subtask); }
 .mm-dot.status-in_progress { fill: var(--inprog); }
 .mm-dot.status-done { fill: var(--done); }
+
+.mm-status-pill rect { fill: var(--todo); }
+.mm-status-pill.status-in_progress rect { fill: var(--inprog); }
+.mm-status-pill.status-done rect { fill: var(--done); }
+.mm-status-pill text {
+  fill: white;
+  font-size: 9px;
+  font-weight: 600;
+  pointer-events: none;
+}
 .mm-node.mm-status-done .mm-rect { fill: #f0fdf4; }
 .mm-node.mm-status-in_progress .mm-rect { fill: #fffbeb; }
 .mm-node.focused .mm-rect {
@@ -387,6 +397,69 @@ tr:hover { background: #f9fafb; }
 }
 .mm-node:hover .mm-plus-circle { opacity: 1; }
 .mm-plus:hover .mm-plus-circle { fill: var(--accent-hover); opacity: 1; }
+
+/* Kanban + sprint cards */
+.kanban {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+.kanban-col {
+  background: #f9fafb;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px;
+  min-height: 120px;
+}
+.kanban-col.drop-over { border-color: var(--accent); background: #eff6ff; }
+.kanban-col-head {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+.kanban-col.status-todo .kanban-col-head { color: var(--todo); }
+.kanban-col.status-in_progress .kanban-col-head { color: var(--inprog); }
+.kanban-col.status-done .kanban-col-head { color: var(--done); }
+
+.ticket-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ticket-list-empty {
+  padding: 12px;
+  text-align: center;
+  font-size: 11px;
+  border: 1px dashed var(--border);
+  border-radius: 4px;
+  background: white;
+}
+.ticket-card {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px;
+  font-size: 12px;
+  cursor: grab;
+  transition: box-shadow 0.1s, border-color 0.1s;
+}
+.ticket-card:hover { border-color: var(--accent); }
+.ticket-card:active { cursor: grabbing; }
+.ticket-card-title { font-weight: 500; line-height: 1.3; }
+
+/* Sprint blocks on /sprints */
+.sprint-block { padding: 14px; }
+.sprint-block.drop-over { border-color: var(--accent); background: #eff6ff; }
+.sprint-block.sprint-active { border-left: 4px solid var(--inprog); }
+.sprint-block.sprint-planned { border-left: 4px solid var(--story); }
+.sprint-block.sprint-closed { border-left: 4px solid var(--muted); opacity: 0.7; }
+.sprint-block.backlog { border-left: 4px solid var(--subtask); background: #f9fafb; }
+
+.badge.sprint-state.active { background: var(--inprog); }
+.badge.sprint-state.planned { background: var(--story); }
+.badge.sprint-state.closed { background: var(--muted); }
 
 /* Jira-style chip tag input */
 .tag-input {
