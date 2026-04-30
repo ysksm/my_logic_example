@@ -1,68 +1,67 @@
 # pcap-go
 
-A packet capture toolkit for macOS (also works on Linux). Ships as a single Go
-binary that exposes both a CLI and an embedded Web UI.
+macOS 向けのパケットキャプチャツールキット（Linux でも動作します）。
+単一の Go バイナリとして配布され、CLI と組み込みの Web UI の両方を提供します。
 
-## Features
+## 機能
 
-- List capturable network interfaces.
-- Live capture with BPF filters, snaplen, and promiscuous mode.
-- CLI (`list`, `capture`, `serve`) and embedded React SPA.
-- WebSocket live stream of decoded packets.
-- IDL-first contract: `idl/pcap.proto` is the single source of truth between
-  backend and frontend.
-- Per-layer decoded detail (Ethernet, IPv4/IPv6, TCP, UDP, ICMP, DNS, HTTP,
-  TLS) with a Wireshark-style detail pane.
-- MAC → vendor lookup using an embedded OUI table (Apple, Intel, Cisco,
-  Samsung, Espressif, Raspberry Pi, …).
-- Peer list (IP + MAC peers with vendor, packets / bytes / sent / received,
-  first/last seen).
-- Visualization: transport / application protocol distribution, top peers,
-  60-second packet-rate sparkline.
-- Filter bar: free-text (host, vendor, SNI, summary), address, port,
-  protocol toggle (TCP/UDP/ICMPv4/DNS/TLS/HTTP).
+- キャプチャ可能なネットワークインターフェース一覧の表示
+- BPF フィルター・snaplen・プロミスキャスモードを指定したライブキャプチャ
+- CLI（`list` / `capture` / `serve`）と組み込みの React SPA
+- WebSocket によるデコード済みパケットのライブストリーム
+- IDL ファースト設計：`idl/pcap.proto` がバックエンドとフロントエンドの唯一の契約
+- レイヤごとのデコード詳細（Ethernet, IPv4/IPv6, TCP, UDP, ICMP, DNS, HTTP, TLS）と
+  Wireshark 風のディテールペイン
+- 組み込み OUI テーブルによる MAC → ベンダー解決（Apple, Intel, Cisco, Samsung,
+  Espressif, Raspberry Pi など）
+- ピア一覧（IP / MAC ピア、ベンダー、パケット数 / バイト数 / 送信 / 受信、初回・最終
+  観測時刻）
+- 可視化：トランスポート / アプリケーションプロトコルの分布、トップピア、直近 60 秒の
+  パケットレートのスパークライン
+- フィルターバー：フリーテキスト（ホスト・ベンダー・SNI・サマリー）、アドレス、ポート、
+  プロトコル絞り込み（TCP / UDP / ICMPv4 / DNS / TLS / HTTP）
 
-## Repository layout
+## リポジトリ構成
 
 ```
 pcap-go/
-├── idl/              # .proto IDL — contract for REST + WebSocket
-├── core/             # domain logic, capture engine, session manager
-├── cli/              # cobra-based CLI (list / capture / serve)
-├── web/              # net/http REST + WebSocket server, embeds SPA via go:embed
-├── frontend/         # React + Vite SPA (TypeScript, layered)
+├── idl/              # .proto IDL — REST + WebSocket の契約
+├── core/             # ドメインロジック、キャプチャエンジン、セッションマネージャ
+├── cli/              # cobra ベースの CLI（list / capture / serve）
+├── web/              # net/http REST + WebSocket サーバ。go:embed で SPA を埋め込む
+├── frontend/         # React + Vite SPA（TypeScript・レイヤード設計）
 │   └── src/
-│       ├── domain/         # IDL types + domain rules
-│       ├── application/    # use cases (ports + services)
-│       ├── infrastructure/ # REST/WebSocket adapters (port implementations)
-│       └── presentation/   # React components, pages, hooks
-├── main.go           # binary entrypoint
+│       ├── domain/         # IDL 型 + ドメインルール
+│       ├── application/    # ユースケース（ポート + サービス）
+│       ├── infrastructure/ # REST/WebSocket アダプタ（ポート実装）
+│       └── presentation/   # React コンポーネント、ページ、フック
+├── main.go           # バイナリのエントリポイント
 ├── go.mod
 └── Makefile
 ```
 
-The frontend layered architecture follows clean-architecture conventions:
-inner layers (domain, application) know nothing about React or fetch; outer
-layers (infrastructure, presentation) implement the ports declared by the
-application layer.
+フロントエンドは クリーンアーキテクチャの考え方に沿ったレイヤード設計です。
+内側のレイヤ（domain / application）は React や fetch を一切知らず、外側のレイヤ
+（infrastructure / presentation）が application 層のポートを実装します。
 
-## Build
+詳細な設計指針は [`ARCHITECTURE.md`](./ARCHITECTURE.md) を参照してください。
 
-### Default (simulator)
+## ビルド
 
-The default build uses an in-memory packet simulator and requires no system
-libraries. Useful for development on machines without libpcap.
+### デフォルト（シミュレータ）
+
+デフォルトビルドはインメモリのパケットシミュレータを使用するため、システム
+ライブラリは不要です。libpcap が無い開発環境での動作確認に便利です。
 
 ```sh
-make all              # builds frontend + Go binary
+make all              # フロントエンド + Go バイナリをビルド
 ./bin/pcap-go serve   # http://localhost:8080
 ```
 
-### Real capture (macOS / Linux)
+### 実キャプチャ（macOS / Linux）
 
-Real capture is gated behind the `pcap` build tag and requires libpcap
-headers. macOS ships libpcap with the system SDK, so no extra install is
-typically needed.
+実キャプチャは `pcap` ビルドタグの裏側にあり、libpcap のヘッダが必要です。
+macOS は SDK に libpcap が同梱されているため、通常は追加のインストールは不要です。
 
 ```sh
 make frontend
@@ -72,26 +71,25 @@ sudo ./bin/pcap-go capture -i en0 -f "tcp port 443" -c 10
 sudo ./bin/pcap-go serve --addr :8080
 ```
 
-`sudo` (or BPF device permissions) is required to open the BPF devices on
-macOS.
+macOS で BPF デバイスを開くには `sudo`（または BPF デバイスの権限）が必要です。
 
-## Development
+## 開発
 
-Run the Go API and Vite dev server side by side:
+Go API と Vite 開発サーバを並行して起動します。
 
 ```sh
-# terminal 1 — Go API on :8080
+# ターミナル 1 — Go API（:8080）
 go run . serve --addr :8080
 
-# terminal 2 — Vite dev server on :5173 (proxies /api → :8080)
+# ターミナル 2 — Vite 開発サーバ（:5173、/api → :8080 へプロキシ）
 cd frontend && npm run dev
 ```
 
-Open <http://localhost:5173>.
+ブラウザで <http://localhost:5173> を開きます。
 
-## REST endpoints
+## REST エンドポイント
 
-See `idl/README.md` for the full contract. Quick reference:
+詳細な契約は `idl/README.md` を参照してください。クイックリファレンスは以下です。
 
 | Method | Path                                  |
 |--------|---------------------------------------|
@@ -107,11 +105,11 @@ See `idl/README.md` for the full contract. Quick reference:
 
 ## IDL
 
-`idl/pcap.proto` is the contract. JSON-on-the-wire field names use snake_case
-(matching protojson defaults). The Go and TypeScript type definitions are
-hand-maintained mirrors:
+`idl/pcap.proto` が契約の単一の真実です。ワイヤ上のフィールド名は snake_case
+（protojson のデフォルトに従う）です。Go と TypeScript の型定義は手動でミラーを
+維持しています。
 
 - Go: `core/models.go`
 - TypeScript: `frontend/src/domain/idl.ts`
 
-When you change the proto, update both mirrors in lockstep.
+proto を変更する際は、両方のミラーを必ず同時に更新してください。

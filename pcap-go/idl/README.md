@@ -13,13 +13,19 @@ Whenever you change `pcap.proto`, update both files in lockstep.
 
 ## REST endpoints
 
-| Method | Path                                  | Request                | Response                  |
-|--------|---------------------------------------|------------------------|---------------------------|
-| GET    | `/api/v1/interfaces`                  | -                      | `ListInterfacesResponse`  |
-| GET    | `/api/v1/sessions`                    | -                      | `ListSessionsResponse`    |
-| POST   | `/api/v1/sessions`                    | `StartCaptureRequest`  | `StartCaptureResponse`    |
-| DELETE | `/api/v1/sessions/{id}`               | -                      | `StopCaptureResponse`     |
-| GET    | `/api/v1/sessions/{id}/packets`       | query: `after_seq`, `limit` | `ListPacketsResponse` |
+| Method | Path                                  | Request                     | Response                  |
+|--------|---------------------------------------|-----------------------------|---------------------------|
+| GET    | `/api/v1/interfaces`                  | -                           | `ListInterfacesResponse`  |
+| GET    | `/api/v1/sessions`                    | -                           | `ListSessionsResponse`    |
+| POST   | `/api/v1/sessions`                    | `StartCaptureRequest`       | `StartCaptureResponse`    |
+| DELETE | `/api/v1/sessions/{id}`               | -                           | `StopCaptureResponse`     |
+| GET    | `/api/v1/sessions/{id}/packets`       | query: `after_seq`, `limit` | `ListPacketsResponse`     |
+| GET    | `/api/v1/sessions/{id}/peers`         | query: `kind`               | `ListPeersResponse`       |
+| GET    | `/api/v1/sessions/{id}/stats`         | query: `top`                | `StatsResponse`           |
+| GET    | `/api/v1/oui/{mac}`                   | -                           | `OUIResponse`             |
+| GET    | `/api/v1/ipranges/status`             | -                           | `IPRangesStatus`          |
+| POST   | `/api/v1/ipranges/update`             | -                           | `IPRangesUpdateResponse`  |
+| GET    | `/api/v1/dns/reverse/{ip}`            | -                           | `ReverseDNSResponse`      |
 
 ## WebSocket
 

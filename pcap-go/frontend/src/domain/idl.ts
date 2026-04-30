@@ -156,6 +156,7 @@ export interface Peer {
   received: number;
   first_seen: string;
   last_seen: string;
+  owner?: string;
 }
 
 export interface ListPeersResponse {
@@ -186,6 +187,32 @@ export interface StatsResponse {
 export interface OUIResponse {
   mac: string;
   vendor: string;
+}
+
+export interface IPRangesProvider {
+  name: string;
+  entries: number;
+  source: "embedded" | "user-file" | "fetched";
+}
+
+export interface IPRangesStatus {
+  total_entries: number;
+  user_file_path: string;
+  user_file_present: boolean;
+  user_file_updated?: string;
+  providers: IPRangesProvider[];
+}
+
+export interface IPRangesUpdateResponse {
+  status: IPRangesStatus;
+  errors?: string[];
+  fetched_total: number;
+}
+
+export interface ReverseDNSResponse {
+  ip: string;
+  names?: string[];
+  error?: string;
 }
 
 export type StreamEnvelope =

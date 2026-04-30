@@ -348,11 +348,19 @@ func (s *sessionStats) bumpPeer(kind, addr, vendor string, sent bool, length uin
 	key := kind + "|" + addr
 	p, ok := s.peers[key]
 	if !ok {
-		p = &peerAgg{Peer: Peer{Kind: kind, Address: addr, Vendor: vendor, FirstSeen: ts}}
+		owner := ""
+		if kind == "ip" {
+			owner = LookupIPOwner(addr)
+		}
+		p = &peerAgg{Peer: Peer{Kind: kind, Address: addr, Vendor: vendor, Owner: owner, FirstSeen: ts}}
 		s.peers[key] = p
 	}
 	if vendor != "" && p.Vendor == "" {
 		p.Vendor = vendor
+	}
+	if kind == "ip" && p.Owner == "" {
+		// Owner table may have been refreshed mid-session via UpdateIPRanges.
+		p.Owner = LookupIPOwner(addr)
 	}
 	p.Packets++
 	p.Bytes += uint64(length)

@@ -86,6 +86,29 @@ func (s *Server) handleOUI(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, core.OUIResponse{MAC: mac, Vendor: core.LookupVendor(mac)})
 }
 
+func (s *Server) handleIPRangesStatus(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, core.IPRangesStatusSnapshot())
+}
+
+func (s *Server) handleIPRangesUpdate(w http.ResponseWriter, r *http.Request) {
+	resp, err := core.UpdateIPRanges()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
+func (s *Server) handleReverseDNS(w http.ResponseWriter, r *http.Request) {
+	ip := r.PathValue("ip")
+	names, err := core.ReverseDNS(ip)
+	resp := core.ReverseDNSResponse{IP: ip, Names: names}
+	if err != nil {
+		resp.Error = err.Error()
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
 func writeJSON(w http.ResponseWriter, status int, body any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)

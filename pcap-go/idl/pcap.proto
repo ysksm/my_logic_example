@@ -122,6 +122,7 @@ message Peer {
   uint64 received    = 7;   // packets observed as dst
   string first_seen  = 8;
   string last_seen   = 9;
+  string owner       = 10;  // for ip peers: matched cloud/service owner ("AWS:EC2", "GCP", ...)
 }
 
 message ProtocolStat {
@@ -152,6 +153,34 @@ message ListPeersResponse {
 message OUIResponse {
   string mac    = 1;
   string vendor = 2;
+}
+
+// ---------- IP ranges + reverse DNS ----------
+
+message IPRangesProvider {
+  string name        = 1;   // "AWS", "GCP", ...
+  uint32 entries     = 2;   // number of CIDRs from this provider
+  string source      = 3;   // "embedded" | "user-file" | "fetched"
+}
+
+message IPRangesStatus {
+  uint32 total_entries     = 1;
+  string user_file_path    = 2;   // path to user-overridable file (may not exist)
+  bool   user_file_present = 3;
+  string user_file_updated = 4;   // RFC3339 of user-file mtime, if present
+  repeated IPRangesProvider providers = 5;
+}
+
+message IPRangesUpdateResponse {
+  IPRangesStatus status      = 1;
+  repeated string errors     = 2;   // per-provider fetch errors, if any
+  uint32 fetched_total       = 3;   // total CIDRs written to user file
+}
+
+message ReverseDNSResponse {
+  string ip      = 1;
+  repeated string names = 2;   // PTR results
+  string error   = 3;          // empty on success
 }
 
 message CaptureSession {

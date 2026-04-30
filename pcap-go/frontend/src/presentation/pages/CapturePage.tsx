@@ -85,7 +85,17 @@ export function CapturePage() {
         </>
       )}
 
-      {tab === "peers" && <PeerList peers={stats.peers} loading={stats.loading} />}
+      {tab === "peers" && (
+        <PeerList
+          peers={stats.peers}
+          loading={stats.loading}
+          onFilterByPeer={(address) => {
+            setFilter({ ...EMPTY_FILTER, address });
+            setSelectedSeq(null);
+            setTab("packets");
+          }}
+        />
+      )}
 
       {tab === "viz" && (
         <div className="viz-grid">

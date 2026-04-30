@@ -117,6 +117,7 @@ type Peer struct {
 	Received  uint64 `json:"received"`
 	FirstSeen string `json:"first_seen"`
 	LastSeen  string `json:"last_seen"`
+	Owner     string `json:"owner,omitempty"` // for ip peers, e.g. "AWS:EC2"
 }
 
 // ProtocolStat is one bucket of the protocol distribution.
@@ -152,6 +153,36 @@ type ListPeersResponse struct {
 type OUIResponse struct {
 	MAC    string `json:"mac"`
 	Vendor string `json:"vendor"`
+}
+
+// IPRangesProvider describes one provider's contribution to the active IP range table.
+type IPRangesProvider struct {
+	Name    string `json:"name"`
+	Entries uint32 `json:"entries"`
+	Source  string `json:"source"` // "embedded" | "user-file" | "fetched"
+}
+
+// IPRangesStatus describes the active IP range table.
+type IPRangesStatus struct {
+	TotalEntries    uint32             `json:"total_entries"`
+	UserFilePath    string             `json:"user_file_path"`
+	UserFilePresent bool               `json:"user_file_present"`
+	UserFileUpdated string             `json:"user_file_updated,omitempty"`
+	Providers       []IPRangesProvider `json:"providers"`
+}
+
+// IPRangesUpdateResponse is returned by POST /api/v1/ipranges/update.
+type IPRangesUpdateResponse struct {
+	Status        IPRangesStatus `json:"status"`
+	Errors        []string       `json:"errors,omitempty"`
+	FetchedTotal  uint32         `json:"fetched_total"`
+}
+
+// ReverseDNSResponse is returned by GET /api/v1/dns/reverse/{ip}.
+type ReverseDNSResponse struct {
+	IP    string   `json:"ip"`
+	Names []string `json:"names,omitempty"`
+	Error string   `json:"error,omitempty"`
 }
 
 // CaptureSession reflects the lifecycle of a capture.

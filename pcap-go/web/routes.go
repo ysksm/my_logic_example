@@ -23,6 +23,11 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/sessions/{id}/stats", s.handleStats)
 	mux.HandleFunc("GET /api/v1/oui/{mac}", s.handleOUI)
 
+	// IP ranges + reverse DNS
+	mux.HandleFunc("GET /api/v1/ipranges/status", s.handleIPRangesStatus)
+	mux.HandleFunc("POST /api/v1/ipranges/update", s.handleIPRangesUpdate)
+	mux.HandleFunc("GET /api/v1/dns/reverse/{ip}", s.handleReverseDNS)
+
 	// WebSocket
 	mux.HandleFunc("GET /api/v1/sessions/{id}/stream", s.handleStream)
 

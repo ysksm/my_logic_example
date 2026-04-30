@@ -1,12 +1,15 @@
 import type { CaptureGateway } from "@application/ports";
 import type {
   CaptureSession,
+  IPRangesStatus,
+  IPRangesUpdateResponse,
   ListInterfacesResponse,
   ListPeersResponse,
   ListSessionsResponse,
   NetworkInterface,
   OUIResponse,
   Peer,
+  ReverseDNSResponse,
   StartCaptureRequest,
   StartCaptureResponse,
   StatsResponse,
@@ -76,6 +79,24 @@ export class HttpCaptureGateway implements CaptureGateway {
     await throwIfErr(r);
     const body = (await r.json()) as OUIResponse;
     return body.vendor;
+  }
+
+  async ipRangesStatus(): Promise<IPRangesStatus> {
+    const r = await fetch(`${this.baseUrl}/api/v1/ipranges/status`);
+    await throwIfErr(r);
+    return (await r.json()) as IPRangesStatus;
+  }
+
+  async ipRangesUpdate(): Promise<IPRangesUpdateResponse> {
+    const r = await fetch(`${this.baseUrl}/api/v1/ipranges/update`, { method: "POST" });
+    await throwIfErr(r);
+    return (await r.json()) as IPRangesUpdateResponse;
+  }
+
+  async reverseDNS(ip: string): Promise<ReverseDNSResponse> {
+    const r = await fetch(`${this.baseUrl}/api/v1/dns/reverse/${encodeURIComponent(ip)}`);
+    await throwIfErr(r);
+    return (await r.json()) as ReverseDNSResponse;
   }
 }
 

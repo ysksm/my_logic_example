@@ -3,9 +3,12 @@
 
 import type {
   CaptureSession,
+  IPRangesStatus,
+  IPRangesUpdateResponse,
   NetworkInterface,
   Packet,
   Peer,
+  ReverseDNSResponse,
   StartCaptureRequest,
   StatsResponse,
 } from "@domain/idl";
@@ -18,6 +21,9 @@ export interface CaptureGateway {
   listPeers(id: string, kind?: "ip" | "mac"): Promise<Peer[]>;
   stats(id: string, top?: number): Promise<StatsResponse>;
   lookupVendor(mac: string): Promise<string>;
+  ipRangesStatus(): Promise<IPRangesStatus>;
+  ipRangesUpdate(): Promise<IPRangesUpdateResponse>;
+  reverseDNS(ip: string): Promise<ReverseDNSResponse>;
 }
 
 export interface PacketStream {

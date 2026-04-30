@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -32,11 +33,21 @@ var serveCmd = &cobra.Command{
 			_ = srv.Shutdown(ctxShutdown)
 		}()
 
-		fmt.Fprintf(os.Stderr, "pcap-go listening on http://%s\n", serveAddr)
+		fmt.Fprintf(os.Stderr, "pcap-go listening on http://%s\n", displayAddr(serveAddr))
 		return srv.ListenAndServe(serveAddr)
 	},
 }
 
 func init() {
 	serveCmd.Flags().StringVar(&serveAddr, "addr", ":8080", "HTTP listen address")
+}
+
+// displayAddr makes the listen address human-friendly. When the host is empty
+// (e.g. ":8080" — listen on all interfaces), prefix "localhost" so the printed
+// URL is clickable.
+func displayAddr(addr string) string {
+	if strings.HasPrefix(addr, ":") {
+		return "localhost" + addr
+	}
+	return addr
 }

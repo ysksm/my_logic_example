@@ -41,4 +41,16 @@ export class CaptureService {
   vendor(mac: string) {
     return this.gw.lookupVendor(mac);
   }
+
+  ipRangesStatus() {
+    return this.gw.ipRangesStatus();
+  }
+
+  ipRangesUpdate() {
+    return this.gw.ipRangesUpdate();
+  }
+
+  reverseDNS(ip: string) {
+    return this.gw.reverseDNS(ip);
+  }
 }
