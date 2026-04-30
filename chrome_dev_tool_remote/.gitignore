@@ -1,0 +1,6 @@
+data/
+__marimo__/
+.env
+__pycache__/
+*.pyc
+.venv/
