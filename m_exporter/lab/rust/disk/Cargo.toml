@@ -1,9 +1,0 @@
-[package]
-name = "lab-disk"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-sysinfo = "0.32"
-ctrlc = "3"
-chrono = { version = "0.4", default-features = false, features = ["clock"] }

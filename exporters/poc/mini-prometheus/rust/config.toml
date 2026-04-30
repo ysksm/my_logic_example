@@ -1,0 +1,21 @@
+[server]
+listen_addr = "0.0.0.0:9093"
+
+[storage]
+retention_samples = 720          # 15s × 3h
+data_dir          = "data"       # snapshots written here; "" disables persistence
+snapshot_interval = "30s"        # background save cadence; "0s" disables periodic save (still saves on shutdown)
+
+[[scrape_configs]]
+job_name        = "mac_exporter_go"
+scrape_interval = "15s"
+scrape_timeout  = "10s"
+metrics_path    = "/metrics"
+targets         = ["localhost:9100"]
+
+[[scrape_configs]]
+job_name        = "mac_exporter_rust"
+scrape_interval = "15s"
+scrape_timeout  = "10s"
+metrics_path    = "/metrics"
+targets         = ["localhost:9101"]
