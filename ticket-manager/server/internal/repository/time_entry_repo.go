@@ -32,11 +32,11 @@ func (r *TimeEntryRepository) List(ctx context.Context, f TimeEntryFilter) ([]do
 		args = append(args, f.TicketID)
 	}
 	if f.From != "" {
-		conds = append(conds, "te.work_date >= ?")
+		conds = append(conds, "te.work_date >= CAST(? AS DATE)")
 		args = append(args, f.From)
 	}
 	if f.To != "" {
-		conds = append(conds, "te.work_date <= ?")
+		conds = append(conds, "te.work_date <= CAST(? AS DATE)")
 		args = append(args, f.To)
 	}
 	q := `SELECT te.id, te.ticket_id, COALESCE(t.title, ''), te."user", te.hours, te.work_date, te.note, te.created_at

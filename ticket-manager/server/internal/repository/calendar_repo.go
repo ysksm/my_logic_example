@@ -70,7 +70,8 @@ func (r *CalendarRepository) RangeItems(ctx context.Context, from, to string) ([
 	{
 		rows, err := r.db.QueryContext(ctx, `
             SELECT id, title, status, due_date FROM tickets
-            WHERE due_date IS NOT NULL AND due_date >= ? AND due_date <= ?`,
+            WHERE due_date IS NOT NULL
+              AND due_date >= CAST(? AS DATE) AND due_date <= CAST(? AS DATE)`,
 			from, to)
 		if err != nil {
 			return nil, fmt.Errorf("ticket dues: %w", err)
@@ -97,7 +98,7 @@ func (r *CalendarRepository) RangeItems(ctx context.Context, from, to string) ([
 		rows, err := r.db.QueryContext(ctx, `
             SELECT te.id, te.ticket_id, t.title, te.hours, te.work_date
             FROM time_entries te LEFT JOIN tickets t ON t.id = te.ticket_id
-            WHERE te.work_date >= ? AND te.work_date <= ?`,
+            WHERE te.work_date >= CAST(? AS DATE) AND te.work_date <= CAST(? AS DATE)`,
 			from, to)
 		if err != nil {
 			return nil, fmt.Errorf("time entries: %w", err)
@@ -129,7 +130,7 @@ func (r *CalendarRepository) RangeItems(ctx context.Context, from, to string) ([
 	{
 		rows, err := r.db.QueryContext(ctx, `
             SELECT id, title, start_date FROM calendar_events
-            WHERE start_date >= ? AND start_date <= ?`,
+            WHERE start_date >= CAST(? AS DATE) AND start_date <= CAST(? AS DATE)`,
 			from, to)
 		if err != nil {
 			return nil, fmt.Errorf("events: %w", err)
