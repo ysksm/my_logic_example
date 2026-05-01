@@ -1,0 +1,95 @@
+{
+  "id": "shop",
+  "name": "Shop Domain",
+  "aggregates": [
+    {
+      "name": "Order",
+      "root": {
+        "name": "Order",
+        "isRoot": true,
+        "fields": [
+          { "name": "id", "type": "vo", "voTypeRef": "OrderId", "required": true },
+          { "name": "customer", "type": "ref", "refTo": "Customer", "required": true },
+          { "name": "status", "type": "enum", "enumValues": ["draft", "placed", "shipped", "cancelled"], "required": true },
+          { "name": "total", "type": "vo", "voTypeRef": "Money" },
+          { "name": "placedAt", "type": "date" }
+        ],
+        "children": ["OrderLine"]
+      },
+      "entities": [
+        {
+          "name": "OrderLine",
+          "fields": [
+            { "name": "id", "type": "vo", "voTypeRef": "LineId", "required": true },
+            { "name": "product", "type": "ref", "refTo": "Product", "required": true },
+            { "name": "quantity", "type": "int", "required": true },
+            { "name": "unitPrice", "type": "vo", "voTypeRef": "Money" }
+          ]
+        }
+      ],
+      "valueObjects": [
+        { "name": "OrderId", "isIdentifier": true, "fields": [{ "name": "value", "type": "string" }] },
+        { "name": "LineId", "isIdentifier": true, "fields": [{ "name": "value", "type": "string" }] },
+        { "name": "Money", "fields": [
+          { "name": "amount", "type": "int" },
+          { "name": "currency", "type": "string" }
+        ]}
+      ],
+      "uiHint": { "childStyle": "table" }
+    },
+    {
+      "name": "Customer",
+      "root": {
+        "name": "Customer",
+        "isRoot": true,
+        "fields": [
+          { "name": "id", "type": "vo", "voTypeRef": "CustomerId", "required": true },
+          { "name": "name", "type": "string", "required": true },
+          { "name": "email", "type": "string", "required": true }
+        ]
+      },
+      "valueObjects": [
+        { "name": "CustomerId", "isIdentifier": true, "fields": [{ "name": "value", "type": "string" }] }
+      ]
+    },
+    {
+      "name": "Product",
+      "root": {
+        "name": "Product",
+        "isRoot": true,
+        "fields": [
+          { "name": "id", "type": "vo", "voTypeRef": "ProductId", "required": true },
+          { "name": "name", "type": "string", "required": true },
+          { "name": "description", "type": "text" },
+          { "name": "price", "type": "vo", "voTypeRef": "Money" },
+          { "name": "category", "type": "enum", "enumValues": ["book", "music", "video"] },
+          { "name": "available", "type": "bool" }
+        ]
+      },
+      "valueObjects": [
+        { "name": "ProductId", "isIdentifier": true, "fields": [{ "name": "value", "type": "string" }] },
+        { "name": "Money", "fields": [
+          { "name": "amount", "type": "int" },
+          { "name": "currency", "type": "string" }
+        ]}
+      ]
+    },
+    {
+      "name": "ShopSettings",
+      "isSingleton": true,
+      "root": {
+        "name": "ShopSettings",
+        "isRoot": true,
+        "fields": [
+          { "name": "shopName", "type": "string", "required": true },
+          { "name": "currency", "type": "enum", "enumValues": ["JPY", "USD", "EUR"], "required": true },
+          { "name": "maintenance", "type": "bool" }
+        ]
+      }
+    }
+  ],
+  "services": [
+    { "name": "PlaceOrder", "aggregateRef": "Order", "confirm": true },
+    { "name": "CancelOrder", "aggregateRef": "Order", "confirm": true }
+  ]
+}

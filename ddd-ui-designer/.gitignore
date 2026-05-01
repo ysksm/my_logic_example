@@ -1,0 +1,5 @@
+server/data/
+ui/node_modules/
+ui/dist/
+ui/tsconfig.tsbuildinfo
+*.log
