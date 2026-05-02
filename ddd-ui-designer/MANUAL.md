@@ -3,6 +3,16 @@
 DDDのドメインモデル（Aggregate / Entity / Value Object / Service）から、
 画面パターンを自動派生する設計支援ツールの操作マニュアルです。
 
+> 📂 本ドキュメントは「**操作手順**」に特化しています。設計・リファレンスは
+> [`docs/`](./docs/) を参照してください
+> ([architecture](./docs/architecture.md) /
+> [patterns](./docs/patterns.md) /
+> [outputs](./docs/outputs.md) /
+> [views](./docs/views.md) /
+> [samples](./docs/samples.md) /
+> [codegen](./docs/codegen.md) /
+> [api](./docs/api.md))。
+
 ---
 
 ## 目次
