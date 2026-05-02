@@ -29,6 +29,9 @@ export function RunPanel({ run, onStop, onClose }: Props) {
   const statusColor = STATUS_COLOR[run.status] ?? "#6b7280";
   return (
     <div
+      className="run-panel"
+      data-testid="run-panel"
+      data-status={run.status}
       style={{
         position: "fixed",
         right: 16,

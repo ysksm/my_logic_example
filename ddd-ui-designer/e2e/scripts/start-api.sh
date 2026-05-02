@@ -6,9 +6,10 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/../.." && pwd)"
 DATA_DIR="$HERE/../.tmp/data"
+RUNS_DIR="$HERE/../.tmp/runs"
 PORT="${API_PORT:-8095}"
 
-mkdir -p "$DATA_DIR"
+mkdir -p "$DATA_DIR" "$RUNS_DIR"
 cd "$ROOT/server"
 
-exec go run . -addr ":$PORT" -data "$DATA_DIR"
+exec go run . -addr ":$PORT" -data "$DATA_DIR" -runs "$RUNS_DIR"

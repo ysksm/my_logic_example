@@ -79,17 +79,41 @@ npm run report
 
 デモは以下を順に実演します:
 
-1. アプリ起動と既定 (Sample → P1)
-2. 名前変更とフィールド追加
-3. 多フィールド Aggregate を追加して P2 に切替わる様子
-4. 子Entity追加で P3 (Master-Detail) へ
-5. UIヒントで P4 (Wizard) を強制
-6. Singleton で P5 (Single Form)
-7. 閾値変更で P1 ⇄ P2 を切替え
-8. 保存と全体プレビュー
+| # | 操作 | スクリーンショット |
+|---|------|------------------|
+| 1 | アプリ起動と既定 (Sample → P1) | `01-app-loaded`, `02-default-derive-P1` |
+| 2 | 名前変更とフィールド追加 | `03-edit-fields`, `04-after-edit-still-P1` |
+| 3 | 多フィールド Aggregate を追加して P2 | `05-article-fields`, `06-article-derive-P2` |
+| 4 | 子Entity追加で P3 (Master-Detail) | `07-article-with-children-P3` |
+| 5 | UIヒントで P4 (Wizard) を強制 | `08-article-wizard-P4` |
+| 6 | Singleton で P5 (Single Form) | `09-settings-P5` |
+| 7 | 閾値変更で P1 ⇄ P2 を切替え | `10-threshold-flips-P2` |
+| 8 | 保存と全体プレビュー | `11-saved`, `12-overview` |
+| 9 | **🚀 生成 → 実行** をクリック | `13-launch-clicked` |
+| 10 | npm install + dev server 起動完了 | `14-launch-ready` |
+| 11 | **生成された React アプリを新タブで開く** | `15-running-app-home` |
+| 12 | P5 Settings 画面でフォーム入力・保存 | `16-running-app-settings`, `17-running-app-settings-saved` |
+| 13 | P2 Tag 一覧から新規作成・保存 | `18-running-app-tag-list`, `19-running-app-tag-saved` |
+| 14 | デザイナーパネルから dev server を停止 | `20-launch-stopped` |
 
-各ステップ前後で `screenshots/NN-*.png` が生成されるので、
-順番に並べるだけで簡易的なドキュメント図解になります。
+連番 PNG を順に並べるだけで「設計 → パターン派生 → 動くアプリ」の
+一気通貫ドキュメントになります。動画は **2 ファイル** 生成されます:
+
+- `test-results/demo-…/video.webm` — デザイナー画面の操作
+- `test-results/demo-…/video-1.webm` — 生成された React アプリ操作
+
+### デモ全体のタイムライン
+
+ローカル測定値（参考）:
+
+| フェーズ | 時間 |
+|----|----|
+| デザイナー操作 (Step 1〜8) | 約 7s |
+| 🚀 launch → ready (初回 npm install 込み) | 約 8s |
+| 生成アプリ操作 (Step 11〜13) | 約 3s |
+| **合計** | **約 17〜20s** |
+
+2 回目以降は `node_modules` がキャッシュされるため launch フェーズは 2〜3 秒に短縮されます。
 
 ## CI 連携
 

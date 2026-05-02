@@ -16,10 +16,10 @@ const SHOTS = path.join(__dirname, "..", "screenshots");
  */
 
 let step = 0;
-async function shot(page: any, label: string) {
+async function shot(target: any, label: string) {
   step += 1;
   const safe = label.replace(/[^a-z0-9-]/gi, "_");
-  await page.screenshot({
+  await target.screenshot({
     path: path.join(SHOTS, `${String(step).padStart(2, "0")}-${safe}.png`),
     fullPage: false,
   });
@@ -29,7 +29,9 @@ async function pause(page: any, ms: number) {
   await page.waitForTimeout(ms);
 }
 
-test("ddd-ui-designer end-to-end demo", async ({ page }) => {
+test.setTimeout(180_000);
+
+test("ddd-ui-designer end-to-end demo", async ({ page, context }) => {
   step = 0;
   const d = new Designer(page);
 
@@ -118,4 +120,70 @@ test("ddd-ui-designer end-to-end demo", async ({ page }) => {
 
   // Sanity: the right pane lists 3 aggregates (Tag, Article, Settings)
   await expect(d.rightPane().locator(".plan-card")).toHaveCount(3);
+
+  // ── 11. 🚀 生成 → 実行: launch the generated React app ────────────────
+  await d.topbar().getByRole("button", { name: /生成 → 実行/ }).click();
+  // The RunPanel appears with the initial "generating" / "installing" status.
+  const panel = page.getByTestId("run-panel");
+  await expect(panel).toBeVisible({ timeout: 5_000 });
+  await pause(page, 600);
+  await shot(page, "launch-clicked");
+
+  // npm install kicks in the first time; allow up to 120s.
+  await expect(panel).toHaveAttribute("data-status", "ready", { timeout: 120_000 });
+  await pause(page, 600);
+  await shot(page, "launch-ready");
+
+  // Pull the URL the runner allocated.
+  const link = panel.locator("a[href^='http://localhost:']").first();
+  const runUrl = await link.getAttribute("href");
+  expect(runUrl).toMatch(/^http:\/\/localhost:\d+/);
+
+  // ── 12. Open the running app in a new tab ──────────────────────────────
+  const generated = await context.newPage();
+  await generated.setViewportSize({ width: 1280, height: 800 });
+  await generated.goto(runUrl!);
+  await generated.waitForLoadState("networkidle");
+  await pause(generated, 800);
+  await shot(generated, "running-app-home");
+
+  // The running app should expose nav buttons for each Aggregate.
+  await expect(generated.locator(".topnav button", { hasText: "Tag" })).toBeVisible();
+  await expect(generated.locator(".topnav button", { hasText: "Article" })).toBeVisible();
+  await expect(generated.locator(".topnav button", { hasText: "Settings" })).toBeVisible();
+
+  // ── 13. Drive the running app: P5 Settings form ───────────────────────
+  await generated.locator(".topnav button", { hasText: "Settings" }).click();
+  await pause(generated, 400);
+  await shot(generated, "running-app-settings");
+
+  await generated.locator('label.field:has-text("name") input').fill("Acme Industries");
+  await pause(generated, 200);
+  await generated.locator(".btn", { hasText: "保存" }).click();
+  await pause(generated, 400);
+  await shot(generated, "running-app-settings-saved");
+
+  // ── 14. Drive Tag (P2 list+detail+edit) ────────────────────────────────
+  await generated.locator(".topnav button", { hasText: "Tag" }).click();
+  await pause(generated, 400);
+  await shot(generated, "running-app-tag-list");
+
+  await generated.locator(".btn", { hasText: "新規作成" }).click();
+  await pause(generated, 300);
+  await generated.locator('label.field:has-text("title") input').fill("react");
+  await generated.locator('label.field:has-text("color") input').fill("#3b82f6");
+  await generated.locator(".btn", { hasText: "保存" }).click();
+  await pause(generated, 400);
+  await generated.locator(".btn-cancel", { hasText: "戻る" }).click();
+  await pause(generated, 300);
+  await expect(generated.locator(".data-table tbody tr")).toHaveCount(1);
+  await shot(generated, "running-app-tag-saved");
+
+  // ── 15. Stop the running app from the designer panel ───────────────────
+  await generated.close();
+  await page.bringToFront();
+  await panel.getByRole("button", { name: /停止/ }).click();
+  await expect(panel).toHaveAttribute("data-status", "stopped", { timeout: 5_000 });
+  await pause(page, 400);
+  await shot(page, "launch-stopped");
 });
