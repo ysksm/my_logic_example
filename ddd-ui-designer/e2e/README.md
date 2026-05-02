@@ -89,12 +89,14 @@ npm run report
 | 6 | Singleton で P5 (Single Form) | `09-settings-P5` |
 | 7 | 閾値変更で P1 ⇄ P2 を切替え | `10-threshold-flips-P2` |
 | 8 | 保存と全体プレビュー | `11-saved`, `12-overview` |
-| 9 | **🚀 生成 → 実行** をクリック | `13-launch-clicked` |
-| 10 | npm install + dev server 起動完了 | `14-launch-ready` |
-| 11 | **生成された React アプリを新タブで開く** | `15-running-app-home` |
-| 12 | P5 Settings 画面でフォーム入力・保存 | `16-running-app-settings`, `17-running-app-settings-saved` |
-| 13 | P2 Tag 一覧から新規作成・保存 | `18-running-app-tag-list`, `19-running-app-tag-saved` |
-| 14 | デザイナーパネルから dev server を停止 | `20-launch-stopped` |
+| 9 | 🔀 画面遷移図ビューに切替 (右ペイン) | `13-view-flow-diagram` |
+| 10 | 📐 ドメイン ER 図ビューに切替 | `14-view-er-diagram` |
+| 11 | **🚀 生成 → 実行** をクリック | `15-launch-clicked` |
+| 12 | npm install + dev server 起動完了 | `16-launch-ready` |
+| 13 | **生成された React アプリを新タブで開く** | `17-running-app-home` |
+| 14 | P5 Settings 画面でフォーム入力・保存 | `18-running-app-settings`, `19-running-app-settings-saved` |
+| 15 | P2 Tag 一覧から新規作成・保存 | `20-running-app-tag-list`, `21-running-app-tag-saved` |
+| 16 | デザイナーパネルから dev server を停止 | `22-launch-stopped` |
 
 連番 PNG を順に並べるだけで「設計 → パターン派生 → 動くアプリ」の
 一気通貫ドキュメントになります。動画は **2 ファイル** 生成されます:

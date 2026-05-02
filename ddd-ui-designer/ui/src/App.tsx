@@ -3,7 +3,7 @@ import { api } from "./api";
 import type { Aggregate, AppSpec, DomainModel, Run, RulesConfig } from "./types";
 import { DomainTree } from "./components/DomainTree";
 import { AggregateEditor } from "./components/AggregateEditor";
-import { ScreenPreview } from "./components/ScreenPreview";
+import { RightPane } from "./components/RightPane";
 import { RunPanel } from "./components/RunPanel";
 
 const EMPTY_DOMAIN: DomainModel = {
@@ -258,7 +258,11 @@ export default function App() {
             <p>左から Aggregate を選択してください。</p>
           )}
         </div>
-        <ScreenPreview spec={spec} filterAggregate={filterByAg ? selected : null} />
+        <RightPane
+          spec={spec}
+          domain={domain}
+          filterAggregate={filterByAg ? selected : null}
+        />
       </div>
       <RunPanel run={run} onStop={stopRun} onClose={closeRunPanel} />
     </div>
