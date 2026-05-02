@@ -46,6 +46,23 @@ export default function App() {
     }
   }
 
+  async function generateReactApp() {
+    setError(null);
+    try {
+      const { blob, filename } = await api.generate(domain, config);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError(String(e));
+    }
+  }
+
   async function save() {
     setError(null);
     try {
@@ -151,6 +168,9 @@ export default function App() {
           選択中のみ
         </label>
         <button onClick={derive}>▶ 派生</button>
+        <button onClick={generateReactApp} title="React + Vite アプリを tar.gz でダウンロード">
+          📦 Reactアプリ生成
+        </button>
       </div>
       {error && (
         <div style={{ background: "#fee2e2", color: "#991b1b", padding: 8, fontSize: 12 }}>

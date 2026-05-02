@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/ysksm/my_logic_example/ddd-ui-designer/server/internal/domain"
+	"github.com/ysksm/my_logic_example/ddd-ui-designer/server/internal/generate"
 	"github.com/ysksm/my_logic_example/ddd-ui-designer/server/internal/rules"
 	"github.com/ysksm/my_logic_example/ddd-ui-designer/server/internal/storage"
 )
@@ -21,6 +22,7 @@ func Handler(store *storage.Store) http.Handler {
 	mux.HandleFunc("/api/domains", domainsRoot(store))
 	mux.HandleFunc("/api/domains/", domainsItem(store))
 	mux.HandleFunc("/api/derive", derive(store))
+	mux.HandleFunc("/api/generate", generateApp(store))
 	return cors(mux)
 }
 
@@ -173,4 +175,93 @@ func derive(store *storage.Store) http.HandlerFunc {
 		spec := rules.Derive(d, cfg)
 		writeJSON(w, http.StatusOK, spec)
 	}
+}
+
+// generateApp emits a tar.gz of a runnable React+Vite project derived from
+// the supplied DomainModel. Format defaults to "react" (only one supported
+// for now; the field exists so we can add e.g. "html" mockups later).
+func generateApp(store *storage.Store) http.HandlerFunc {
+	type req struct {
+		DomainID string              `json:"domainId,omitempty"`
+		Domain   *domain.DomainModel `json:"domain,omitempty"`
+		Config   *rules.Config       `json:"config,omitempty"`
+		Format   string              `json:"format,omitempty"`
+	}
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.Header().Set("Allow", "POST")
+			writeErr(w, http.StatusMethodNotAllowed, "POST only")
+			return
+		}
+		var body req
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeErr(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		var d domain.DomainModel
+		switch {
+		case body.Domain != nil:
+			d = *body.Domain
+		case body.DomainID != "":
+			loaded, err := store.Get(body.DomainID)
+			if err != nil {
+				writeErr(w, http.StatusNotFound, err.Error())
+				return
+			}
+			d = loaded
+		default:
+			writeErr(w, http.StatusBadRequest, "either domainId or domain must be provided")
+			return
+		}
+		cfg := rules.Default()
+		if body.Config != nil {
+			cfg = *body.Config
+		}
+		spec := rules.Derive(d, cfg)
+
+		format := body.Format
+		if format == "" {
+			format = "react"
+		}
+		if format != "react" {
+			writeErr(w, http.StatusBadRequest, "unsupported format: "+format)
+			return
+		}
+
+		files, err := generate.React(spec)
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		root := slug(d.ID) + "-app"
+		archive, err := generate.TarGz(files, root)
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/gzip")
+		w.Header().Set("Content-Disposition", `attachment; filename="`+root+`.tar.gz"`)
+		w.Header().Set("X-App-Root", root)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(archive)
+	}
+}
+
+func slug(s string) string {
+	s = strings.ToLower(s)
+	var b strings.Builder
+	for _, r := range s {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+			b.WriteRune(r)
+		case r == '-' || r == '_':
+			b.WriteRune('-')
+		}
+	}
+	out := strings.Trim(b.String(), "-")
+	if out == "" {
+		return "ddd"
+	}
+	return out
 }

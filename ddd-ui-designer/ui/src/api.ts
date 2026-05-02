@@ -31,4 +31,18 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ domain, config }),
     }).then((r) => json<AppSpec>(r)),
+  generate: async (
+    domain: DomainModel,
+    config?: RulesConfig,
+  ): Promise<{ blob: Blob; filename: string }> => {
+    const r = await fetch("/api/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ domain, config, format: "react" }),
+    });
+    if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
+    const blob = await r.blob();
+    const root = r.headers.get("X-App-Root") ?? "ddd-app";
+    return { blob, filename: `${root}.tar.gz` };
+  },
 };
