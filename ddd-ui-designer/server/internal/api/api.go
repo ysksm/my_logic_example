@@ -11,11 +11,12 @@ import (
 	"github.com/ysksm/my_logic_example/ddd-ui-designer/server/internal/domain"
 	"github.com/ysksm/my_logic_example/ddd-ui-designer/server/internal/generate"
 	"github.com/ysksm/my_logic_example/ddd-ui-designer/server/internal/rules"
+	"github.com/ysksm/my_logic_example/ddd-ui-designer/server/internal/runner"
 	"github.com/ysksm/my_logic_example/ddd-ui-designer/server/internal/storage"
 )
 
 // Handler builds an http.Handler with all routes mounted.
-func Handler(store *storage.Store) http.Handler {
+func Handler(store *storage.Store, mgr *runner.Manager) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/health", health)
 	mux.HandleFunc("/api/rules", rulesInfo)
@@ -23,6 +24,9 @@ func Handler(store *storage.Store) http.Handler {
 	mux.HandleFunc("/api/domains/", domainsItem(store))
 	mux.HandleFunc("/api/derive", derive(store))
 	mux.HandleFunc("/api/generate", generateApp(store))
+	mux.HandleFunc("/api/launch", launchApp(store, mgr))
+	mux.HandleFunc("/api/runs", listRuns(mgr))
+	mux.HandleFunc("/api/runs/", runItem(mgr))
 	return cors(mux)
 }
 
@@ -245,6 +249,130 @@ func generateApp(store *storage.Store) http.HandlerFunc {
 		w.Header().Set("X-App-Root", root)
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write(archive)
+	}
+}
+
+// launchApp generates files into the runner's folder and (optionally) runs
+// `npm install` and `npm run dev`. Returns immediately with the initial Run
+// object; callers poll /api/runs/{id} to see status transitions.
+func launchApp(store *storage.Store, mgr *runner.Manager) http.HandlerFunc {
+	type req struct {
+		DomainID string              `json:"domainId,omitempty"`
+		Domain   *domain.DomainModel `json:"domain,omitempty"`
+		Config   *rules.Config       `json:"config,omitempty"`
+		Install  *bool               `json:"install,omitempty"`
+		Start    *bool               `json:"start,omitempty"`
+	}
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.Header().Set("Allow", "POST")
+			writeErr(w, http.StatusMethodNotAllowed, "POST only")
+			return
+		}
+		var body req
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeErr(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		var d domain.DomainModel
+		switch {
+		case body.Domain != nil:
+			d = *body.Domain
+		case body.DomainID != "":
+			loaded, err := store.Get(body.DomainID)
+			if err != nil {
+				writeErr(w, http.StatusNotFound, err.Error())
+				return
+			}
+			d = loaded
+		default:
+			writeErr(w, http.StatusBadRequest, "either domainId or domain must be provided")
+			return
+		}
+		if d.ID == "" {
+			writeErr(w, http.StatusBadRequest, "domain.id is required for launch")
+			return
+		}
+		cfg := rules.Default()
+		if body.Config != nil {
+			cfg = *body.Config
+		}
+		spec := rules.Derive(d, cfg)
+		files, err := generate.React(spec)
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		opts := runner.LaunchOptions{Install: true, Start: true}
+		if body.Install != nil {
+			opts.Install = *body.Install
+		}
+		if body.Start != nil {
+			opts.Start = *body.Start
+		}
+		run, err := mgr.Launch(d.ID, files, opts)
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		writeJSON(w, http.StatusAccepted, run)
+	}
+}
+
+func listRuns(mgr *runner.Manager) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			w.Header().Set("Allow", "GET")
+			writeErr(w, http.StatusMethodNotAllowed, "GET only")
+			return
+		}
+		runs := mgr.List()
+		if runs == nil {
+			runs = []*runner.Run{}
+		}
+		writeJSON(w, http.StatusOK, runs)
+	}
+}
+
+// runItem dispatches GET (status) and POST .../stop (terminate dev server).
+func runItem(mgr *runner.Manager) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		path := strings.TrimPrefix(r.URL.Path, "/api/runs/")
+		stop := strings.HasSuffix(path, "/stop")
+		id := strings.TrimSuffix(path, "/stop")
+		if id == "" {
+			writeErr(w, http.StatusBadRequest, "run id required")
+			return
+		}
+		if stop {
+			if r.Method != http.MethodPost {
+				w.Header().Set("Allow", "POST")
+				writeErr(w, http.StatusMethodNotAllowed, "POST only")
+				return
+			}
+			if err := mgr.Stop(id); err != nil {
+				writeErr(w, http.StatusInternalServerError, err.Error())
+				return
+			}
+			run := mgr.Get(id)
+			if run == nil {
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+			writeJSON(w, http.StatusOK, run)
+			return
+		}
+		if r.Method != http.MethodGet {
+			w.Header().Set("Allow", "GET,POST")
+			writeErr(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+		run := mgr.Get(id)
+		if run == nil {
+			writeErr(w, http.StatusNotFound, "no such run")
+			return
+		}
+		writeJSON(w, http.StatusOK, run)
 	}
 }
 

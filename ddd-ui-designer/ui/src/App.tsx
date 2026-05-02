@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "./api";
-import type { Aggregate, AppSpec, DomainModel, RulesConfig } from "./types";
+import type { Aggregate, AppSpec, DomainModel, Run, RulesConfig } from "./types";
 import { DomainTree } from "./components/DomainTree";
 import { AggregateEditor } from "./components/AggregateEditor";
 import { ScreenPreview } from "./components/ScreenPreview";
+import { RunPanel } from "./components/RunPanel";
 
 const EMPTY_DOMAIN: DomainModel = {
   id: "new",
@@ -26,6 +27,8 @@ export default function App() {
   const [config, setConfig] = useState<RulesConfig>(DEFAULT_RULES);
   const [filterByAg, setFilterByAg] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [run, setRun] = useState<Run | null>(null);
+  const pollRef = useRef<number | null>(null);
 
   useEffect(() => {
     api.listDomains().then(setList).catch((e) => setError(String(e)));
@@ -62,6 +65,57 @@ export default function App() {
       setError(String(e));
     }
   }
+
+  function stopPolling() {
+    if (pollRef.current !== null) {
+      window.clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  }
+
+  async function launchAndRun() {
+    setError(null);
+    if (!domain.id) {
+      setError("ドメインに id を設定してください");
+      return;
+    }
+    try {
+      const initial = await api.launch(domain, config);
+      setRun(initial);
+      stopPolling();
+      pollRef.current = window.setInterval(async () => {
+        try {
+          const r = await api.getRun(domain.id);
+          setRun(r);
+          if (r.status === "ready" || r.status === "stopped" || r.status === "error") {
+            stopPolling();
+          }
+        } catch (e) {
+          stopPolling();
+          setError(String(e));
+        }
+      }, 1000);
+    } catch (e) {
+      setError(String(e));
+    }
+  }
+
+  async function stopRun() {
+    if (!run) return;
+    try {
+      const r = await api.stopRun(run.domainId);
+      setRun(r);
+    } catch (e) {
+      setError(String(e));
+    }
+  }
+
+  function closeRunPanel() {
+    stopPolling();
+    setRun(null);
+  }
+
+  useEffect(() => () => stopPolling(), []);
 
   async function save() {
     setError(null);
@@ -169,7 +223,14 @@ export default function App() {
         </label>
         <button onClick={derive}>▶ 派生</button>
         <button onClick={generateReactApp} title="React + Vite アプリを tar.gz でダウンロード">
-          📦 Reactアプリ生成
+          📦 tar.gz
+        </button>
+        <button
+          onClick={launchAndRun}
+          title="サーバー側のフォルダにアプリを生成して dev server を起動"
+          style={{ background: "#16a34a" }}
+        >
+          🚀 生成 → 実行
         </button>
       </div>
       {error && (
@@ -199,6 +260,7 @@ export default function App() {
         </div>
         <ScreenPreview spec={spec} filterAggregate={filterByAg ? selected : null} />
       </div>
+      <RunPanel run={run} onStop={stopRun} onClose={closeRunPanel} />
     </div>
   );
 }

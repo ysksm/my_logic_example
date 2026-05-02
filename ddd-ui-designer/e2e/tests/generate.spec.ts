@@ -10,7 +10,7 @@ test.describe("react app generation", () => {
     // Trigger the download.
     const [download] = await Promise.all([
       page.waitForEvent("download"),
-      d.topbar().getByRole("button", { name: /Reactアプリ生成/ }).click(),
+      d.topbar().getByRole("button", { name: /tar\.gz/ }).click(),
     ]);
 
     expect(download.suggestedFilename()).toContain("e2e-gen-app");

@@ -110,3 +110,23 @@ export interface RulesConfig {
   SmallFormFieldLimit: number;
   WizardFieldLimit: number;
 }
+
+export type RunStatus =
+  | "generating"
+  | "installing"
+  | "starting"
+  | "ready"
+  | "stopped"
+  | "error";
+
+export interface Run {
+  domainId: string;
+  path: string;
+  port: number;
+  url?: string;
+  status: RunStatus;
+  error?: string;
+  startedAt: string;
+  updatedAt: string;
+  logPath?: string;
+}
