@@ -1,0 +1,21 @@
+{
+  "name": "ddd-ui-designer-e2e",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "test": "playwright test --project=tests",
+    "test:headed": "playwright test --project=tests --headed",
+    "test:ui": "playwright test --project=tests --ui",
+    "demo": "playwright test --project=demo",
+    "demo:headed": "playwright test --project=demo --headed",
+    "demo:watch": "DEMO_SLOWMO=400 playwright test --project=demo --headed",
+    "demo:debug": "PWDEBUG=1 playwright test --project=demo --headed",
+    "report": "playwright show-report",
+    "install:browsers": "playwright install chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.47.0",
+    "typescript": "^5.4.5"
+  }
+}

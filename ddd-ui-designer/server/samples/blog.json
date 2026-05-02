@@ -1,0 +1,73 @@
+{
+  "id": "blog",
+  "name": "Blog Domain",
+  "description": "個人ブログ。Post (多フィールドの list+detail+edit)、Author (小型モーダル)、Comment (小型モーダル)、BlogSettings (Singleton)。P1/P2/P5 を示します。",
+  "aggregates": [
+    {
+      "name": "Post",
+      "root": {
+        "name": "Post",
+        "isRoot": true,
+        "fields": [
+          { "name": "id", "type": "vo", "voTypeRef": "PostId", "required": true },
+          { "name": "title", "type": "string", "required": true },
+          { "name": "slug", "type": "string" },
+          { "name": "excerpt", "type": "string" },
+          { "name": "body", "type": "text" },
+          { "name": "author", "type": "ref", "refTo": "Author", "required": true },
+          { "name": "status", "type": "enum", "enumValues": ["draft", "published", "archived"], "required": true },
+          { "name": "publishedAt", "type": "date" },
+          { "name": "featured", "type": "bool" }
+        ]
+      },
+      "valueObjects": [
+        { "name": "PostId", "isIdentifier": true, "fields": [{ "name": "value", "type": "string" }] }
+      ]
+    },
+    {
+      "name": "Author",
+      "root": {
+        "name": "Author",
+        "isRoot": true,
+        "fields": [
+          { "name": "id", "type": "vo", "voTypeRef": "AuthorId", "required": true },
+          { "name": "name", "type": "string", "required": true },
+          { "name": "bio", "type": "text" }
+        ]
+      },
+      "valueObjects": [
+        { "name": "AuthorId", "isIdentifier": true, "fields": [{ "name": "value", "type": "string" }] }
+      ]
+    },
+    {
+      "name": "Comment",
+      "root": {
+        "name": "Comment",
+        "isRoot": true,
+        "fields": [
+          { "name": "id", "type": "vo", "voTypeRef": "CommentId", "required": true },
+          { "name": "post", "type": "ref", "refTo": "Post", "required": true },
+          { "name": "author", "type": "string" },
+          { "name": "body", "type": "text" }
+        ]
+      },
+      "valueObjects": [
+        { "name": "CommentId", "isIdentifier": true, "fields": [{ "name": "value", "type": "string" }] }
+      ]
+    },
+    {
+      "name": "BlogSettings",
+      "isSingleton": true,
+      "root": {
+        "name": "BlogSettings",
+        "isRoot": true,
+        "fields": [
+          { "name": "title", "type": "string", "required": true },
+          { "name": "description", "type": "text" },
+          { "name": "language", "type": "enum", "enumValues": ["ja", "en"] },
+          { "name": "allowComments", "type": "bool" }
+        ]
+      }
+    }
+  ]
+}

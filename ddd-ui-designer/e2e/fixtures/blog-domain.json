@@ -1,0 +1,21 @@
+{
+  "id": "e2e-blog",
+  "name": "E2E Blog",
+  "aggregates": [
+    {
+      "name": "Post",
+      "root": {
+        "name": "Post",
+        "isRoot": true,
+        "fields": [
+          { "name": "title", "type": "string", "required": true },
+          { "name": "body", "type": "text" },
+          { "name": "published", "type": "bool" },
+          { "name": "publishedAt", "type": "date" },
+          { "name": "category", "type": "enum", "enumValues": ["news", "blog", "ad"] },
+          { "name": "tags", "type": "string" }
+        ]
+      }
+    }
+  ]
+}

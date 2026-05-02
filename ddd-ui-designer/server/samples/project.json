@@ -1,0 +1,132 @@
+{
+  "id": "project",
+  "name": "Project Management",
+  "description": "プロジェクト管理。Project (大規模 + 子Entity → P4 ウィザード)、Task (子Entity あり → P3)、User (P1)、AppSettings (P5)。全パターン中の P3/P4/P1/P5 を示します。",
+  "aggregates": [
+    {
+      "name": "Project",
+      "root": {
+        "name": "Project",
+        "isRoot": true,
+        "fields": [
+          { "name": "id", "type": "vo", "voTypeRef": "ProjectId", "required": true },
+          { "name": "code", "type": "string", "required": true },
+          { "name": "name", "type": "string", "required": true },
+          { "name": "description", "type": "text" },
+          { "name": "owner", "type": "ref", "refTo": "User", "required": true },
+          { "name": "client", "type": "string" },
+          { "name": "status", "type": "enum", "enumValues": ["planning", "active", "on-hold", "completed", "cancelled"] },
+          { "name": "priority", "type": "enum", "enumValues": ["low", "medium", "high"] },
+          { "name": "budget", "type": "vo", "voTypeRef": "Money" },
+          { "name": "startDate", "type": "date", "required": true },
+          { "name": "endDate", "type": "date" },
+          { "name": "estimatedHours", "type": "int" },
+          { "name": "actualHours", "type": "int" },
+          { "name": "tags", "type": "string" },
+          { "name": "notes", "type": "text" },
+          { "name": "publicVisibility", "type": "bool" },
+          { "name": "objectives", "type": "text" },
+          { "name": "successCriteria", "type": "text" },
+          { "name": "stakeholders", "type": "text" },
+          { "name": "methodology", "type": "enum", "enumValues": ["waterfall", "scrum", "kanban", "hybrid"] },
+          { "name": "billingType", "type": "enum", "enumValues": ["fixed", "hourly", "retainer"] },
+          { "name": "archived", "type": "bool" }
+        ],
+        "children": ["Milestone", "Risk"]
+      },
+      "entities": [
+        {
+          "name": "Milestone",
+          "fields": [
+            { "name": "id", "type": "vo", "voTypeRef": "MilestoneId", "required": true },
+            { "name": "title", "type": "string", "required": true },
+            { "name": "dueDate", "type": "date", "required": true },
+            { "name": "completed", "type": "bool" }
+          ]
+        },
+        {
+          "name": "Risk",
+          "fields": [
+            { "name": "id", "type": "vo", "voTypeRef": "RiskId", "required": true },
+            { "name": "description", "type": "text", "required": true },
+            { "name": "severity", "type": "enum", "enumValues": ["low", "medium", "high", "critical"] },
+            { "name": "mitigation", "type": "text" }
+          ]
+        }
+      ],
+      "valueObjects": [
+        { "name": "ProjectId", "isIdentifier": true, "fields": [{ "name": "value", "type": "string" }] },
+        { "name": "MilestoneId", "isIdentifier": true, "fields": [{ "name": "value", "type": "string" }] },
+        { "name": "RiskId", "isIdentifier": true, "fields": [{ "name": "value", "type": "string" }] },
+        { "name": "Money", "fields": [
+          { "name": "amount", "type": "int" },
+          { "name": "currency", "type": "string" }
+        ]}
+      ]
+    },
+    {
+      "name": "Task",
+      "root": {
+        "name": "Task",
+        "isRoot": true,
+        "fields": [
+          { "name": "id", "type": "vo", "voTypeRef": "TaskId", "required": true },
+          { "name": "project", "type": "ref", "refTo": "Project", "required": true },
+          { "name": "title", "type": "string", "required": true },
+          { "name": "description", "type": "text" },
+          { "name": "assignee", "type": "ref", "refTo": "User" },
+          { "name": "status", "type": "enum", "enumValues": ["todo", "in-progress", "review", "done"] },
+          { "name": "priority", "type": "enum", "enumValues": ["low", "medium", "high"] },
+          { "name": "dueDate", "type": "date" },
+          { "name": "estimatedHours", "type": "int" }
+        ],
+        "children": ["TaskComment"]
+      },
+      "entities": [
+        {
+          "name": "TaskComment",
+          "fields": [
+            { "name": "id", "type": "vo", "voTypeRef": "TaskCommentId", "required": true },
+            { "name": "author", "type": "ref", "refTo": "User" },
+            { "name": "body", "type": "text" },
+            { "name": "createdAt", "type": "date" }
+          ]
+        }
+      ],
+      "valueObjects": [
+        { "name": "TaskId", "isIdentifier": true, "fields": [{ "name": "value", "type": "string" }] },
+        { "name": "TaskCommentId", "isIdentifier": true, "fields": [{ "name": "value", "type": "string" }] }
+      ]
+    },
+    {
+      "name": "User",
+      "root": {
+        "name": "User",
+        "isRoot": true,
+        "fields": [
+          { "name": "id", "type": "vo", "voTypeRef": "UserId", "required": true },
+          { "name": "name", "type": "string", "required": true },
+          { "name": "email", "type": "string", "required": true },
+          { "name": "role", "type": "enum", "enumValues": ["admin", "manager", "developer", "viewer"] }
+        ]
+      },
+      "valueObjects": [
+        { "name": "UserId", "isIdentifier": true, "fields": [{ "name": "value", "type": "string" }] }
+      ]
+    },
+    {
+      "name": "AppSettings",
+      "isSingleton": true,
+      "root": {
+        "name": "AppSettings",
+        "isRoot": true,
+        "fields": [
+          { "name": "organizationName", "type": "string", "required": true },
+          { "name": "defaultPriority", "type": "enum", "enumValues": ["low", "medium", "high"] },
+          { "name": "workdaysPerWeek", "type": "int" },
+          { "name": "currency", "type": "enum", "enumValues": ["JPY", "USD", "EUR"] }
+        ]
+      }
+    }
+  ]
+}
