@@ -1,6 +1,7 @@
 {
   "id": "shop",
   "name": "Shop Domain",
+  "description": "EC ドメイン。Order の集約 (Master-Detail / 子Entity / VO) と、Customer・Product (フォーム/詳細) と、ShopSettings (Singleton) の組合せ。P1/P2/P3/P5 を示します。",
   "aggregates": [
     {
       "name": "Order",

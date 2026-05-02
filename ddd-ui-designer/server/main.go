@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"embed"
 	"errors"
 	"flag"
 	"log"
@@ -12,8 +13,12 @@ import (
 
 	"github.com/ysksm/my_logic_example/ddd-ui-designer/server/internal/api"
 	"github.com/ysksm/my_logic_example/ddd-ui-designer/server/internal/runner"
+	"github.com/ysksm/my_logic_example/ddd-ui-designer/server/internal/samples"
 	"github.com/ysksm/my_logic_example/ddd-ui-designer/server/internal/storage"
 )
+
+//go:embed samples/*.json
+var samplesFS embed.FS
 
 func main() {
 	addr := flag.String("addr", ":8095", "listen address")
@@ -31,9 +36,14 @@ func main() {
 	}
 	defer mgr.StopAll()
 
+	sm := samples.New(samplesFS, "samples")
+	if infos, err := sm.List(); err == nil {
+		log.Printf("bundled samples: %d", len(infos))
+	}
+
 	srv := &http.Server{
 		Addr:    *addr,
-		Handler: api.Handler(store, mgr),
+		Handler: api.Handler(store, mgr, sm),
 	}
 	log.Printf("ddd-ui-designer listening on %s (data=%s runs=%s)", *addr, *dataDir, *runsDir)
 

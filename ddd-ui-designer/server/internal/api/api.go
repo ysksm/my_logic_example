@@ -12,11 +12,12 @@ import (
 	"github.com/ysksm/my_logic_example/ddd-ui-designer/server/internal/generate"
 	"github.com/ysksm/my_logic_example/ddd-ui-designer/server/internal/rules"
 	"github.com/ysksm/my_logic_example/ddd-ui-designer/server/internal/runner"
+	"github.com/ysksm/my_logic_example/ddd-ui-designer/server/internal/samples"
 	"github.com/ysksm/my_logic_example/ddd-ui-designer/server/internal/storage"
 )
 
 // Handler builds an http.Handler with all routes mounted.
-func Handler(store *storage.Store, mgr *runner.Manager) http.Handler {
+func Handler(store *storage.Store, mgr *runner.Manager, sm *samples.Manager) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/health", health)
 	mux.HandleFunc("/api/rules", rulesInfo)
@@ -27,6 +28,8 @@ func Handler(store *storage.Store, mgr *runner.Manager) http.Handler {
 	mux.HandleFunc("/api/launch", launchApp(store, mgr))
 	mux.HandleFunc("/api/runs", listRuns(mgr))
 	mux.HandleFunc("/api/runs/", runItem(mgr))
+	mux.HandleFunc("/api/samples", listSamples(sm))
+	mux.HandleFunc("/api/samples/", sampleItem(sm, store))
 	return cors(mux)
 }
 
@@ -373,6 +376,65 @@ func runItem(mgr *runner.Manager) http.HandlerFunc {
 			return
 		}
 		writeJSON(w, http.StatusOK, run)
+	}
+}
+
+// listSamples returns the bundled sample summaries.
+func listSamples(sm *samples.Manager) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			w.Header().Set("Allow", "GET")
+			writeErr(w, http.StatusMethodNotAllowed, "GET only")
+			return
+		}
+		infos, err := sm.List()
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if infos == nil {
+			infos = []samples.Info{}
+		}
+		writeJSON(w, http.StatusOK, infos)
+	}
+}
+
+// sampleItem dispatches:
+//   GET /api/samples/{id}        → full sample (info + domain)
+//   POST /api/samples/{id}/load  → also persist the domain into storage
+func sampleItem(sm *samples.Manager, store *storage.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		path := strings.TrimPrefix(r.URL.Path, "/api/samples/")
+		load := strings.HasSuffix(path, "/load")
+		id := strings.TrimSuffix(path, "/load")
+		if id == "" {
+			writeErr(w, http.StatusBadRequest, "sample id required")
+			return
+		}
+		s, err := sm.Get(id)
+		if err != nil {
+			writeErr(w, http.StatusNotFound, err.Error())
+			return
+		}
+		if load {
+			if r.Method != http.MethodPost {
+				w.Header().Set("Allow", "POST")
+				writeErr(w, http.StatusMethodNotAllowed, "POST only")
+				return
+			}
+			if err := store.Put(s.Domain); err != nil {
+				writeErr(w, http.StatusInternalServerError, err.Error())
+				return
+			}
+			writeJSON(w, http.StatusOK, s.Domain)
+			return
+		}
+		if r.Method != http.MethodGet {
+			w.Header().Set("Allow", "GET")
+			writeErr(w, http.StatusMethodNotAllowed, "GET only")
+			return
+		}
+		writeJSON(w, http.StatusOK, s)
 	}
 }
 

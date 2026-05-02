@@ -1,4 +1,11 @@
-import type { AppSpec, DomainModel, Run, RulesConfig } from "./types";
+import type {
+  AppSpec,
+  DomainModel,
+  Run,
+  RulesConfig,
+  Sample,
+  SampleInfo,
+} from "./types";
 
 async function json<T>(r: Response): Promise<T> {
   if (!r.ok) throw new Error(`${r.status} ${r.statusText}: ${await r.text()}`);
@@ -57,5 +64,12 @@ export const api = {
   stopRun: (id: string) =>
     fetch(`/api/runs/${encodeURIComponent(id)}/stop`, { method: "POST" }).then(
       (r) => json<Run>(r),
+    ),
+  listSamples: () => fetch("/api/samples").then((r) => json<SampleInfo[]>(r)),
+  getSample: (id: string) =>
+    fetch(`/api/samples/${encodeURIComponent(id)}`).then((r) => json<Sample>(r)),
+  loadSample: (id: string) =>
+    fetch(`/api/samples/${encodeURIComponent(id)}/load`, { method: "POST" }).then(
+      (r) => json<DomainModel>(r),
     ),
 };

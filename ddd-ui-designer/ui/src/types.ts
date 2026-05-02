@@ -111,6 +111,21 @@ export interface RulesConfig {
   WizardFieldLimit: number;
 }
 
+export interface SampleInfo {
+  id: string;
+  name: string;
+  description?: string;
+  aggregateCount: number;
+}
+
+export interface Sample {
+  id: string;
+  name: string;
+  description?: string;
+  aggregateCount: number;
+  domain: DomainModel;
+}
+
 export type RunStatus =
   | "generating"
   | "installing"

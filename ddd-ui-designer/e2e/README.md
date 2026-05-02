@@ -81,22 +81,25 @@ npm run report
 
 | # | 操作 | スクリーンショット |
 |---|------|------------------|
-| 1 | アプリ起動と既定 (Sample → P1) | `01-app-loaded`, `02-default-derive-P1` |
-| 2 | 名前変更とフィールド追加 | `03-edit-fields`, `04-after-edit-still-P1` |
-| 3 | 多フィールド Aggregate を追加して P2 | `05-article-fields`, `06-article-derive-P2` |
-| 4 | 子Entity追加で P3 (Master-Detail) | `07-article-with-children-P3` |
-| 5 | UIヒントで P4 (Wizard) を強制 | `08-article-wizard-P4` |
-| 6 | Singleton で P5 (Single Form) | `09-settings-P5` |
-| 7 | 閾値変更で P1 ⇄ P2 を切替え | `10-threshold-flips-P2` |
-| 8 | 保存と全体プレビュー | `11-saved`, `12-overview` |
-| 9 | 🔀 画面遷移図ビューに切替 (右ペイン) | `13-view-flow-diagram` |
-| 10 | 📐 ドメイン ER 図ビューに切替 | `14-view-er-diagram` |
-| 11 | **🚀 生成 → 実行** をクリック | `15-launch-clicked` |
-| 12 | npm install + dev server 起動完了 | `16-launch-ready` |
-| 13 | **生成された React アプリを新タブで開く** | `17-running-app-home` |
-| 14 | P5 Settings 画面でフォーム入力・保存 | `18-running-app-settings`, `19-running-app-settings-saved` |
-| 15 | P2 Tag 一覧から新規作成・保存 | `20-running-app-tag-list`, `21-running-app-tag-saved` |
-| 16 | デザイナーパネルから dev server を停止 | `22-launch-stopped` |
+| 1 | アプリ起動 | `01-app-loaded` |
+| 2 | **📂 サンプルメニューを開く** | `02-sample-menu-open` |
+| 3 | **Project Management サンプルを読込** | `03-sample-project-loaded` |
+| 4 | 派生で P1/P3/P4/P5 が一気に出る | `04-sample-project-derived` |
+| 5 | リロードして空状態に戻し、Sample → P1 | `05-default-derive-P1` |
+| 6 | 名前変更とフィールド追加 | `06-edit-fields`, `07-after-edit-still-P1` |
+| 7 | 多フィールド Aggregate を追加して P2 | `08-article-fields`, `09-article-derive-P2` |
+| 8 | 子Entity追加で P3 (Master-Detail) | `10-article-with-children-P3` |
+| 9 | UIヒントで P4 (Wizard) を強制 | `11-article-wizard-P4` |
+| 10 | Singleton で P5 (Single Form) | `12-settings-P5` |
+| 11 | 閾値変更で P1 ⇄ P2 を切替え | `13-threshold-flips-P2` |
+| 12 | 保存と全体プレビュー | `14-saved`, `15-overview` |
+| 13 | 🔀 画面遷移図ビュー / 📐 ドメイン ER 図ビュー | `16-view-flow-diagram`, `17-view-er-diagram` |
+| 14 | **🚀 生成 → 実行** をクリック | `18-launch-clicked` |
+| 15 | npm install + dev server 起動完了 | `19-launch-ready` |
+| 16 | **生成された React アプリを新タブで開く** | `20-running-app-home` |
+| 17 | P5 Settings 画面でフォーム入力・保存 | `21-running-app-settings`, `22-running-app-settings-saved` |
+| 18 | P2 Tag 一覧から新規作成・保存 | `23-running-app-tag-list`, `24-running-app-tag-saved` |
+| 19 | デザイナーパネルから dev server を停止 | `25-launch-stopped` |
 
 連番 PNG を順に並べるだけで「設計 → パターン派生 → 動くアプリ」の
 一気通貫ドキュメントになります。動画は **2 ファイル** 生成されます:

@@ -5,6 +5,7 @@ import { DomainTree } from "./components/DomainTree";
 import { AggregateEditor } from "./components/AggregateEditor";
 import { RightPane } from "./components/RightPane";
 import { RunPanel } from "./components/RunPanel";
+import { SampleMenu } from "./components/SampleMenu";
 
 const EMPTY_DOMAIN: DomainModel = {
   id: "new",
@@ -115,6 +116,22 @@ export default function App() {
     setRun(null);
   }
 
+  async function loadSample(id: string, persist: boolean) {
+    setError(null);
+    try {
+      const d = persist ? await api.loadSample(id) : (await api.getSample(id)).domain;
+      setDomain(d);
+      setSelected(d.aggregates[0]?.name ?? null);
+      setSpec(null);
+      if (persist) {
+        const fresh = await api.listDomains();
+        setList(fresh);
+      }
+    } catch (e) {
+      setError(String(e));
+    }
+  }
+
   useEffect(() => () => stopPolling(), []);
 
   async function save() {
@@ -182,6 +199,7 @@ export default function App() {
             <option key={d.id} value={d.id}>{d.name}</option>
           ))}
         </select>
+        <SampleMenu onLoad={loadSample} />
         <input
           type="text"
           value={domain.id}

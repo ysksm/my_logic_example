@@ -58,6 +58,26 @@ test("ddd-ui-designer end-to-end demo", async ({ page, context }) => {
   await pause(page, 600);
   await shot(page, "app-loaded");
 
+  // ── 1b. Open the bundled sample menu and load the project sample ────────
+  await page.getByTestId("sample-menu-button").click();
+  await pause(page, 400);
+  await shot(page, "sample-menu-open");
+  await page.getByTestId("sample-project-load").click();
+  await pause(page, 600);
+  await shot(page, "sample-project-loaded");
+
+  // Derive immediately to show that bundled data lights up all 4 patterns
+  // (P4 / P3 / P1 / P5) in one shot.
+  await d.setFilterSelectedOnly(false);
+  await d.derive();
+  await pause(page, 600);
+  await shot(page, "sample-project-derived");
+  await expect(page.locator(".plan-card")).toHaveCount(4);
+
+  // Reset to a clean "Sample" aggregate for the rest of the demo.
+  await page.reload();
+  await pause(page, 600);
+
   // ── 2. Show that the seed Sample aggregate yields P1 (list + modal) ────
   await d.derive();
   await pause(page, 600);

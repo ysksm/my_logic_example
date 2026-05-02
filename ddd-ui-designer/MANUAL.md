@@ -84,7 +84,7 @@ curl http://localhost:8095/api/health
 ```sh
 curl -X POST http://localhost:8095/api/domains \
   -H "Content-Type: application/json" \
-  -d @ddd-ui-designer/server/examples/shop.json
+  -d @ddd-ui-designer/server/samples/shop.json
 ```
 
 UI のトップバーで「Shop Domain」を選択して読み込めます。
@@ -153,6 +153,26 @@ UI のトップバーで「Shop Domain」を選択して読み込めます。
 ---
 
 ## 4. 基本ワークフロー
+
+### 4.0 サンプルから始める（最短）
+
+**「📂 サンプル ▾」**ボタンに、すぐ試せる 3 種類のドメインがバンドルされています。
+
+| サンプル | 集約 | 実演されるパターン |
+|---------|------|-------------------|
+| **Blog Domain** | Post / Author / Comment / BlogSettings | P1 + P2 + P5 |
+| **Project Management** | Project / Task / User / AppSettings | P1 + P3 + P4 + P5 |
+| **Shop Domain** | Order / Customer / Product / ShopSettings | P1 + P2 + P3 + P5 |
+
+操作:
+1. トップバーの **📂 サンプル** をクリック
+2. メニューから読み込みたいサンプルを選択
+3. **「編集に読込」** … 編集ペインに反映 (永続化なし、必要なら手動で保存)
+4. **「読込 + 保存」** … 編集に反映 + サーバーへ即保存
+
+その後 `▶ 派生` を押すと 4 つのパターンすべてのプレビューが見られます。
+特に **Project Management** は P4 ウィザードを既定の閾値で発動するので、
+ウィザードパターンを実際に確かめる用途に便利です。
 
 ### 4.1 新規ドメインを 0 から作る
 
@@ -467,7 +487,7 @@ curl -s http://localhost:8095/api/rules | python3 -m json.tool
 # 保存
 curl -X POST http://localhost:8095/api/domains \
   -H "Content-Type: application/json" \
-  -d @ddd-ui-designer/server/examples/shop.json
+  -d @ddd-ui-designer/server/samples/shop.json
 
 # 一覧
 curl http://localhost:8095/api/domains
