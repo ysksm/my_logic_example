@@ -54,11 +54,18 @@ npm run report
 
 ## デモ（録画付き自動操作）
 
-```sh
-npm run demo
-```
+実際に Chromium を起動してアプリを操作します。実行モードは 3 通り:
 
-`demo` プロジェクトとして実行され、`video: "on"` で全行動が録画されます。
+| コマンド | 実行モード | 用途 |
+|----|----|----|
+| `npm run demo` | ヘッドレス (画面非表示) | CI / 動画と PNG だけ欲しい時 |
+| `npm run demo:headed` | ヘッド有り (画面表示) | 目視確認、社内デモのライブ実行 |
+| `npm run demo:slow` | `PWDEBUG=1` + ヘッド有り | Playwright Inspector でステップ実行 |
+
+ヘッドレス + ヘッド有りいずれの場合も、`video: "on"` の設定により全行動が
+.webm 動画として録画されます。ヘッド有りで物理ディスプレイが無い CI 環境で
+実行する場合は `xvfb-run -a npm run demo:headed` を使ってください。
+
 完了後に成果物が次の場所に出力されます:
 
 | 出力 | 場所 |
