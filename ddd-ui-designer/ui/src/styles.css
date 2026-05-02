@@ -28,7 +28,12 @@ body {
   border: 1px solid #374151;
   border-radius: 4px;
   padding: 4px 8px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
+.topbar .mode-switch { flex-shrink: 0; }
+.topbar > * { flex-shrink: 0; }
+.topbar > .spacer { flex-shrink: 1; }
 .topbar button:hover { background: #374151; cursor: pointer; }
 
 .layout {
@@ -36,6 +41,42 @@ body {
   grid-template-columns: 320px 1fr 380px;
   height: 100%;
   overflow: hidden;
+  transition: grid-template-columns 180ms ease-out;
+}
+
+/* 「👁 表示」モード — 中央 (編集) ペインを畳んで、右ペインに残り全部を割り当てる */
+.layout[data-mode="view"] {
+  grid-template-columns: 220px 1fr;
+}
+.layout[data-mode="view"] > .pane:nth-child(2) {
+  display: none;
+}
+
+/* セグメント切替 (🛠 設定 / 👁 表示) */
+.topbar .mode-switch {
+  display: inline-flex;
+  border: 1px solid #374151;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #1f2937;
+}
+.topbar .mode-switch button {
+  border: 0;
+  background: transparent;
+  color: #9ca3af;
+  padding: 4px 10px;
+  border-radius: 0;
+}
+.topbar .mode-switch button.mode-active {
+  background: #3b82f6;
+  color: #fff;
+}
+.topbar .mode-switch button:hover {
+  background: #374151;
+  color: #f9fafb;
+}
+.topbar .mode-switch button.mode-active:hover {
+  background: #2563eb;
 }
 .pane {
   background: #fff;

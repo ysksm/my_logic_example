@@ -29,24 +29,6 @@ async function pause(page: any, ms: number) {
   await page.waitForTimeout(ms);
 }
 
-async function widenRightPane(page: any) {
-  await page.evaluate(() => {
-    const layout = document.querySelector(".layout") as HTMLElement | null;
-    if (layout) {
-      layout.dataset.origCols = layout.style.gridTemplateColumns || "";
-      layout.style.gridTemplateColumns = "260px 320px 1fr";
-    }
-  });
-}
-async function restoreRightPane(page: any) {
-  await page.evaluate(() => {
-    const layout = document.querySelector(".layout") as HTMLElement | null;
-    if (layout) {
-      layout.style.gridTemplateColumns = layout.dataset.origCols ?? "";
-    }
-  });
-}
-
 test.setTimeout(180_000);
 
 test("ddd-ui-designer end-to-end demo", async ({ page, context }) => {
@@ -159,22 +141,22 @@ test("ddd-ui-designer end-to-end demo", async ({ page, context }) => {
   // Sanity: the right pane lists 3 aggregates (Tag, Article, Settings)
   await expect(d.rightPane().locator(".plan-card")).toHaveCount(3);
 
-  // ── 10b. Switch to the screen-flow diagram view ───────────────────────
-  // Widen the right pane and viewport temporarily so the SVG isn't clipped.
-  await page.setViewportSize({ width: 2000, height: 900 });
-  await widenRightPane(page);
+  // ── 10b. Switch to 👁 表示モード — the editor pane folds away and the
+  //         right pane gets the full remaining width.
+  await page.getByTestId("mode-view").click();
+  await pause(page, 400);
+  await shot(page, "mode-view-on");
+
   await page.getByTestId("tab-flow").click();
   await pause(page, 600);
   await shot(page, "view-flow-diagram");
 
-  // ── 10c. Switch to the domain ER diagram view ─────────────────────────
   await page.getByTestId("tab-er").click();
   await pause(page, 600);
   await shot(page, "view-er-diagram");
 
-  // Restore layout.
-  await restoreRightPane(page);
-  await page.setViewportSize({ width: 1440, height: 900 });
+  // Back to 🛠 設定 mode for the rest of the flow (launch, etc.)
+  await page.getByTestId("mode-edit").click();
   await page.getByTestId("tab-preview").click();
   await pause(page, 400);
 

@@ -93,7 +93,8 @@ npm run report
 | 10 | Singleton で P5 (Single Form) | `12-settings-P5` |
 | 11 | 閾値変更で P1 ⇄ P2 を切替え | `13-threshold-flips-P2` |
 | 12 | 保存と全体プレビュー | `14-saved`, `15-overview` |
-| 13 | 🔀 画面遷移図ビュー / 📐 ドメイン ER 図ビュー | `16-view-flow-diagram`, `17-view-er-diagram` |
+| 13a | 👁 表示モードに切替 (中央エディタが畳まれる) | `16-mode-view-on` |
+| 13b | 🔀 画面遷移図 / 📐 ドメイン ER 図 (右ペインが全幅で表示) | `17-view-flow-diagram`, `18-view-er-diagram` |
 | 14 | **🚀 生成 → 実行** をクリック | `18-launch-clicked` |
 | 15 | npm install + dev server 起動完了 | `19-launch-ready` |
 | 16 | **生成された React アプリを新タブで開く** | `20-running-app-home` |

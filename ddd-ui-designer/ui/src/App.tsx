@@ -20,6 +20,15 @@ const EMPTY_DOMAIN: DomainModel = {
 
 const DEFAULT_RULES: RulesConfig = { SmallFormFieldLimit: 5, WizardFieldLimit: 20 };
 
+type Mode = "edit" | "view";
+const MODE_STORAGE_KEY = "ddd-ui-designer:mode";
+
+function loadInitialMode(): Mode {
+  if (typeof window === "undefined") return "edit";
+  const v = window.localStorage.getItem(MODE_STORAGE_KEY);
+  return v === "view" ? "view" : "edit";
+}
+
 export default function App() {
   const [list, setList] = useState<DomainModel[]>([]);
   const [domain, setDomain] = useState<DomainModel>(EMPTY_DOMAIN);
@@ -29,11 +38,20 @@ export default function App() {
   const [filterByAg, setFilterByAg] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [run, setRun] = useState<Run | null>(null);
+  const [mode, setMode] = useState<Mode>(loadInitialMode);
   const pollRef = useRef<number | null>(null);
 
   useEffect(() => {
     api.listDomains().then(setList).catch((e) => setError(String(e)));
   }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(MODE_STORAGE_KEY, mode);
+    } catch {
+      /* ignore quota errors */
+    }
+  }, [mode]);
 
   const selectedAg = useMemo(
     () => domain.aggregates.find((a) => a.name === selected) ?? null,
@@ -193,6 +211,28 @@ export default function App() {
     <div className="app">
       <div className="topbar">
         <h1>ddd-ui-designer</h1>
+        <div className="mode-switch" data-testid="mode-switch" role="group" aria-label="表示モード切替">
+          <button
+            type="button"
+            className={mode === "edit" ? "mode-active" : ""}
+            onClick={() => setMode("edit")}
+            data-testid="mode-edit"
+            aria-pressed={mode === "edit"}
+            title="設定モード: ドメインを編集する 3 ペインレイアウト"
+          >
+            🛠 設定
+          </button>
+          <button
+            type="button"
+            className={mode === "view" ? "mode-active" : ""}
+            onClick={() => setMode("view")}
+            data-testid="mode-view"
+            aria-pressed={mode === "view"}
+            title="表示モード: 編集を畳み、ドキュメント / プレゼン用に右ペインを最大化"
+          >
+            👁 表示
+          </button>
+        </div>
         <select onChange={(e) => load(e.target.value)} value={domain.id}>
           <option value="">(新規)</option>
           {list.map((d) => (
@@ -256,7 +296,7 @@ export default function App() {
           {error}
         </div>
       )}
-      <div className="layout">
+      <div className="layout" data-mode={mode}>
         <div className="pane">
           <DomainTree
             domain={domain}
