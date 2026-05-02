@@ -59,8 +59,11 @@ npm run report
 | コマンド | 実行モード | 用途 |
 |----|----|----|
 | `npm run demo` | ヘッドレス (画面非表示) | CI / 動画と PNG だけ欲しい時 |
-| `npm run demo:headed` | ヘッド有り (画面表示) | 目視確認、社内デモのライブ実行 |
-| `npm run demo:slow` | `PWDEBUG=1` + ヘッド有り | Playwright Inspector でステップ実行 |
+| `npm run demo:headed` | ヘッド有り (通常速度) | 目視確認 |
+| `npm run demo:watch` | ヘッド有り + 各操作 400ms スロー | ライブ説明、社内デモ |
+| `npm run demo:debug` | `PWDEBUG=1` + ヘッド有り | Playwright Inspector でステップ実行 |
+
+スロー速度は `DEMO_SLOWMO=600 npm run demo:watch` のように環境変数で調整可。
 
 ヘッドレス + ヘッド有りいずれの場合も、`video: "on"` の設定により全行動が
 .webm 動画として録画されます。ヘッド有りで物理ディスプレイが無い CI 環境で

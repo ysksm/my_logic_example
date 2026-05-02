@@ -34,6 +34,9 @@ export default defineConfig({
         ...devices["Desktop Chrome"],
         viewport: { width: 1440, height: 900 },
         video: "on",
+        launchOptions: {
+          slowMo: Number(process.env.DEMO_SLOWMO ?? 0),
+        },
       },
     },
   ],
