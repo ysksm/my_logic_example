@@ -12,7 +12,7 @@
 | POST   | `/api/domains`               | DomainModel upsert |
 | GET    | `/api/domains/{id}`          | DomainModel 取得 |
 | DELETE | `/api/domains/{id}`          | DomainModel 削除 |
-| POST   | `/api/derive`                | DomainModel → AppSpec を派生 |
+| POST   | `/api/derive`                | DomainModel → AppSpec を導出 |
 | POST   | `/api/generate`              | DomainModel → React アプリ tar.gz |
 | POST   | `/api/launch`                | 生成 + npm install + dev server 起動 |
 | GET    | `/api/runs`                  | 起動中アプリ一覧 |
@@ -77,7 +77,7 @@ DomainModel を upsert。`id` は必須。
 
 ### POST /api/derive
 
-DomainModel から AppSpec を派生。
+DomainModel から AppSpec を導出。
 
 **Request**:
 ```json

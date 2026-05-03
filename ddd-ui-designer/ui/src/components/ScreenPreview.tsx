@@ -9,8 +9,8 @@ export function ScreenPreview({ spec, filterAggregate }: Props) {
   if (!spec) {
     return (
       <div className="pane">
-        <h2>UI 派生</h2>
-        <p style={{ color: "#6b7280" }}>「派生」を押すと、左のドメイン定義から画面仕様 (IR2) を生成します。</p>
+        <h2>UI 導出</h2>
+        <p style={{ color: "#6b7280" }}>「導出」を押すと、左のドメイン定義から画面仕様 (IR2) を生成します。</p>
       </div>
     );
   }
@@ -19,7 +19,7 @@ export function ScreenPreview({ spec, filterAggregate }: Props) {
     : spec.plans;
   return (
     <div className="pane">
-      <h2>UI 派生 ({plans.length} aggregate)</h2>
+      <h2>UI 導出 ({plans.length} aggregate)</h2>
       {plans.map((plan) => (
         <PlanBlock key={plan.aggregateRef} plan={plan} spec={spec} />
       ))}

@@ -12,8 +12,8 @@ ddd-ui-designer は 2 軸で「見せ方」を制御します。
 
 | タブ | 内容 | 必要なもの | 実装 |
 |------|------|-----------|------|
-| 🪟 **モックプレビュー** | 派生結果を画面ごとにモック UI で描画 | `▶ 派生` 実行後 | `ScreenPreview.tsx` |
-| 🔀 **画面遷移図** | Screen をノード、Transition を矢印にした SVG フロー | `▶ 派生` 実行後 | `FlowDiagram.tsx` |
+| 🪟 **モックプレビュー** | 導出結果を画面ごとにモック UI で描画 | `▶ 画面を導出` 実行後 | `ScreenPreview.tsx` |
+| 🔀 **画面遷移図** | Screen をノード、Transition を矢印にした SVG フロー | `▶ 画面を導出` 実行後 | `FlowDiagram.tsx` |
 | 📐 **ドメイン ER 図** | Aggregate / Entity / VO を ER 風に描画 | （常時表示） | `DomainDiagram.tsx` |
 
 タブの切替は state 管理のみで、データ自体は同じ `domain` / `spec` を参照。

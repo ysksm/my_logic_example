@@ -1,6 +1,6 @@
 # 出力物カタログ
 
-ddd-ui-designer は同じ `DomainModel` から **6 種類**の成果物を派生できます。
+ddd-ui-designer は同じ `DomainModel` から **6 種類**の成果物を導出できます。
 用途に応じて取り出し方を選びます。
 
 ## 一覧
@@ -52,7 +52,7 @@ curl -X POST http://localhost:8095/api/derive \
 
 ## 2. 🪟 モックプレビュー
 
-派生済みの `AppSpec` を React コンポーネントで描画した「結果イメージ」。
+導出済みの `AppSpec` を React コンポーネントで描画した「結果イメージ」。
 実データは入らないモック (`form.title` 等のプレースホルダ表示) で、
 `Aggregate ごとのカード × Screen ごとのモック` として右ペインに並ぶ。
 
@@ -79,7 +79,7 @@ curl -X POST http://localhost:8095/api/derive \
 
 ## 4. 📐 ドメイン ER 図 (Domain ER Diagram)
 
-`DomainModel` (= IR1) を **ER 風に SVG 描画**したもの。AppSpec の派生は
+`DomainModel` (= IR1) を **ER 風に SVG 描画**したもの。AppSpec の導出は
 不要 (常時表示)。
 
 - 1 列 = 1 Aggregate (紫の破線クラスタで囲む)
@@ -157,9 +157,9 @@ npm install && npm run dev
 | 出力 | 更新タイミング |
 |------|----------------|
 | AppSpec JSON | 都度 API 呼び出し |
-| モックプレビュー | `▶ 派生` クリック時 |
+| モックプレビュー | `▶ 画面を導出` クリック時 |
 | 画面遷移図 | 同上 |
-| ER 図 | ドメイン編集の都度 (派生不要) |
+| ER 図 | ドメイン編集の都度 (導出不要) |
 | tar.gz | 「📦 tar.gz」クリック時 |
 | 起動済みアプリ | 「🚀 生成 → 実行」クリック時。再クリックで既存プロセスを停止 → 再生成 → 再起動 (`node_modules` は保持) |
 

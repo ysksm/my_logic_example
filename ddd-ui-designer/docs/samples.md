@@ -43,7 +43,7 @@ EC (電子商取引) ドメイン。最もリッチな組合せ。
 - **ShopSettings** (P5 — Single Form): Singleton。
 
 ドメインサービス (`PlaceOrder`, `CancelOrder`) は `confirm: true` 付きで、
-派生時に `svc_Order_<service>_confirm` 画面が追加生成される。
+導出時に `svc_Order_<service>_confirm` 画面が追加生成される。
 
 ### Blog Domain
 

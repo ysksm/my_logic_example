@@ -10,7 +10,7 @@ e2e/
 ├── scripts/start-api.sh      # Go API を一時データディレクトリで起動
 ├── tests/
 │   ├── helpers.ts            # Designer ページオブジェクト
-│   ├── smoke.spec.ts         # アプリ起動 + 既定派生
+│   ├── smoke.spec.ts         # アプリ起動 + 既定導出
 │   ├── domain-edit.spec.ts   # Aggregate / Field 編集
 │   └── pattern-derive.spec.ts# パターン選択ルール
 ├── demo/
@@ -84,7 +84,7 @@ npm run report
 | 1 | アプリ起動 | `01-app-loaded` |
 | 2 | **📂 サンプルメニューを開く** | `02-sample-menu-open` |
 | 3 | **Project Management サンプルを読込** | `03-sample-project-loaded` |
-| 4 | 派生で P1/P3/P4/P5 が一気に出る | `04-sample-project-derived` |
+| 4 | 導出で P1/P3/P4/P5 が一気に出る | `04-sample-project-derived` |
 | 5 | リロードして空状態に戻し、Sample → P1 | `05-default-derive-P1` |
 | 6 | 名前変更とフィールド追加 | `06-edit-fields`, `07-after-edit-still-P1` |
 | 7 | 多フィールド Aggregate を追加して P2 | `08-article-fields`, `09-article-derive-P2` |
@@ -102,7 +102,7 @@ npm run report
 | 18 | P2 Tag 一覧から新規作成・保存 | `23-running-app-tag-list`, `24-running-app-tag-saved` |
 | 19 | デザイナーパネルから dev server を停止 | `25-launch-stopped` |
 
-連番 PNG を順に並べるだけで「設計 → パターン派生 → 動くアプリ」の
+連番 PNG を順に並べるだけで「設計 → パターン導出 → 動くアプリ」の
 一気通貫ドキュメントになります。動画は **2 ファイル** 生成されます:
 
 - `test-results/demo-…/video.webm` — デザイナー画面の操作

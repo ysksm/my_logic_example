@@ -190,7 +190,7 @@ curl -X POST http://localhost:8095/api/launch \
 |------|-----|------|------|
 | `domainId` | string | — | 既存ドメインを指定 (or `domain` で直接渡す) |
 | `domain` | DomainModel | — | インラインで渡す |
-| `config` | RulesConfig | デフォルト | 派生時の閾値 |
+| `config` | RulesConfig | デフォルト | 導出時の閾値 |
 | `install` | bool | true | `npm install` を実行するか |
 | `start` | bool | true | `vite dev` を起動するか |
 

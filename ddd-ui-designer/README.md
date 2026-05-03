@@ -1,10 +1,10 @@
 # ddd-ui-designer
 
 DDD のドメインモデル (Aggregate / Entity / Value Object / Service) から、
-**画面パターンを自動派生し、動く React アプリまで生成する**設計支援ツール。
+**画面パターンを自動導出し、動く React アプリまで生成する**設計支援ツール。
 
 ```
-ドメインを書く → ▶ 派生 → モック / 遷移図 / ER 図 → 🚀 動かす
+ドメインを書く → ▶ 画面を導出 → モック / 遷移図 / ER 図 → 🚀 動かす
                                                        ↑
                                             tar.gz か、サーバ側で
                                             npm install & vite dev
