@@ -1,0 +1,97 @@
+// webcam-go IDL — single source of truth for backend ⇄ frontend communication.
+//
+// Wire formats:
+//   - REST over HTTP: JSON with snake_case field names (protojson defaults)
+//   - WebSocket frame stream: binary JPEG payloads, with control messages as
+//     JSON-encoded `StreamEnvelope`
+//   - MJPEG over HTTP: multipart/x-mixed-replace; boundary=frame
+//
+// Hand-maintained Go types live in core/models.go.
+// Both files MUST be kept in sync with this schema.
+
+syntax = "proto3";
+
+package webcam;
+
+// ---------- Resources ----------
+
+message CameraDevice {
+  string id           = 1;   // platform handle ("0", "/dev/video0", "fake-0")
+  string name         = 2;   // human-readable label
+  string description  = 3;
+  repeated VideoMode modes = 4; // optional, supported capture modes
+}
+
+message VideoMode {
+  uint32 width      = 1;
+  uint32 height     = 2;
+  uint32 framerate  = 3; // frames per second
+  string pixel_fmt  = 4; // "mjpeg", "nv12", "uyvy422", ...
+}
+
+message Frame {
+  uint64 seq         = 1;   // monotonic per-session sequence
+  string captured_at = 2;   // RFC3339 nano
+  uint32 width       = 3;
+  uint32 height      = 4;
+  string mime        = 5;   // "image/jpeg"
+  bytes  data        = 6;   // JPEG bytes (omitted from REST listings)
+  uint32 size        = 7;   // byte length of `data`
+}
+
+// ---------- Sessions ----------
+
+message StreamSession {
+  string id            = 1;
+  string device_id     = 2;
+  uint32 width         = 3;
+  uint32 height        = 4;
+  uint32 framerate     = 5;
+  uint32 quality       = 6;   // JPEG quality 1..100
+  string state         = 7;   // "running" | "stopped" | "error"
+  string started_at    = 8;
+  string stopped_at    = 9;
+  uint64 frame_count   = 10;
+  uint64 bytes_sent    = 11;
+  string error         = 12;
+}
+
+message StartStreamRequest {
+  string device_id = 1;
+  uint32 width     = 2;
+  uint32 height    = 3;
+  uint32 framerate = 4;
+  uint32 quality   = 5;
+}
+
+// ---------- Stats ----------
+
+message StatsResponse {
+  uint64 total_frames = 1;
+  uint64 total_bytes  = 2;
+  double current_fps  = 3;
+  uint32 last_width   = 4;
+  uint32 last_height  = 5;
+  repeated FpsBucket fps = 6; // 60-second sparkline
+}
+
+message FpsBucket {
+  string ts    = 1; // RFC3339 truncated to second
+  uint32 count = 2;
+  uint64 bytes = 3;
+}
+
+// ---------- Responses ----------
+
+message ListDevicesResponse  { repeated CameraDevice devices = 1; }
+message ListSessionsResponse { repeated StreamSession sessions = 1; }
+message StartStreamResponse  { StreamSession session = 1; }
+message StopStreamResponse   { StreamSession session = 1; }
+
+// WebSocket control messages. Binary frames carry raw JPEG bytes.
+message StreamEnvelope {
+  string         type    = 1; // "session" | "error" | "frame_meta"
+  StreamSession  session = 2;
+  Frame          frame   = 3; // metadata only; payload arrives as binary frame
+  string         message = 4;
+}
