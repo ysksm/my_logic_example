@@ -2,6 +2,15 @@
 
 本ドキュメントは、`react-ts` をフロントエンドの基盤とし、レイヤードアーキテクチャ・依存性逆転原則 (DIP)・DI・DDD を採用したプロジェクトにおいて、AI（LLM／コーディングエージェント）をどの領域でどう活用するかをまとめたものである。
 
+> **詳細版**：各章の深掘りドキュメントは [`ai-integration/`](./ai-integration/README.md) を参照。
+> - [00. 前提と基本原則](./ai-integration/00-principles.md)
+> - [01. 開発環境](./ai-integration/01-dev-environment.md)
+> - [02. CI](./ai-integration/02-ci.md)
+> - [03. テスト](./ai-integration/03-testing.md)
+> - [04. デバッグ](./ai-integration/04-debugging.md)
+> - [05. パフォーマンス](./ai-integration/05-performance.md)
+> - [06. 領域横断の運用](./ai-integration/06-operations.md)
+
 ---
 
 ## 0. 全体方針
