@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>webcam-go</title>
+  <style>
+    :root {
+      --bg: #0e1116;
+      --panel: #1a1f29;
+      --panel2: #232a36;
+      --fg: #e8ecf1;
+      --muted: #8b95a7;
+      --accent: #6ea8fe;
+      --danger: #f17d7d;
+      --ok: #7dd87d;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg);
+      font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif; }
+    header { padding: 12px 18px; background: var(--panel); border-bottom: 1px solid #000;
+      display: flex; align-items: center; gap: 16px; }
+    header h1 { font-size: 16px; margin: 0; font-weight: 600; }
+    header .badge { font-size: 11px; padding: 2px 6px; background: var(--panel2);
+      color: var(--muted); border-radius: 4px; }
+    main { display: grid; grid-template-columns: 320px 1fr; gap: 16px; padding: 16px; }
+    .panel { background: var(--panel); border-radius: 8px; padding: 14px; }
+    .panel h2 { font-size: 13px; margin: 0 0 10px; color: var(--muted); text-transform: uppercase;
+      letter-spacing: 0.05em; }
+    label { display: block; font-size: 12px; color: var(--muted); margin: 8px 0 4px; }
+    select, input, button { width: 100%; background: var(--panel2); color: var(--fg);
+      border: 1px solid #333; border-radius: 6px; padding: 7px 9px; font-size: 13px; }
+    button { cursor: pointer; font-weight: 600; }
+    button.primary { background: var(--accent); color: #0b1220; border-color: var(--accent); }
+    button.danger { background: var(--danger); color: #2a0a0a; border-color: var(--danger); }
+    button[disabled] { opacity: 0.5; cursor: not-allowed; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .stage { background: #000; border-radius: 8px; overflow: hidden; min-height: 320px;
+      display: flex; align-items: center; justify-content: center; position: relative; }
+    .stage img, .stage canvas { max-width: 100%; max-height: 80vh; display: block; }
+    .stage .placeholder { color: var(--muted); font-size: 14px; }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
+    .stat { background: var(--panel); padding: 10px; border-radius: 6px; }
+    .stat .k { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    .stat .v { font-size: 18px; font-weight: 600; margin-top: 4px; }
+    .status { font-size: 12px; color: var(--muted); margin-top: 12px; min-height: 1.4em; }
+    .status.error { color: var(--danger); }
+    .status.ok { color: var(--ok); }
+    .tabs { display: flex; gap: 4px; margin-bottom: 8px; }
+    .tabs button { width: auto; padding: 4px 10px; background: var(--panel2);
+      border-color: transparent; font-weight: 500; }
+    .tabs button.active { background: var(--accent); color: #0b1220; }
+    code.inline { font-family: ui-monospace, monospace; background: var(--panel2);
+      padding: 1px 5px; border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>webcam-go</h1>
+    <span class="badge" id="version">dev</span>
+    <span class="badge" id="conn">disconnected</span>
+  </header>
+  <main>
+    <section class="panel">
+      <h2>カメラ</h2>
+      <label for="device">デバイス</label>
+      <select id="device"></select>
+      <div class="row">
+        <div>
+          <label for="width">幅</label>
+          <input id="width" type="number" value="640" min="160" step="80">
+        </div>
+        <div>
+          <label for="height">高さ</label>
+          <input id="height" type="number" value="480" min="120" step="60">
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label for="fps">FPS</label>
+          <input id="fps" type="number" value="15" min="1" max="60">
+        </div>
+        <div>
+          <label for="quality">JPEG 品質</label>
+          <input id="quality" type="number" value="75" min="10" max="100">
+        </div>
+      </div>
+      <label for="transport">配信方式</label>
+      <select id="transport">
+        <option value="mjpeg">MJPEG (multipart/x-mixed-replace)</option>
+        <option value="ws">WebSocket (binary JPEG)</option>
+      </select>
+      <div style="margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+        <button id="start" class="primary">開始</button>
+        <button id="stop" class="danger" disabled>停止</button>
+      </div>
+      <div id="status" class="status"></div>
+    </section>
+
+    <section>
+      <div class="panel">
+        <div class="tabs">
+          <button id="tab-live" class="active">ライブ</button>
+          <button id="tab-snapshot">スナップショット</button>
+        </div>
+        <div class="stage" id="stage">
+          <span class="placeholder">「開始」を押すとここに映像が出ます</span>
+        </div>
+        <div class="stats">
+          <div class="stat"><div class="k">セッション</div><div class="v" id="s-id">—</div></div>
+          <div class="stat"><div class="k">フレーム</div><div class="v" id="s-frames">0</div></div>
+          <div class="stat"><div class="k">FPS</div><div class="v" id="s-fps">0</div></div>
+          <div class="stat"><div class="k">転送量</div><div class="v" id="s-bytes">0 B</div></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const state = {
+      devices: [],
+      session: null,
+      ws: null,
+      pollTimer: null,
+      objectURL: null,
+    };
+
+    async function api(method, path, body) {
+      const res = await fetch(path, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      const text = await res.text();
+      let data = null;
+      try { data = text ? JSON.parse(text) : null; } catch (_) { /* ignore */ }
+      if (!res.ok) {
+        throw new Error((data && data.error) || res.statusText);
+      }
+      return data;
+    }
+
+    function fmtBytes(n) {
+      if (n < 1024) return n + " B";
+      if (n < 1024*1024) return (n/1024).toFixed(1) + " KB";
+      if (n < 1024*1024*1024) return (n/1024/1024).toFixed(2) + " MB";
+      return (n/1024/1024/1024).toFixed(2) + " GB";
+    }
+
+    function setStatus(msg, kind) {
+      const el = $("status");
+      el.textContent = msg || "";
+      el.className = "status " + (kind || "");
+    }
+
+    function setConn(label) {
+      $("conn").textContent = label;
+    }
+
+    function clearStage(message) {
+      const stage = $("stage");
+      stage.innerHTML = "";
+      if (state.objectURL) { URL.revokeObjectURL(state.objectURL); state.objectURL = null; }
+      if (message) {
+        const span = document.createElement("span");
+        span.className = "placeholder";
+        span.textContent = message;
+        stage.appendChild(span);
+      }
+    }
+
+    async function loadDevices() {
+      try {
+        const { devices } = await api("GET", "/api/v1/devices");
+        state.devices = devices || [];
+        const sel = $("device");
+        sel.innerHTML = "";
+        for (const d of state.devices) {
+          const opt = document.createElement("option");
+          opt.value = d.id;
+          opt.textContent = `${d.name} (${d.id})`;
+          sel.appendChild(opt);
+        }
+        if (!state.devices.length) {
+          setStatus("利用可能なデバイスがありません。", "error");
+        }
+      } catch (e) {
+        setStatus("デバイス取得に失敗: " + e.message, "error");
+      }
+    }
+
+    async function startSession() {
+      $("start").disabled = true;
+      try {
+        const req = {
+          device_id: $("device").value,
+          width: Number($("width").value),
+          height: Number($("height").value),
+          framerate: Number($("fps").value),
+          quality: Number($("quality").value),
+        };
+        const { session } = await api("POST", "/api/v1/sessions", req);
+        state.session = session;
+        $("s-id").textContent = session.id.slice(0, 8);
+        $("stop").disabled = false;
+        setStatus("ストリーム開始 (" + session.id + ")", "ok");
+        attachTransport();
+        startStatsPolling();
+      } catch (e) {
+        $("start").disabled = false;
+        setStatus("開始に失敗: " + e.message, "error");
+      }
+    }
+
+    async function stopSession() {
+      $("stop").disabled = true;
+      detachTransport();
+      stopStatsPolling();
+      if (state.session) {
+        try { await api("DELETE", "/api/v1/sessions/" + state.session.id); } catch (_) {}
+      }
+      state.session = null;
+      $("s-id").textContent = "—";
+      $("start").disabled = false;
+      setStatus("停止しました", "");
+      setConn("disconnected");
+      clearStage("「開始」を押すとここに映像が出ます");
+    }
+
+    function attachTransport() {
+      const transport = $("transport").value;
+      clearStage();
+      if (transport === "mjpeg") {
+        const img = document.createElement("img");
+        img.src = "/api/v1/sessions/" + state.session.id + "/mjpeg";
+        img.alt = "MJPEG stream";
+        img.onload = () => setConn("MJPEG connected");
+        img.onerror = () => setConn("MJPEG error");
+        $("stage").appendChild(img);
+      } else {
+        const img = document.createElement("img");
+        img.alt = "WebSocket frame";
+        $("stage").appendChild(img);
+        const proto = location.protocol === "https:" ? "wss:" : "ws:";
+        const ws = new WebSocket(proto + "//" + location.host + "/api/v1/sessions/" + state.session.id + "/stream");
+        ws.binaryType = "blob";
+        ws.onopen = () => setConn("WS connected");
+        ws.onclose = () => setConn("WS closed");
+        ws.onerror = () => setConn("WS error");
+        ws.onmessage = (ev) => {
+          if (typeof ev.data === "string") return; // ignore JSON envelopes for now
+          if (state.objectURL) URL.revokeObjectURL(state.objectURL);
+          state.objectURL = URL.createObjectURL(ev.data);
+          img.src = state.objectURL;
+        };
+        state.ws = ws;
+      }
+    }
+
+    function detachTransport() {
+      if (state.ws) {
+        try { state.ws.close(); } catch (_) {}
+        state.ws = null;
+      }
+    }
+
+    function startStatsPolling() {
+      stopStatsPolling();
+      state.pollTimer = setInterval(async () => {
+        if (!state.session) return;
+        try {
+          const stats = await api("GET", "/api/v1/sessions/" + state.session.id + "/stats");
+          $("s-frames").textContent = stats.total_frames;
+          $("s-fps").textContent = (stats.current_fps || 0).toFixed(0);
+          $("s-bytes").textContent = fmtBytes(stats.total_bytes);
+        } catch (_) {}
+      }, 1000);
+    }
+
+    function stopStatsPolling() {
+      if (state.pollTimer) { clearInterval(state.pollTimer); state.pollTimer = null; }
+    }
+
+    function showSnapshot() {
+      if (!state.session) {
+        setStatus("セッションがありません", "error");
+        return;
+      }
+      detachTransport();
+      clearStage();
+      const img = document.createElement("img");
+      img.src = "/api/v1/sessions/" + state.session.id + "/snapshot.jpg?t=" + Date.now();
+      img.alt = "snapshot";
+      $("stage").appendChild(img);
+      setConn("snapshot");
+    }
+
+    function showLive() {
+      if (!state.session) return;
+      attachTransport();
+    }
+
+    $("start").addEventListener("click", startSession);
+    $("stop").addEventListener("click", stopSession);
+    $("tab-live").addEventListener("click", () => {
+      $("tab-live").classList.add("active");
+      $("tab-snapshot").classList.remove("active");
+      showLive();
+    });
+    $("tab-snapshot").addEventListener("click", () => {
+      $("tab-snapshot").classList.add("active");
+      $("tab-live").classList.remove("active");
+      showSnapshot();
+    });
+
+    loadDevices();
+  </script>
+</body>
+</html>
