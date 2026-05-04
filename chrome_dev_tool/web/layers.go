@@ -16,7 +16,8 @@ import (
 // Event handlers stay registered for the lifetime of the CDP client; an
 // `active` flag silences them when the user has not enabled layer
 // observation. Tree updates are coalesced to one emit per ~150ms so a
-// scroll-driven cascade of changes doesn't flood /ws.
+// scroll-driven cascade of changes doesn't flood /ws. The latest tree is
+// also cached so highlight requests can look up the rect/backendNode.
 type layerCollector struct {
 	mu     sync.Mutex
 	active bool
@@ -26,6 +27,9 @@ type layerCollector struct {
 	pmu          sync.Mutex
 	pendingTree  events.LayerTree
 	pendingTimer *time.Timer
+
+	treeMu sync.Mutex
+	tree   events.LayerTree
 }
 
 func (l *layerCollector) wire(cl *cdp.Client, sink func(events.Event)) {
@@ -54,7 +58,11 @@ func (l *layerCollector) wire(cl *cdp.Client, sink func(events.Event)) {
 		for _, r := range wrap.Layers {
 			layers = append(layers, r.toEvent())
 		}
-		l.coalesceEmit(events.LayerTree{Layers: layers})
+		tree := events.LayerTree{Layers: layers}
+		l.treeMu.Lock()
+		l.tree = tree
+		l.treeMu.Unlock()
+		l.coalesceEmit(tree)
 	})
 
 	cl.On("LayerTree.layerPainted", func(p json.RawMessage) {
@@ -114,11 +122,91 @@ func (l *layerCollector) stop(ctx context.Context, cl *cdp.Client) error {
 	wasActive := l.active
 	l.active = false
 	l.mu.Unlock()
+	l.treeMu.Lock()
+	l.tree = events.LayerTree{}
+	l.treeMu.Unlock()
 	if !wasActive || cl == nil {
 		return nil
 	}
+	// Clear any leftover highlight from the browser viewport.
+	_, _ = cl.Send(ctx, "Overlay.hideHighlight", nil)
 	_, err := cl.Send(ctx, "LayerTree.disable", nil)
 	return err
+}
+
+func (l *layerCollector) findLayer(id string) (events.Layer, bool) {
+	l.treeMu.Lock()
+	defer l.treeMu.Unlock()
+	for _, lyr := range l.tree.Layers {
+		if lyr.LayerID == id {
+			return lyr, true
+		}
+	}
+	return events.Layer{}, false
+}
+
+// highlightColor is a translucent blue matching the rest of the UI.
+var highlightColor = map[string]any{"r": 88, "g": 166, "b": 255, "a": 0.4}
+var highlightOutline = map[string]any{"r": 88, "g": 166, "b": 255, "a": 0.95}
+
+// highlight asks the browser to overlay the given layer. Empty id clears.
+// Prefers Overlay.highlightNode (with the layer's backendNodeId) so the
+// browser draws a "real" inspector-like overlay; falls back to a plain
+// rect when no DOM node is associated.
+func (l *layerCollector) highlight(ctx context.Context, cl *cdp.Client, layerID string) error {
+	if cl == nil {
+		return errors.New("not attached")
+	}
+	// Overlay.* requires DOM.enable; the latter is idempotent.
+	if _, err := cl.Send(ctx, "DOM.enable", nil); err != nil {
+		return fmt.Errorf("DOM.enable: %w", err)
+	}
+	if _, err := cl.Send(ctx, "Overlay.enable", nil); err != nil {
+		return fmt.Errorf("Overlay.enable: %w", err)
+	}
+	if layerID == "" {
+		if _, err := cl.Send(ctx, "Overlay.hideHighlight", nil); err != nil {
+			return fmt.Errorf("Overlay.hideHighlight: %w", err)
+		}
+		return nil
+	}
+	lyr, ok := l.findLayer(layerID)
+	if !ok {
+		return fmt.Errorf("layer %s not in latest tree", layerID)
+	}
+	if lyr.BackendNodeID > 0 {
+		params := map[string]any{
+			"backendNodeId": lyr.BackendNodeID,
+			"highlightConfig": map[string]any{
+				"showInfo":     true,
+				"contentColor": highlightColor,
+				"paddingColor": map[string]any{"r": 88, "g": 166, "b": 255, "a": 0.2},
+				"borderColor":  highlightOutline,
+				"marginColor":  map[string]any{"r": 88, "g": 166, "b": 255, "a": 0.1},
+			},
+		}
+		if _, err := cl.Send(ctx, "Overlay.highlightNode", params); err != nil {
+			return fmt.Errorf("Overlay.highlightNode: %w", err)
+		}
+		return nil
+	}
+	// Fall back to a plain rect when no backing DOM node (e.g. scrolling
+	// containers, reflection layers).
+	if lyr.Width <= 0 || lyr.Height <= 0 {
+		return fmt.Errorf("layer %s has no visible bounds", layerID)
+	}
+	params := map[string]any{
+		"x":            int(lyr.OffsetX),
+		"y":            int(lyr.OffsetY),
+		"width":        int(lyr.Width),
+		"height":       int(lyr.Height),
+		"color":        highlightColor,
+		"outlineColor": highlightOutline,
+	}
+	if _, err := cl.Send(ctx, "Overlay.highlightRect", params); err != nil {
+		return fmt.Errorf("Overlay.highlightRect: %w", err)
+	}
+	return nil
 }
 
 func (l *layerCollector) compositingReasons(ctx context.Context, cl *cdp.Client, layerID string) ([]string, error) {

@@ -15,11 +15,32 @@ export function LayersPanel({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [reasons, setReasons] = useState<Record<string, string[]>>({});
   const [reasonsBusy, setReasonsBusy] = useState(false);
+  const [highlightInBrowser, setHighlightInBrowser] = useState(true);
 
   // Auto-pick first layer when the tree first arrives.
   useEffect(() => {
     if (!selectedId && layers.length > 0) setSelectedId(layers[0].layerId);
   }, [layers, selectedId]);
+
+  // Reflect the selection on the browser viewport via Overlay.highlightNode.
+  // Clears on unmount and on stop.
+  useEffect(() => {
+    if (!highlightInBrowser) return;
+    if (!selectedId) {
+      api.layersHighlight('').catch(() => {});
+      return;
+    }
+    api.layersHighlight(selectedId).catch((e) =>
+      setError(String(e?.message ?? e)),
+    );
+  }, [selectedId, highlightInBrowser]);
+
+  useEffect(
+    () => () => {
+      api.layersHighlight('').catch(() => {});
+    },
+    [],
+  );
 
   async function start() {
     setBusy(true);
@@ -40,6 +61,7 @@ export function LayersPanel({
     try {
       await api.layersStop();
       setObserving(false);
+      setSelectedId(null);
     } catch (e: any) {
       setError(String(e?.message ?? e));
     } finally {
@@ -96,6 +118,17 @@ export function LayersPanel({
             Start layers
           </button>
         )}
+        <label className="dim" title="Overlay.highlightNode で viewport にも描画">
+          <input
+            type="checkbox"
+            checked={highlightInBrowser}
+            onChange={(e) => {
+              setHighlightInBrowser(e.target.checked);
+              if (!e.target.checked) api.layersHighlight('').catch(() => {});
+            }}
+          />{' '}
+          ブラウザにも反映
+        </label>
         <span className="dim">
           {layers.length === 0
             ? observing

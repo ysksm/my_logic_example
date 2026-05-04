@@ -246,6 +246,34 @@ func (s *Server) handleLayersStop(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{"observing": false})
 }
 
+func (s *Server) handleLayersHighlight(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST required", http.StatusMethodNotAllowed)
+		return
+	}
+	var p struct {
+		LayerID string `json:"layerId"`
+	}
+	if r.ContentLength > 0 {
+		if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+			writeErr(w, err, http.StatusBadRequest)
+			return
+		}
+	}
+	cl := s.cdpClient()
+	if cl == nil {
+		writeErr(w, fmt.Errorf("no active collector"), http.StatusBadRequest)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	if err := s.layers.highlight(ctx, cl, p.LayerID); err != nil {
+		writeErr(w, err, http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, map[string]any{"layerId": p.LayerID})
+}
+
 func (s *Server) handleLayersReasons(w http.ResponseWriter, r *http.Request) {
 	layerID := r.URL.Query().Get("layerId")
 	if layerID == "" {

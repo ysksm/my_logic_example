@@ -65,6 +65,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/layers/start", s.handleLayersStart)
 	mux.HandleFunc("/api/layers/stop", s.handleLayersStop)
 	mux.HandleFunc("/api/layers/reasons", s.handleLayersReasons)
+	mux.HandleFunc("/api/layers/highlight", s.handleLayersHighlight)
 	mux.HandleFunc("/ws", s.handleWS)
 	mux.Handle("/", spaHandler())
 	return cors(mux)

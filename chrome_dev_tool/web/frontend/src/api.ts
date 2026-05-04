@@ -91,6 +91,13 @@ export const api = {
   layersReasons(layerId: string): Promise<{ layerId: string; reasons: string[] }> {
     return http(`/api/layers/reasons?layerId=${encodeURIComponent(layerId)}`);
   },
+  layersHighlight(layerId: string): Promise<{ layerId: string }> {
+    return http('/api/layers/highlight', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ layerId }),
+    });
+  },
 };
 
 export type NetworkPreset =
