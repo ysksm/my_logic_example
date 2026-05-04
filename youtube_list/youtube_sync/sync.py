@@ -14,7 +14,12 @@ from typing import Callable
 
 from youtube_sync.client import YouTubeClient
 from youtube_sync.db import Database
-from youtube_sync.transform import ChannelTransformer, VideoTransformer
+from youtube_sync.transcript import TranscriptFetcher
+from youtube_sync.transform import (
+    ChannelTransformer,
+    CommentTransformer,
+    VideoTransformer,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -57,10 +62,12 @@ class SyncState:
 class SyncService:
     """同期オーケストレーター"""
 
-    def __init__(self, client: YouTubeClient, db: Database, sync_state: SyncState):
+    def __init__(self, client: YouTubeClient, db: Database, sync_state: SyncState,
+                 transcript_fetcher: TranscriptFetcher | None = None):
         self.client = client
         self.db = db
         self.sync_state = sync_state
+        self.transcript_fetcher = transcript_fetcher or TranscriptFetcher()
 
     def add_channel(
         self,
@@ -179,3 +186,135 @@ class SyncService:
             "errors": errors,
             "summary": summary,
         }
+
+    # ── コメント同期 ───────────────────────────────────
+
+    def sync_comments(
+        self,
+        channel_id: str | None = None,
+        max_videos: int = 0,
+        max_comments_per_video: int = 100,
+        on_log: Callable[[str], None] | None = None,
+    ) -> dict:
+        """コメント未取得の動画について commentThreads を取得して保存"""
+        def _log(msg: str):
+            logger.info(msg)
+            if on_log:
+                on_log(msg)
+
+        self.client.on_log = on_log
+        video_ids = self.db.get_video_ids_without_comments(channel_id, max_videos)
+        total = len(video_ids)
+        _log(f"コメント取得対象: {total} 動画")
+
+        fetched = 0
+        errors: list[str] = []
+        for i, vid in enumerate(video_ids):
+            _log(f"[{i + 1}/{total}] コメント取得 {vid}")
+            try:
+                threads = self.client.fetch_comments(vid, max_comments_per_video)
+                df = CommentTransformer.transform(threads, vid)
+                self.db.upsert_comments(df, vid)
+                fetched += len(df)
+            except Exception as e:
+                err = f"{vid}: {e}"
+                _log(f"  エラー: {err}")
+                errors.append(err)
+                continue
+
+        _log(f"コメント同期完了: {fetched} 件保存 / {total} 動画")
+        return {"videos": total, "comments": fetched, "errors": errors}
+
+    # ── 文字起こし同期 ────────────────────────────────
+
+    def sync_transcripts(
+        self,
+        channel_id: str | None = None,
+        max_videos: int = 0,
+        language: str = "ja",
+        on_log: Callable[[str], None] | None = None,
+    ) -> dict:
+        """指定言語の文字起こし未取得の動画について字幕を取得して保存"""
+        def _log(msg: str):
+            logger.info(msg)
+            if on_log:
+                on_log(msg)
+
+        video_ids = self.db.get_video_ids_without_transcript(
+            channel_id, language, max_videos,
+        )
+        total = len(video_ids)
+        _log(f"文字起こし取得対象: {total} 動画 (希望言語: {language})")
+
+        fetched = 0
+        skipped = 0
+        errors: list[str] = []
+        for i, vid in enumerate(video_ids):
+            _log(f"[{i + 1}/{total}] 文字起こし取得 {vid}")
+            try:
+                result = self.transcript_fetcher.fetch(vid)
+                if result is None:
+                    skipped += 1
+                    continue
+                self.db.upsert_transcript(
+                    vid,
+                    result["language"],
+                    result["is_generated"],
+                    result["text"],
+                    result["segments"],
+                )
+                fetched += 1
+            except Exception as e:
+                err = f"{vid}: {e}"
+                _log(f"  エラー: {err}")
+                errors.append(err)
+                continue
+
+        _log(f"文字起こし完了: {fetched} 件取得 / {skipped} スキップ / {total} 動画")
+        return {"videos": total, "fetched": fetched, "skipped": skipped, "errors": errors}
+
+    # ── サムネ画像同期 ────────────────────────────────
+
+    def sync_thumbnails(
+        self,
+        channel_id: str | None = None,
+        max_videos: int = 0,
+        include_channels: bool = True,
+        include_videos: bool = True,
+        on_log: Callable[[str], None] | None = None,
+    ) -> dict:
+        """未取得のサムネ画像をダウンロードして DB に保存"""
+        def _log(msg: str):
+            logger.info(msg)
+            if on_log:
+                on_log(msg)
+
+        targets: list[tuple[str, str, str]] = []
+        if include_channels:
+            for eid, url in self.db.get_entities_without_thumbnail("channel", channel_id):
+                targets.append(("channel", eid, url))
+        if include_videos:
+            for eid, url in self.db.get_entities_without_thumbnail(
+                "video", channel_id, max_videos,
+            ):
+                targets.append(("video", eid, url))
+
+        total = len(targets)
+        _log(f"サムネ画像取得対象: {total} 件")
+
+        fetched = 0
+        errors: list[str] = []
+        for i, (etype, eid, url) in enumerate(targets):
+            _log(f"[{i + 1}/{total}] サムネ取得 {etype}/{eid}")
+            try:
+                content, ctype = self.client.fetch_thumbnail_image(url)
+                self.db.upsert_thumbnail(etype, eid, url, content, ctype)
+                fetched += 1
+            except Exception as e:
+                err = f"{etype}/{eid}: {e}"
+                _log(f"  エラー: {err}")
+                errors.append(err)
+                continue
+
+        _log(f"サムネ画像完了: {fetched} 件取得 / {total} 件中")
+        return {"total": total, "fetched": fetched, "errors": errors}

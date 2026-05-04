@@ -24,6 +24,11 @@ VIDEOS_TABLE_COLUMNS = [
     "comment_count", "raw_data",
 ]
 
+COMMENTS_TABLE_COLUMNS = [
+    "id", "video_id", "parent_id", "author", "author_channel_id",
+    "text", "like_count", "published_at", "updated_at", "raw_data",
+]
+
 
 def _best_thumbnail(thumbnails: dict) -> str:
     """サムネイル URL を高解像度優先で取得"""
@@ -89,4 +94,52 @@ class VideoTransformer:
         if not df.empty:
             df = df[VIDEOS_TABLE_COLUMNS]
         logger.info("Transformed %d videos", len(df))
+        return df
+
+
+def _comment_row(comment: dict, video_id: str, parent_id: str | None) -> dict:
+    """commentThreads / replies の comment リソースから 1 行を作る"""
+    snippet = comment.get("snippet", {})
+    author_ch = snippet.get("authorChannelId", {})
+    if isinstance(author_ch, dict):
+        author_channel_id = author_ch.get("value", "")
+    else:
+        author_channel_id = str(author_ch or "")
+    return {
+        "id": comment.get("id", ""),
+        "video_id": video_id,
+        "parent_id": parent_id,
+        "author": snippet.get("authorDisplayName", ""),
+        "author_channel_id": author_channel_id,
+        "text": snippet.get("textDisplay", "") or snippet.get("textOriginal", ""),
+        "like_count": int(snippet.get("likeCount", 0) or 0),
+        "published_at": snippet.get("publishedAt", ""),
+        "updated_at": snippet.get("updatedAt", ""),
+        "raw_data": json.dumps(comment, ensure_ascii=False),
+    }
+
+
+class CommentTransformer:
+    """commentThreads レスポンスを DataFrame に変換（返信も平坦化）"""
+
+    @staticmethod
+    def transform(raw_threads: list[dict], video_id: str) -> pd.DataFrame:
+        rows: list[dict] = []
+        for thread in raw_threads:
+            snippet = thread.get("snippet", {})
+            top = snippet.get("topLevelComment")
+            if top:
+                rows.append(_comment_row(top, video_id, parent_id=None))
+                top_id = top.get("id", "")
+            else:
+                top_id = ""
+            replies = (thread.get("replies") or {}).get("comments", [])
+            for r in replies:
+                rows.append(_comment_row(r, video_id, parent_id=top_id))
+
+        df = pd.DataFrame(rows)
+        if not df.empty:
+            df = df.drop_duplicates(subset=["id"])
+            df = df[COMMENTS_TABLE_COLUMNS]
+        logger.info("Transformed %d comments for %s", len(df), video_id)
         return df

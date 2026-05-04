@@ -29,6 +29,8 @@ def _(mo):
     | `YOUTUBE_CHANNEL_IDS` | No | 同期するチャンネル（カンマ区切り URL/ID） |
     | `YOUTUBE_AUTO_SYNC` | No | `full` で自動同期 |
     | `YOUTUBE_MAX_VIDEOS` | No | チャンネルあたりの最大動画数 (default: 0=全件) |
+    | `YOUTUBE_TRANSCRIPT_LANG` | No | 文字起こしの希望言語 (default: `ja`) |
+    | `YOUTUBE_MAX_COMMENTS` | No | 動画あたりの最大コメント数 (default: 100) |
     """)
     return
 
@@ -52,6 +54,8 @@ def _():
         "1", "true", "yes", "full",
     )
     YOUTUBE_MAX_VIDEOS = int(os.environ.get("YOUTUBE_MAX_VIDEOS", "0"))
+    YOUTUBE_TRANSCRIPT_LANG = os.environ.get("YOUTUBE_TRANSCRIPT_LANG", "ja")
+    YOUTUBE_MAX_COMMENTS = int(os.environ.get("YOUTUBE_MAX_COMMENTS", "100"))
     return (
         Database,
         SyncService,
@@ -60,7 +64,9 @@ def _():
         YOUTUBE_AUTO_SYNC,
         YOUTUBE_CHANNEL_IDS,
         YOUTUBE_DB_PATH,
+        YOUTUBE_MAX_COMMENTS,
         YOUTUBE_MAX_VIDEOS,
+        YOUTUBE_TRANSCRIPT_LANG,
         YouTubeClient,
         os,
         pd,
@@ -348,7 +354,205 @@ def _(alt, db, mo):
 @app.cell
 def _(mo):
     mo.md("""
-    ## 6. チャンネル詳細
+    ## 6. コメント / 文字起こし / サムネ画像 取得
+    """)
+    return
+
+
+@app.cell
+def _(mo):
+    extras_btn = mo.ui.run_button(label="未取得分を取得（コメント / 文字起こし / サムネ）")
+    extras_btn
+    return (extras_btn,)
+
+
+@app.cell
+def _(
+    SyncService,
+    YOUTUBE_MAX_COMMENTS,
+    YOUTUBE_MAX_VIDEOS,
+    YOUTUBE_TRANSCRIPT_LANG,
+    client,
+    db,
+    extras_btn,
+    mo,
+    sync_state,
+):
+    mo.stop(not extras_btn.value, mo.md("ボタンを押すと未取得分のみ取得します"))
+
+    _svc = SyncService(client, db, sync_state)
+
+    def _on_log(msg):
+        mo.output.replace(mo.md(f"**取得中...**\n\n`{msg}`"))
+
+    _comments_result = _svc.sync_comments(
+        max_videos=YOUTUBE_MAX_VIDEOS,
+        max_comments_per_video=YOUTUBE_MAX_COMMENTS,
+        on_log=_on_log,
+    )
+    _transcripts_result = _svc.sync_transcripts(
+        max_videos=YOUTUBE_MAX_VIDEOS,
+        language=YOUTUBE_TRANSCRIPT_LANG,
+        on_log=_on_log,
+    )
+    _thumbs_result = _svc.sync_thumbnails(
+        max_videos=YOUTUBE_MAX_VIDEOS,
+        on_log=_on_log,
+    )
+
+    extras_result = {
+        "comments": _comments_result,
+        "transcripts": _transcripts_result,
+        "thumbnails": _thumbs_result,
+    }
+
+    mo.md(
+        f"**取得完了**\n\n"
+        f"- コメント: **{_comments_result['comments']}** 件保存"
+        f"（{_comments_result['videos']} 動画対象 / エラー {len(_comments_result['errors'])}）\n"
+        f"- 文字起こし: **{_transcripts_result['fetched']}** 件取得"
+        f"（{_transcripts_result['videos']} 動画対象 / "
+        f"スキップ {_transcripts_result['skipped']} / "
+        f"エラー {len(_transcripts_result['errors'])}）\n"
+        f"- サムネ画像: **{_thumbs_result['fetched']}** 件取得"
+        f"（{_thumbs_result['total']} 件対象 / エラー {len(_thumbs_result['errors'])}）"
+    )
+    return (extras_result,)
+
+
+@app.cell
+def _(db, mo):
+    _stats = db.conn.execute("""
+        SELECT
+            (SELECT COUNT(*) FROM comments) AS comments,
+            (SELECT COUNT(DISTINCT video_id) FROM comments) AS commented_videos,
+            (SELECT COUNT(*) FROM transcripts) AS transcripts,
+            (SELECT COUNT(*) FROM thumbnails WHERE entity_type = 'channel') AS channel_thumbs,
+            (SELECT COUNT(*) FROM thumbnails WHERE entity_type = 'video') AS video_thumbs
+    """).fetchone()
+    mo.md(
+        f"**現在の取得状況**: コメント **{_stats[0]}** 件 / "
+        f"動画 **{_stats[1]}** 件にコメント取得済 / "
+        f"文字起こし **{_stats[2]}** 件 / "
+        f"サムネ画像 チャンネル {_stats[3]} ・動画 {_stats[4]}"
+    )
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md("""
+    ## 7. 動画詳細（説明文・文字起こし・コメント・サムネ）
+    """)
+    return
+
+
+@app.cell
+def _(db, mo):
+    _videos = db.conn.execute("""
+        SELECT v.id, v.title || ' (' || c.title || ')' AS label
+        FROM videos v JOIN channels c ON v.channel_id = c.id
+        ORDER BY v.published_at DESC
+        LIMIT 500
+    """).fetchall()
+    if not _videos:
+        video_select = None
+        mo.md("動画がありません。先に同期してください。")
+    else:
+        video_select = mo.ui.dropdown(
+            options={lbl: vid for vid, lbl in _videos},
+            label="動画を選択",
+        )
+    video_select
+    return (video_select,)
+
+
+@app.cell
+def _(db, mo, video_select):
+    _vid = video_select.value if video_select else None
+    if not _vid:
+        mo.md("動画を選択してください")
+    else:
+        _meta = db.conn.execute(
+            "SELECT title, description, thumbnail_url, published_at, view_count, "
+            "like_count, comment_count FROM videos WHERE id = ?",
+            [_vid],
+        ).fetchone()
+        if _meta:
+            _thumb_row = db.conn.execute(
+                "SELECT content, content_type FROM thumbnails "
+                "WHERE entity_type = 'video' AND entity_id = ?",
+                [_vid],
+            ).fetchone()
+            _thumb_md = ""
+            if _thumb_row and _thumb_row[0]:
+                import base64
+                _b64 = base64.b64encode(_thumb_row[0]).decode("ascii")
+                _thumb_md = f"\n\n![thumb](data:{_thumb_row[1]};base64,{_b64})"
+            elif _meta[2]:
+                _thumb_md = f"\n\n![thumb]({_meta[2]})"
+            mo.md(
+                f"### {_meta[0]}\n\n"
+                f"- 公開: {_meta[3]} / 再生 {_meta[4]:,} / "
+                f"いいね {_meta[5]:,} / コメント {_meta[6]:,}"
+                f"{_thumb_md}\n\n"
+                f"**説明:**\n\n```\n{_meta[1] or '(なし)'}\n```"
+            )
+        else:
+            mo.md("動画が見つかりません")
+    return
+
+
+@app.cell
+def _(db, mo, video_select):
+    _vid = video_select.value if video_select else None
+    if not _vid:
+        mo.md("")
+    else:
+        _trs = db.conn.execute(
+            "SELECT language, is_generated, text FROM transcripts "
+            "WHERE video_id = ? ORDER BY language",
+            [_vid],
+        ).fetchall()
+        if not _trs:
+            mo.md("**文字起こし:** （未取得）")
+        else:
+            _items = []
+            for _lang, _is_gen, _text in _trs:
+                _label = f"{_lang} ({'自動生成' if _is_gen else '手動'})"
+                _items.append(
+                    mo.accordion({_label: mo.md(f"```\n{_text}\n```")})
+                )
+            mo.vstack([mo.md("**文字起こし:**"), *_items])
+    return
+
+
+@app.cell
+def _(db, mo, pd, video_select):
+    _vid = video_select.value if video_select else None
+    if not _vid:
+        mo.md("")
+    else:
+        _df = db.conn.execute(
+            "SELECT author, text, like_count, published_at, parent_id "
+            "FROM comments WHERE video_id = ? "
+            "ORDER BY (parent_id IS NULL) DESC, published_at DESC",
+            [_vid],
+        ).fetchdf()
+        if isinstance(_df, pd.DataFrame) and not _df.empty:
+            mo.vstack([
+                mo.md(f"**コメント: {len(_df)} 件**"),
+                mo.ui.table(_df, page_size=20),
+            ])
+        else:
+            mo.md("**コメント:** （未取得）")
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md("""
+    ## 8. チャンネル詳細
     """)
     return
 
@@ -375,7 +579,7 @@ def _(channel_table, db, mo, pd):
 @app.cell
 def _(mo):
     mo.md("""
-    ## 7. 履歴データ
+    ## 9. 履歴データ
     """)
     return
 
@@ -407,7 +611,7 @@ def _(alt, db, mo, sync_result):
 @app.cell
 def _(mo):
     mo.md("""
-    ## 8. SQL クエリ
+    ## 10. SQL クエリ
     """)
     return
 
