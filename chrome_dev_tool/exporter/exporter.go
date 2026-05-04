@@ -49,6 +49,16 @@ type Exporter struct {
 	consoleMessages *Counter
 	exceptionsTotal *Counter
 
+	// Derived gauges (computed from consecutive Performance.getMetrics
+	// samples — cheap to expose so Prom users without rate() can read them
+	// directly, and the WebUI shows them in real time).
+	cpuUsagePercent     *Gauge
+	layoutsPerSecond    *Gauge
+	recalcStylesPerSec  *Gauge
+
+	prevMu sync.Mutex
+	prev   *perfSnapshot
+
 	// Lifecycle
 	col   *collector.Collector
 	mu    sync.Mutex
@@ -57,6 +67,13 @@ type Exporter struct {
 		port      int
 		targetURL string
 	}
+}
+
+type perfSnapshot struct {
+	ts                float64 // CDP Timestamp (seconds, monotonic-ish)
+	taskDuration      float64
+	layoutCount       float64
+	recalcStyleCount  float64
 }
 
 func NewExporter(reg *Registry, version string) *Exporter {
@@ -107,6 +124,13 @@ func NewExporter(reg *Registry, version string) *Exporter {
 		"Console / Log messages observed since attach, bucketed by level.")
 	e.exceptionsTotal = reg.NewCounter("chrome_devtools_exceptions_total",
 		"Uncaught exceptions observed since attach.")
+
+	e.cpuUsagePercent = reg.NewGauge("chrome_devtools_cpu_usage_percent",
+		"Renderer CPU usage % computed from ΔTaskDuration / Δt over the last two perf samples.")
+	e.layoutsPerSecond = reg.NewGauge("chrome_devtools_layouts_per_second",
+		"Layout passes per second over the last two perf samples.")
+	e.recalcStylesPerSec = reg.NewGauge("chrome_devtools_recalc_styles_per_second",
+		"Style recalculations per second over the last two perf samples.")
 
 	e.buildInfo.Set(1, map[string]string{"version": version})
 	e.attached.Set(0, nil)
@@ -167,6 +191,11 @@ func (e *Exporter) Stop() {
 		_ = c.Stop()
 	}
 	e.attached.Set(0, nil)
+	// Drop the perf baseline so the first sample after a re-attach doesn't
+	// compute a bogus delta against the previous session.
+	e.prevMu.Lock()
+	e.prev = nil
+	e.prevMu.Unlock()
 	// We leave target_info series in the registry; on next attach the same
 	// label tuple is updated in place. That matches what other Prom
 	// exporters do for "info" gauges.
@@ -252,6 +281,27 @@ func (e *Exporter) Emit(ev events.Event) {
 
 func (e *Exporter) applyPerfSample(m map[string]float64) {
 	get := func(k string) (float64, bool) { v, ok := m[k]; return v, ok }
+
+	// Derive rates from consecutive samples.
+	now := perfSnapshot{
+		ts:               m["Timestamp"],
+		taskDuration:     m["TaskDuration"],
+		layoutCount:      m["LayoutCount"],
+		recalcStyleCount: m["RecalcStyleCount"],
+	}
+	e.prevMu.Lock()
+	prev := e.prev
+	e.prev = &now
+	e.prevMu.Unlock()
+	if prev != nil && now.ts > prev.ts {
+		dt := now.ts - prev.ts
+		if dt > 0 {
+			e.cpuUsagePercent.Set(((now.taskDuration-prev.taskDuration)/dt)*100, nil)
+			e.layoutsPerSecond.Set((now.layoutCount-prev.layoutCount)/dt, nil)
+			e.recalcStylesPerSec.Set((now.recalcStyleCount-prev.recalcStyleCount)/dt, nil)
+		}
+	}
+
 	if v, ok := get("JSHeapUsedSize"); ok {
 		e.jsHeapUsed.Set(v, nil)
 	}

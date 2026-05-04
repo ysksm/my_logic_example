@@ -82,6 +82,9 @@ curl http://localhost:9101/metrics
 | `chrome_devtools_recalc_style_duration_seconds_total` | counter | 累積 style 時間 |
 | `chrome_devtools_script_duration_seconds_total` | counter | 累積 JS 実行時間 |
 | `chrome_devtools_task_duration_seconds_total` | counter | 累積 renderer タスク時間 |
+| `chrome_devtools_cpu_usage_percent` | gauge | renderer CPU 使用率 (%) — `ΔTaskDuration / Δt × 100` |
+| `chrome_devtools_layouts_per_second` | gauge | layout 回数/秒 |
+| `chrome_devtools_recalc_styles_per_second` | gauge | style 再計算/秒 |
 | `chrome_devtools_network_requests_total{method,type}` | counter | 開始したリクエスト数 |
 | `chrome_devtools_network_responses_total{status_class,protocol}` | counter | 受信レスポンス数 |
 | `chrome_devtools_network_failed_total` | counter | 失敗したリクエスト数 |
@@ -90,6 +93,14 @@ curl http://localhost:9101/metrics
 | `chrome_devtools_exceptions_total` | counter | 未捕捉例外 |
 
 ターゲットが落ちたら 5 秒間隔 (`--retry-interval`) で自動的に再 attach する。
+
+CPU 使用率は派生 gauge `chrome_devtools_cpu_usage_percent` を直接読むほか、
+累積カウンタから PromQL で計算することもできる:
+
+```promql
+# 過去 1 分の平均 CPU 使用率 (%)
+rate(chrome_devtools_task_duration_seconds_total[1m]) * 100
+```
 
 `cdt watch` は `--port` を省略すると Chromium を内蔵 launcher で起動する
 (初回のみ `~/.cache/chrome_dev_tool/chromium/<rev>/` に snapshot を DL)。
