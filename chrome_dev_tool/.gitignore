@@ -1,0 +1,9 @@
+bin/
+# Re-include the dist directory itself (the parent .gitignore globally
+# excludes `dist/`); the //go:embed directive needs the empty folder + .keep.
+!web/frontend/dist/
+web/frontend/dist/*
+!web/frontend/dist/.keep
+web/frontend/node_modules/
+web/frontend/tsconfig.tsbuildinfo
+*.ndjson
