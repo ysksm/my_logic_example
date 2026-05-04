@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Step 02 - 基本図形</title>
+    <link rel="stylesheet" href="../common.css">
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+</head>
+<body>
+    <canvas id="renderCanvas"></canvas>
+    <div class="info-panel">
+        <h2>Step 02: 基本図形</h2>
+        MeshBuilder で生成できる主要な図形を並べて表示しています。<br>
+        Box, Sphere, Cylinder, Torus, Plane, Ground
+    </div>
+    <a href="../index.html" class="back-link">← 一覧へ</a>
+
+    <script>
+    const canvas = document.getElementById("renderCanvas");
+    const engine = new BABYLON.Engine(canvas, true);
+
+    const createScene = () => {
+        const scene = new BABYLON.Scene(engine);
+        scene.clearColor = new BABYLON.Color3(0.1, 0.12, 0.18);
+
+        const camera = new BABYLON.ArcRotateCamera(
+            "camera", -Math.PI / 2, Math.PI / 3, 18,
+            new BABYLON.Vector3(0, 0, 0), scene
+        );
+        camera.attachControl(canvas, true);
+
+        new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
+
+        // 地面（参照用のグリッド）
+        const ground = BABYLON.MeshBuilder.CreateGround(
+            "ground", { width: 16, height: 16, subdivisions: 16 }, scene
+        );
+        const groundMat = new BABYLON.StandardMaterial("groundMat", scene);
+        groundMat.diffuseColor = new BABYLON.Color3(0.3, 0.3, 0.35);
+        groundMat.wireframe = true;
+        ground.material = groundMat;
+
+        // 各図形を横に並べる
+        const box = BABYLON.MeshBuilder.CreateBox("box", { size: 1.5 }, scene);
+        box.position.set(-5, 1, 0);
+
+        const sphere = BABYLON.MeshBuilder.CreateSphere(
+            "sphere", { diameter: 1.8 }, scene
+        );
+        sphere.position.set(-2.5, 1, 0);
+
+        const cylinder = BABYLON.MeshBuilder.CreateCylinder(
+            "cylinder", { height: 2, diameter: 1.5 }, scene
+        );
+        cylinder.position.set(0, 1, 0);
+
+        const torus = BABYLON.MeshBuilder.CreateTorus(
+            "torus", { diameter: 2, thickness: 0.5 }, scene
+        );
+        torus.position.set(2.5, 1, 0);
+
+        const plane = BABYLON.MeshBuilder.CreatePlane(
+            "plane", { size: 1.8 }, scene
+        );
+        plane.position.set(5, 1, 0);
+
+        // 図形に色を付けて区別しやすくする
+        const colors = [
+            [0.9, 0.4, 0.4], [0.4, 0.7, 0.9], [0.5, 0.9, 0.5],
+            [0.95, 0.8, 0.3], [0.8, 0.5, 0.9]
+        ];
+        [box, sphere, cylinder, torus, plane].forEach((mesh, i) => {
+            const m = new BABYLON.StandardMaterial(`mat${i}`, scene);
+            m.diffuseColor = new BABYLON.Color3(...colors[i]);
+            m.backFaceCulling = false;  // Plane を裏から見ても表示
+            mesh.material = m;
+        });
+
+        return scene;
+    };
+
+    const scene = createScene();
+    engine.runRenderLoop(() => scene.render());
+    window.addEventListener("resize", () => engine.resize());
+    </script>
+</body>
+</html>

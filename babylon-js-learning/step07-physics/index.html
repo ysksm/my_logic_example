@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Step 07 - 物理（衝突判定）</title>
+    <link rel="stylesheet" href="../common.css">
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <style>
+        .reset-btn {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #bf3434;
+            color: #fff;
+            border: none;
+            padding: 10px 24px;
+            font-size: 14px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="renderCanvas"></canvas>
+    <div class="info-panel">
+        <h2>Step 07: 物理（簡易）</h2>
+        外部物理エンジンを使わず、Babylon.js の <b>moveWithCollisions</b> と<br>
+        手動の重力で球を地面と障害物に衝突させています。<br>
+        球をクリックすると上に跳ねます。
+    </div>
+    <a href="../index.html" class="back-link">← 一覧へ</a>
+    <button class="reset-btn" id="reset">リセット</button>
+
+    <script>
+    const canvas = document.getElementById("renderCanvas");
+    const engine = new BABYLON.Engine(canvas, true);
+
+    const scene = new BABYLON.Scene(engine);
+    scene.clearColor = new BABYLON.Color3(0.6, 0.75, 0.95);
+    scene.collisionsEnabled = true;  // 衝突判定の有効化
+
+    const camera = new BABYLON.ArcRotateCamera(
+        "camera", -Math.PI / 2, Math.PI / 3, 22,
+        new BABYLON.Vector3(0, 1, 0), scene
+    );
+    camera.attachControl(canvas, true);
+
+    new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
+    const dir = new BABYLON.DirectionalLight("dir", new BABYLON.Vector3(-1, -2, -1), scene);
+    dir.intensity = 0.7;
+
+    // 地面
+    const ground = BABYLON.MeshBuilder.CreateGround("ground", { width: 30, height: 30 }, scene);
+    const gMat = new BABYLON.StandardMaterial("gMat", scene);
+    gMat.diffuseColor = new BABYLON.Color3(0.4, 0.55, 0.4);
+    ground.material = gMat;
+    ground.checkCollisions = true;  // 衝突対象に登録
+
+    // 障害物（階段風）
+    for (let i = 0; i < 5; i++) {
+        const step = BABYLON.MeshBuilder.CreateBox("step", {
+            width: 4, height: 0.5, depth: 2
+        }, scene);
+        step.position.set(0, 0.25 + i * 0.5, 5 + i * 2);
+        const m = new BABYLON.StandardMaterial("m", scene);
+        m.diffuseColor = new BABYLON.Color3(0.5, 0.4, 0.3);
+        step.material = m;
+        step.checkCollisions = true;
+    }
+
+    // 落下する球を生成
+    const balls = [];
+    const ballCount = 15;
+    const velocities = new Map();
+
+    const createBalls = () => {
+        balls.forEach(b => b.dispose());
+        balls.length = 0;
+        velocities.clear();
+
+        for (let i = 0; i < ballCount; i++) {
+            const ball = BABYLON.MeshBuilder.CreateSphere(
+                `ball${i}`, { diameter: 0.8 }, scene
+            );
+            ball.position.set(
+                (Math.random() - 0.5) * 6,
+                8 + Math.random() * 4,
+                -5 + (Math.random() - 0.5) * 4
+            );
+            ball.checkCollisions = true;
+            // 衝突判定用の楕円体（球の半径）
+            ball.ellipsoid = new BABYLON.Vector3(0.4, 0.4, 0.4);
+
+            const m = new BABYLON.StandardMaterial(`bm${i}`, scene);
+            m.diffuseColor = new BABYLON.Color3(Math.random(), Math.random(), Math.random());
+            ball.material = m;
+
+            balls.push(ball);
+            velocities.set(ball, new BABYLON.Vector3(0, 0, 0));
+        }
+    };
+    createBalls();
+
+    // 簡易物理シミュレーション（重力 + 衝突）
+    const gravity = new BABYLON.Vector3(0, -0.012, 0);
+    scene.registerBeforeRender(() => {
+        balls.forEach(ball => {
+            const v = velocities.get(ball);
+            v.addInPlace(gravity);
+            const prevY = ball.position.y;
+            ball.moveWithCollisions(v);
+            // 地面/障害物に衝突して上下がほぼ動かなければ縦速度をリセット
+            if (Math.abs(ball.position.y - prevY) < Math.abs(v.y) * 0.5) {
+                v.y *= -0.4;  // 跳ね返り（減衰）
+                v.x *= 0.95;
+                v.z *= 0.95;
+                if (Math.abs(v.y) < 0.02) v.y = 0;
+            }
+        });
+    });
+
+    // クリックした球を上に跳ねさせる
+    scene.onPointerDown = (evt, pickResult) => {
+        if (pickResult.hit && velocities.has(pickResult.pickedMesh)) {
+            const v = velocities.get(pickResult.pickedMesh);
+            v.y = 0.35;
+            v.x += (Math.random() - 0.5) * 0.1;
+            v.z += (Math.random() - 0.5) * 0.1;
+        }
+    };
+
+    document.getElementById("reset").onclick = createBalls;
+
+    engine.runRenderLoop(() => scene.render());
+    window.addEventListener("resize", () => engine.resize());
+    </script>
+</body>
+</html>

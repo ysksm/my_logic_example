@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Step 08 - ユーザー入力</title>
+    <link rel="stylesheet" href="../common.css">
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+</head>
+<body>
+    <canvas id="renderCanvas"></canvas>
+    <div class="info-panel">
+        <h2>Step 08: ユーザー入力</h2>
+        <b>WASD / 矢印キー</b>: プレイヤー（緑）を移動<br>
+        <b>Space</b>: ジャンプ<br>
+        <b>クリック</b>: ボックスを別の色に変更（ピッキング）
+    </div>
+    <a href="../index.html" class="back-link">← 一覧へ</a>
+
+    <script>
+    const canvas = document.getElementById("renderCanvas");
+    const engine = new BABYLON.Engine(canvas, true);
+
+    const scene = new BABYLON.Scene(engine);
+    scene.clearColor = new BABYLON.Color3(0.5, 0.7, 0.9);
+
+    const camera = new BABYLON.ArcRotateCamera(
+        "camera", -Math.PI / 2, Math.PI / 3, 18,
+        new BABYLON.Vector3(0, 0, 0), scene
+    );
+    camera.attachControl(canvas, true);
+
+    new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
+
+    // 地面
+    const ground = BABYLON.MeshBuilder.CreateGround("g", { width: 20, height: 20 }, scene);
+    const gMat = new BABYLON.StandardMaterial("gMat", scene);
+    gMat.diffuseColor = new BABYLON.Color3(0.4, 0.6, 0.4);
+    ground.material = gMat;
+
+    // プレイヤー（緑のキャラ風カプセル）
+    const player = BABYLON.MeshBuilder.CreateCapsule(
+        "player", { radius: 0.4, height: 1.4 }, scene
+    );
+    player.position.y = 0.7;
+    const pMat = new BABYLON.StandardMaterial("pMat", scene);
+    pMat.diffuseColor = new BABYLON.Color3(0.3, 0.85, 0.4);
+    player.material = pMat;
+
+    // クリック対象のボックス群
+    for (let i = 0; i < 8; i++) {
+        const box = BABYLON.MeshBuilder.CreateBox(`b${i}`, { size: 1 }, scene);
+        const angle = (i / 8) * Math.PI * 2;
+        box.position.set(Math.cos(angle) * 6, 0.5, Math.sin(angle) * 6);
+        const m = new BABYLON.StandardMaterial(`m${i}`, scene);
+        m.diffuseColor = new BABYLON.Color3(0.7, 0.5, 0.7);
+        box.material = m;
+        box.metadata = { isClickable: true };
+    }
+
+    // ─── キーボード入力 ───
+    // pressed map に押されているキー名を保持
+    const pressed = {};
+    scene.onKeyboardObservable.add((info) => {
+        const key = info.event.key.toLowerCase();
+        if (info.type === BABYLON.KeyboardEventTypes.KEYDOWN) {
+            pressed[key] = true;
+        } else if (info.type === BABYLON.KeyboardEventTypes.KEYUP) {
+            pressed[key] = false;
+        }
+    });
+
+    // 物理パラメータ
+    const speed = 0.12;
+    let velocityY = 0;
+    const gravity = -0.015;
+    const jumpPower = 0.3;
+
+    scene.registerBeforeRender(() => {
+        // 移動
+        if (pressed["w"] || pressed["arrowup"])    player.position.z += speed;
+        if (pressed["s"] || pressed["arrowdown"])  player.position.z -= speed;
+        if (pressed["a"] || pressed["arrowleft"])  player.position.x -= speed;
+        if (pressed["d"] || pressed["arrowright"]) player.position.x += speed;
+
+        // ジャンプ
+        if (pressed[" "] && player.position.y <= 0.71) {
+            velocityY = jumpPower;
+        }
+        velocityY += gravity;
+        player.position.y += velocityY;
+        if (player.position.y < 0.7) {
+            player.position.y = 0.7;
+            velocityY = 0;
+        }
+    });
+
+    // ─── マウスピッキング ───
+    scene.onPointerDown = (evt, pickResult) => {
+        if (pickResult.hit && pickResult.pickedMesh.metadata?.isClickable) {
+            const m = pickResult.pickedMesh.material;
+            m.diffuseColor = new BABYLON.Color3(
+                Math.random(), Math.random(), Math.random()
+            );
+        }
+    };
+
+    engine.runRenderLoop(() => scene.render());
+    window.addEventListener("resize", () => engine.resize());
+    </script>
+</body>
+</html>

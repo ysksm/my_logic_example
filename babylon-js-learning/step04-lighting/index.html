@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Step 04 - ライティング</title>
+    <link rel="stylesheet" href="../common.css">
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+</head>
+<body>
+    <canvas id="renderCanvas"></canvas>
+    <div class="info-panel">
+        <h2>Step 04: ライティング</h2>
+        4種類のライトを4つの球体に割り当てています。<br>
+        左から: <span style="color:#ffd">Hemispheric</span> / <span style="color:#fcc">Directional</span> / <span style="color:#cfc">Point</span> / <span style="color:#ccf">Spot</span><br>
+        Point ライトは黄色い球がアニメーションで動きます。
+    </div>
+    <a href="../index.html" class="back-link">← 一覧へ</a>
+
+    <script>
+    const canvas = document.getElementById("renderCanvas");
+    const engine = new BABYLON.Engine(canvas, true);
+
+    const createScene = () => {
+        const scene = new BABYLON.Scene(engine);
+        scene.clearColor = new BABYLON.Color3(0.05, 0.05, 0.08);
+
+        const camera = new BABYLON.ArcRotateCamera(
+            "camera", -Math.PI / 2, Math.PI / 2.6, 16,
+            new BABYLON.Vector3(0, 0, 0), scene
+        );
+        camera.attachControl(canvas, true);
+
+        // 4つの球体を並べる
+        const positions = [-5, -1.7, 1.7, 5];
+        const spheres = positions.map((x, i) => {
+            const s = BABYLON.MeshBuilder.CreateSphere(`s${i}`, { diameter: 2 }, scene);
+            s.position.x = x;
+            const m = new BABYLON.StandardMaterial(`m${i}`, scene);
+            m.diffuseColor = new BABYLON.Color3(0.9, 0.9, 0.9);
+            s.material = m;
+            return s;
+        });
+
+        // 各ライトは includedOnlyMeshes で対象球体だけを照らす
+        // ① Hemispheric - 天球光（ambient ライクな全体照明）
+        const hemi = new BABYLON.HemisphericLight(
+            "hemi", new BABYLON.Vector3(0, 1, 0), scene
+        );
+        hemi.diffuse = new BABYLON.Color3(1, 1, 0.6);
+        hemi.includedOnlyMeshes = [spheres[0]];
+
+        // ② Directional - 平行光（太陽光）
+        const dir = new BABYLON.DirectionalLight(
+            "dir", new BABYLON.Vector3(-0.5, -1, -0.5), scene
+        );
+        dir.diffuse = new BABYLON.Color3(1, 0.6, 0.6);
+        dir.intensity = 1.5;
+        dir.includedOnlyMeshes = [spheres[1]];
+
+        // ③ Point - 点光源（電球）
+        const point = new BABYLON.PointLight(
+            "point", new BABYLON.Vector3(1.7, 2, 0), scene
+        );
+        point.diffuse = new BABYLON.Color3(0.6, 1, 0.6);
+        point.intensity = 30;
+        point.includedOnlyMeshes = [spheres[2]];
+
+        // 光源位置を可視化する小さな黄色い球
+        const lightBulb = BABYLON.MeshBuilder.CreateSphere(
+            "bulb", { diameter: 0.2 }, scene
+        );
+        const bulbMat = new BABYLON.StandardMaterial("bulbMat", scene);
+        bulbMat.emissiveColor = new BABYLON.Color3(1, 1, 0);
+        lightBulb.material = bulbMat;
+
+        // ④ Spot - スポットライト（懐中電灯）
+        const spot = new BABYLON.SpotLight(
+            "spot",
+            new BABYLON.Vector3(5, 3, 3),       // 位置
+            new BABYLON.Vector3(0, -1, -1),     // 方向
+            Math.PI / 4,                        // angle: 円錐角
+            2,                                  // exponent: 減衰
+            scene
+        );
+        spot.diffuse = new BABYLON.Color3(0.6, 0.6, 1);
+        spot.intensity = 50;
+        spot.includedOnlyMeshes = [spheres[3]];
+
+        // Point ライトを動かしてリアルタイムに陰影変化を観察
+        let t = 0;
+        scene.registerBeforeRender(() => {
+            t += 0.02;
+            const x = 1.7 + Math.cos(t) * 1.5;
+            const y = 1 + Math.sin(t) * 1;
+            point.position.set(x, y, Math.sin(t * 0.7) * 1.5);
+            lightBulb.position.copyFrom(point.position);
+        });
+
+        return scene;
+    };
+
+    const scene = createScene();
+    engine.runRenderLoop(() => scene.render());
+    window.addEventListener("resize", () => engine.resize());
+    </script>
+</body>
+</html>
