@@ -4,6 +4,35 @@ Chrome の **--remote-debugging-port** に接続し、Network / Console / Perfor
 
 3 種類の Go バックエンド (`chromedp` / `rod` / 自作 WS クライアント) と 3 種類の UI (CLI / WebUI / Wails デスクトップ) を同じ `Collector` インターフェースの上に揃え、Playwright と組み合わせて E2E テストの裏で常時ロギングする使い方も想定している。
 
+## いちばん簡単な使い方 (Mac / Linux / Windows)
+
+```bash
+git clone <repo>
+cd perf-investigator
+make all-bin                              # web をビルドして同梱した1バイナリを生成
+./bin/pi-all -url https://example.com
+```
+
+これだけで:
+
+1. ローカルの Chrome (Mac は `/Applications/Google Chrome.app` を自動検出) を `--remote-debugging-port` 付きで起動
+2. WebUI (`http://localhost:7681`) を立てて自動的に既定ブラウザで開く
+3. rod ベースの Collector が attach してイベントを `./recordings/pi-YYYY-MM-DD.ndjson` に書きながら WebUI に流す
+
+オプション:
+
+| フラグ | 既定値 | 役割 |
+| --- | --- | --- |
+| `-url`     | `https://example.com` | 起動した Chrome で開く URL |
+| `-headless` | `false`              | ヘッドレスで Chrome を立てる |
+| `-chrome`  | (空)                  | Chrome バイナリのパスを明示指定 |
+| `-addr`    | `:7681`               | WebUI のリッスンアドレス |
+| `-no-open` | `false`               | 既定ブラウザを自動で開かない |
+| `-record`  | `./recordings`        | NDJSON 出力ディレクトリ (空文字で無効) |
+| `-source`  | `rod`                 | バックエンド: `rod` / `chromedp` / `raw` |
+
+> Chrome が入っていない環境では rod の launcher が初回に Chromium を自動ダウンロードするので、最初の起動だけ少し時間がかかる。
+
 ```
                                 ┌──────────────┐
        Chrome (port 9222) ─────►│   pkg/cdp    │  自作 WS クライアント

@@ -219,11 +219,8 @@ func (r *Rod) Stop() error {
 	if r.cancel != nil {
 		r.cancel()
 	}
-	if r.browser != nil {
-		// Don't close the *remote* browser — we don't own it.
-		// Just disconnect this client.
-		_ = r.browser.Close
-	}
+	// Don't close the remote browser — when we attached via ControlURL we
+	// don't own its lifecycle. Cancelling the context is enough to detach.
 	return nil
 }
 

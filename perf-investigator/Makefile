@@ -1,9 +1,15 @@
 # perf-investigator build helpers.
-.PHONY: all cli server web wails clean test
+.PHONY: all all-bin cli server web wails clean test
 
 BIN_DIR ?= bin
 
-all: cli server web
+all: all-bin
+
+# Single-binary build: web → embed under cmd/all/dist → go build.
+all-bin: web
+	rm -rf cmd/all/dist
+	cp -r web/dist cmd/all/dist
+	go build -o $(BIN_DIR)/pi-all ./cmd/all
 
 cli:
 	go build -o $(BIN_DIR)/pi-cli ./cmd/cli
@@ -21,4 +27,4 @@ test:
 	go test ./...
 
 clean:
-	rm -rf $(BIN_DIR) web/dist cmd/wails/frontend/dist
+	rm -rf $(BIN_DIR) web/dist cmd/wails/frontend/dist cmd/all/dist
