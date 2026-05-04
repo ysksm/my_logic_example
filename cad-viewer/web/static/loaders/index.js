@@ -13,12 +13,17 @@
 
 import { loadSTL } from "./stl.js";
 import { loadBabylonAsset } from "./babylon.js";
+import { loadOcct } from "./occt.js";
 
 export const loaders = {
   ".stl": loadSTL,
   ".gltf": loadBabylonAsset,
   ".glb": loadBabylonAsset,
   ".obj": loadBabylonAsset,
+  ".step": loadOcct,
+  ".stp": loadOcct,
+  ".iges": loadOcct,
+  ".igs": loadOcct,
 };
 
 export const supportedExtensions = Object.keys(loaders);

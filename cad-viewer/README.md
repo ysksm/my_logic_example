@@ -112,6 +112,20 @@ make test
 | `.stl` | STL ASCII / Binary | サーバ (Go) | `core/stl.go` |
 | `.gltf` / `.glb` | glTF 2.0 | クライアント (Babylon.js Loader) | `web/static/loaders/babylon.js` |
 | `.obj` | Wavefront OBJ | クライアント (Babylon.js Loader) | `web/static/loaders/babylon.js` |
+| `.step` / `.stp` | STEP (ISO 10303) | クライアント (OpenCASCADE/WASM) | `web/static/loaders/occt.js` |
+| `.iges` / `.igs` | IGES | クライアント (OpenCASCADE/WASM) | `web/static/loaders/occt.js` |
+
+STEP/IGES は `web/static/vendor/occt/occt-import-js.{js,wasm}` (約 7.6 MB)
+を必要とします。リポジトリに同梱済みですが、バージョンを上げるときは
+`make vendor-js` で取得し直せます。WASM はファイル選択時まで
+ロードされない遅延読込です。
+
+#### 商用カーネル形式 (Parasolid / ACIS / SolidWorks / CATIA / Inventor)
+
+これらは独自カーネルの SDK が NDA + 有償ライセンス必須のため OSS では
+表示できません。対応するには **CAD Exchanger** や **3D InterOp** などの
+商用 SDK 経由で STEP / glTF / STL に変換するパイプラインを別途用意し、
+本アプリには変換後の中立フォーマットを読ませてください。
 
 新しい形式は `web/static/loaders/<format>.js` を作って
 `loaders/index.js` のレジストリに 1 行加えるだけで追加できます。サーバ側で
