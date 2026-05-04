@@ -212,6 +212,61 @@ func (s *Server) handleTraceStart(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{"recording": true})
 }
 
+func (s *Server) handleLayersStart(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST required", http.StatusMethodNotAllowed)
+		return
+	}
+	cl := s.cdpClient()
+	if cl == nil {
+		writeErr(w, fmt.Errorf("no active collector — start observation first"), http.StatusBadRequest)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	if err := s.layers.start(ctx, cl); err != nil {
+		writeErr(w, err, http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, map[string]any{"observing": true})
+}
+
+func (s *Server) handleLayersStop(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST required", http.StatusMethodNotAllowed)
+		return
+	}
+	cl := s.cdpClient()
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	if err := s.layers.stop(ctx, cl); err != nil {
+		writeErr(w, err, http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, map[string]any{"observing": false})
+}
+
+func (s *Server) handleLayersReasons(w http.ResponseWriter, r *http.Request) {
+	layerID := r.URL.Query().Get("layerId")
+	if layerID == "" {
+		writeErr(w, fmt.Errorf("layerId query parameter is required"), http.StatusBadRequest)
+		return
+	}
+	cl := s.cdpClient()
+	if cl == nil {
+		writeErr(w, fmt.Errorf("no active collector"), http.StatusBadRequest)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	reasons, err := s.layers.compositingReasons(ctx, cl, layerID)
+	if err != nil {
+		writeErr(w, err, http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, map[string]any{"layerId": layerID, "reasons": reasons})
+}
+
 func (s *Server) handleTraceStop(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "POST required", http.StatusMethodNotAllowed)

@@ -82,6 +82,15 @@ export const api = {
       body: JSON.stringify(p),
     });
   },
+  layersStart(): Promise<{ observing: boolean }> {
+    return http('/api/layers/start', { method: 'POST' });
+  },
+  layersStop(): Promise<{ observing: boolean }> {
+    return http('/api/layers/stop', { method: 'POST' });
+  },
+  layersReasons(layerId: string): Promise<{ layerId: string; reasons: string[] }> {
+    return http(`/api/layers/reasons?layerId=${encodeURIComponent(layerId)}`);
+  },
 };
 
 export type NetworkPreset =

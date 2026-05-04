@@ -23,6 +23,9 @@ const (
 	KindPerfMonitor Kind = "perf.monitor"
 	KindPerfMetrics Kind = "perf.metrics"
 
+	KindLayersTree    Kind = "layers.tree"
+	KindLayersPainted Kind = "layers.painted"
+
 	KindMeta Kind = "meta"
 )
 
@@ -87,4 +90,34 @@ type PerfSample struct {
 type Meta struct {
 	Message string         `json:"message"`
 	Extra   map[string]any `json:"extra,omitempty"`
+}
+
+// Layer mirrors LayerTree.Layer (subset CDP exposes per layer).
+type Layer struct {
+	LayerID         string    `json:"layerId"`
+	ParentLayerID   string    `json:"parentLayerId,omitempty"`
+	BackendNodeID   int       `json:"backendNodeId,omitempty"`
+	OffsetX         float64   `json:"offsetX"`
+	OffsetY         float64   `json:"offsetY"`
+	Width           float64   `json:"width"`
+	Height          float64   `json:"height"`
+	PaintCount      int       `json:"paintCount,omitempty"`
+	DrawsContent    bool      `json:"drawsContent"`
+	Invisible       bool      `json:"invisible,omitempty"`
+	Transform       []float64 `json:"transform,omitempty"`
+	ScrollRectCount int       `json:"scrollRectCount,omitempty"`
+}
+
+// LayerTree is the payload of KindLayersTree (snapshot of the compositing tree).
+type LayerTree struct {
+	Layers []Layer `json:"layers"`
+}
+
+// LayerPainted is the payload of KindLayersPainted (one rect repainted).
+type LayerPainted struct {
+	LayerID string  `json:"layerId"`
+	X       float64 `json:"x"`
+	Y       float64 `json:"y"`
+	Width   float64 `json:"width"`
+	Height  float64 `json:"height"`
 }

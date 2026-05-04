@@ -28,6 +28,7 @@ type Server struct {
 	subs   map[*subscriber]struct{}
 
 	tracer tracer
+	layers layerCollector
 }
 
 // State is the snapshot returned from /api/state.
@@ -61,6 +62,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/render", s.handleRender)
 	mux.HandleFunc("/api/trace/start", s.handleTraceStart)
 	mux.HandleFunc("/api/trace/stop", s.handleTraceStop)
+	mux.HandleFunc("/api/layers/start", s.handleLayersStart)
+	mux.HandleFunc("/api/layers/stop", s.handleLayersStop)
+	mux.HandleFunc("/api/layers/reasons", s.handleLayersReasons)
 	mux.HandleFunc("/ws", s.handleWS)
 	mux.Handle("/", spaHandler())
 	return cors(mux)
@@ -140,6 +144,9 @@ func (s *Server) startCollector(ctx context.Context, p StartParams) error {
 	// drop events whenever tracer.active is false, so they're harmless
 	// before the first /api/trace/start.
 	s.tracer.wire(c.Client())
+	// Same pattern for layer events — handlers register once per attach
+	// and gate themselves on layers.active.
+	s.layers.wire(c.Client(), s.Emit)
 	return nil
 }
 

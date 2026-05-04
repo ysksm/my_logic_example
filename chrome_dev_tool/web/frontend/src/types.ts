@@ -10,6 +10,8 @@ export type EventKind =
   | 'exception'
   | 'perf.monitor'
   | 'perf.metrics'
+  | 'layers.tree'
+  | 'layers.painted'
   | 'meta';
 
 export interface CDTEvent<T = unknown> {
@@ -50,6 +52,33 @@ export interface ConsoleEntry {
 export interface PerfSample {
   title: string;
   metrics: Record<string, number>;
+}
+
+export interface Layer {
+  layerId: string;
+  parentLayerId?: string;
+  backendNodeId?: number;
+  offsetX: number;
+  offsetY: number;
+  width: number;
+  height: number;
+  paintCount?: number;
+  drawsContent: boolean;
+  invisible?: boolean;
+  transform?: number[];
+  scrollRectCount?: number;
+}
+
+export interface LayerTree {
+  layers: Layer[];
+}
+
+export interface LayerPainted {
+  layerId: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 
 export interface CDPTarget {

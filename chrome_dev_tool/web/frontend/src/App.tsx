@@ -3,6 +3,9 @@ import { api, openEventStream } from './api';
 import type {
   CDTEvent,
   ConsoleEntry,
+  Layer,
+  LayerPainted,
+  LayerTree,
   NetworkRequest,
   NetworkResponse,
   PerfSample,
@@ -13,12 +16,19 @@ import { ConsolePanel, type ConsoleRow } from './components/ConsolePanel';
 import { PerformanceMonitorPanel } from './components/PerformanceMonitorPanel';
 import { PerformancePanel } from './components/PerformancePanel';
 import { RenderingPanel } from './components/RenderingPanel';
+import { LayersPanel } from './components/LayersPanel';
 
 const MAX_NET = 1500;
 const MAX_CONSOLE = 1500;
 const MAX_PERF_HISTORY = 120;
 
-type Tab = 'network' | 'console' | 'performance' | 'perfMonitor' | 'rendering';
+type Tab =
+  | 'network'
+  | 'console'
+  | 'performance'
+  | 'perfMonitor'
+  | 'rendering'
+  | 'layers';
 
 export function App() {
   const [state, setState] = useState<State>({
@@ -45,6 +55,8 @@ export function App() {
   const [consoleRows, setConsoleRows] = useState<ConsoleRow[]>([]);
   const [perfLatest, setPerfLatest] = useState<Record<string, number>>({});
   const [perfSampleSeq, setPerfSampleSeq] = useState(0);
+  const [layers, setLayers] = useState<Layer[]>([]);
+  const [layerFlash, setLayerFlash] = useState<LayerPainted | null>(null);
   const perfHistRef = useRef<Record<string, number[]>>({});
   const perfTimesRef = useRef<number[]>([]);
   const perfPrevRef = useRef<{ ts: number; m: Record<string, number> } | null>(null);
@@ -119,6 +131,16 @@ export function App() {
             line: d.line,
           }),
         );
+        break;
+      }
+      case 'layers.tree': {
+        const d = ev.data as LayerTree;
+        setLayers(d.layers ?? []);
+        break;
+      }
+      case 'layers.painted': {
+        const d = ev.data as LayerPainted;
+        setLayerFlash({ ...d });
         break;
       }
       case 'perf.monitor': {
@@ -314,6 +336,15 @@ export function App() {
         >
           レンダリング
         </button>
+        <button
+          className={`tab ${tab === 'layers' ? 'active' : ''}`}
+          onClick={() => setTab('layers')}
+        >
+          レイヤ
+          {layers.length > 0 && (
+            <span className="badge">{layers.length}</span>
+          )}
+        </button>
       </div>
 
       <div className="tab-host">
@@ -334,6 +365,7 @@ export function App() {
           />
         )}
         {tab === 'rendering' && <RenderingPanel />}
+        {tab === 'layers' && <LayersPanel layers={layers} paintFlash={layerFlash} />}
       </div>
     </div>
   );
