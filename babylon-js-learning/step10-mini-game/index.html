@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Step 10 - ミニゲーム</title>
+    <link rel="stylesheet" href="../common.css">
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <script src="https://cdn.babylonjs.com/gui/babylon.gui.min.js"></script>
+</head>
+<body>
+    <canvas id="renderCanvas"></canvas>
+    <div class="info-panel">
+        <h2>Step 10: コイン収集ゲーム</h2>
+        <b>WASD / 矢印キー</b>でプレイヤーを動かして<br>
+        散らばった金色のコインを全て集めよう！<br>
+        Step 01～09 の要素の総まとめです。
+    </div>
+    <a href="../index.html" class="back-link">← 一覧へ</a>
+
+    <script>
+    const canvas = document.getElementById("renderCanvas");
+    const engine = new BABYLON.Engine(canvas, true);
+
+    const scene = new BABYLON.Scene(engine);
+    scene.clearColor = new BABYLON.Color3(0.5, 0.75, 0.95);
+
+    // フォローカメラの対象用ベース
+    new BABYLON.HemisphericLight("hemi", new BABYLON.Vector3(0, 1, 0), scene);
+    const dir = new BABYLON.DirectionalLight("dir", new BABYLON.Vector3(-1, -2, -1), scene);
+    dir.intensity = 0.6;
+
+    // 地面
+    const groundSize = 30;
+    const ground = BABYLON.MeshBuilder.CreateGround(
+        "ground", { width: groundSize, height: groundSize }, scene
+    );
+    const gMat = new BABYLON.StandardMaterial("gMat", scene);
+    gMat.diffuseColor = new BABYLON.Color3(0.4, 0.65, 0.4);
+    ground.material = gMat;
+
+    // 壁（外周）
+    const wallMat = new BABYLON.StandardMaterial("wallMat", scene);
+    wallMat.diffuseColor = new BABYLON.Color3(0.5, 0.4, 0.3);
+    const makeWall = (w, h, d, x, z) => {
+        const wall = BABYLON.MeshBuilder.CreateBox("wall", { width: w, height: h, depth: d }, scene);
+        wall.position.set(x, h / 2, z);
+        wall.material = wallMat;
+        return wall;
+    };
+    makeWall(groundSize, 1, 0.5, 0, groundSize / 2);
+    makeWall(groundSize, 1, 0.5, 0, -groundSize / 2);
+    makeWall(0.5, 1, groundSize, groundSize / 2, 0);
+    makeWall(0.5, 1, groundSize, -groundSize / 2, 0);
+
+    // 障害物（ランダム配置のボックス）
+    const obstacles = [];
+    for (let i = 0; i < 8; i++) {
+        const size = 1 + Math.random() * 2;
+        const obs = BABYLON.MeshBuilder.CreateBox("obs", { size }, scene);
+        obs.position.set(
+            (Math.random() - 0.5) * (groundSize - 4),
+            size / 2,
+            (Math.random() - 0.5) * (groundSize - 4)
+        );
+        const om = new BABYLON.StandardMaterial("om", scene);
+        om.diffuseColor = new BABYLON.Color3(0.3, 0.3, 0.4);
+        obs.material = om;
+        obstacles.push(obs);
+    }
+
+    // プレイヤー
+    const player = BABYLON.MeshBuilder.CreateSphere("player", { diameter: 1 }, scene);
+    player.position.y = 0.5;
+    const pMat = new BABYLON.StandardMaterial("pMat", scene);
+    pMat.diffuseColor = new BABYLON.Color3(0.95, 0.3, 0.3);
+    pMat.emissiveColor = new BABYLON.Color3(0.3, 0, 0);
+    player.material = pMat;
+
+    // フォローカメラで追跡
+    const camera = new BABYLON.FollowCamera(
+        "follow", new BABYLON.Vector3(0, 8, -10), scene
+    );
+    camera.lockedTarget = player;
+    camera.radius = 10;
+    camera.heightOffset = 6;
+    camera.rotationOffset = 180;
+    camera.cameraAcceleration = 0.05;
+    camera.maxCameraSpeed = 20;
+
+    // コイン生成
+    const coins = [];
+    const totalCoins = 12;
+    const coinMat = new BABYLON.StandardMaterial("coinMat", scene);
+    coinMat.diffuseColor = new BABYLON.Color3(1, 0.85, 0.2);
+    coinMat.emissiveColor = new BABYLON.Color3(0.5, 0.4, 0);
+    coinMat.specularColor = new BABYLON.Color3(1, 1, 1);
+
+    const isOverlapping = (pos) => {
+        for (const obs of obstacles) {
+            if (BABYLON.Vector3.Distance(pos, obs.position) < 2) return true;
+        }
+        for (const c of coins) {
+            if (BABYLON.Vector3.Distance(pos, c.position) < 1.5) return true;
+        }
+        if (BABYLON.Vector3.Distance(pos, player.position) < 2) return true;
+        return false;
+    };
+
+    for (let i = 0; i < totalCoins; i++) {
+        const coin = BABYLON.MeshBuilder.CreateCylinder(
+            `coin${i}`, { height: 0.15, diameter: 0.7 }, scene
+        );
+        let pos;
+        let attempts = 0;
+        do {
+            pos = new BABYLON.Vector3(
+                (Math.random() - 0.5) * (groundSize - 4),
+                0.5,
+                (Math.random() - 0.5) * (groundSize - 4)
+            );
+            attempts++;
+        } while (isOverlapping(pos) && attempts < 30);
+
+        coin.position = pos;
+        coin.rotation.x = Math.PI / 2;
+        coin.material = coinMat;
+        coins.push(coin);
+    }
+
+    // コインのアニメーション（回転と上下浮遊）
+    let coinTime = 0;
+    scene.registerBeforeRender(() => {
+        coinTime += 0.05;
+        coins.forEach((c, i) => {
+            if (!c.isDisposed()) {
+                c.rotation.y += 0.05;
+                c.position.y = 0.5 + Math.sin(coinTime + i) * 0.15;
+            }
+        });
+    });
+
+    // 入力管理
+    const pressed = {};
+    scene.onKeyboardObservable.add((info) => {
+        const key = info.event.key.toLowerCase();
+        if (info.type === BABYLON.KeyboardEventTypes.KEYDOWN) pressed[key] = true;
+        if (info.type === BABYLON.KeyboardEventTypes.KEYUP)   pressed[key] = false;
+    });
+
+    // ゲーム状態
+    let score = 0;
+    let gameStartTime = Date.now();
+    let gameOver = false;
+
+    // GUI
+    const ui = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("UI");
+
+    const scoreText = new BABYLON.GUI.TextBlock();
+    scoreText.text = `コイン: 0 / ${totalCoins}`;
+    scoreText.color = "white";
+    scoreText.fontSize = 28;
+    scoreText.fontStyle = "bold";
+    scoreText.top = "20px";
+    scoreText.shadowColor = "black";
+    scoreText.shadowBlur = 4;
+    scoreText.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_TOP;
+    ui.addControl(scoreText);
+
+    const timerText = new BABYLON.GUI.TextBlock();
+    timerText.text = "Time: 0.0s";
+    timerText.color = "white";
+    timerText.fontSize = 22;
+    timerText.top = "60px";
+    timerText.shadowColor = "black";
+    timerText.shadowBlur = 4;
+    timerText.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_TOP;
+    ui.addControl(timerText);
+
+    const winText = new BABYLON.GUI.TextBlock();
+    winText.color = "#ffd54a";
+    winText.fontSize = 64;
+    winText.fontStyle = "bold";
+    winText.shadowColor = "black";
+    winText.shadowBlur = 6;
+    winText.isVisible = false;
+    ui.addControl(winText);
+
+    // 衝突判定（簡易：距離ベース）
+    const collidesWithObstacle = (pos) => {
+        for (const obs of obstacles) {
+            const dx = Math.abs(pos.x - obs.position.x);
+            const dz = Math.abs(pos.z - obs.position.z);
+            const r = obs.scaling.x * 0.5 + 0.5;
+            const half = obs.getBoundingInfo().boundingBox.extendSize.x + 0.5;
+            if (dx < half && dz < half) return true;
+        }
+        // 壁との衝突
+        const limit = groundSize / 2 - 0.7;
+        if (Math.abs(pos.x) > limit || Math.abs(pos.z) > limit) return true;
+        return false;
+    };
+
+    // ゲームループ
+    const speed = 0.18;
+    scene.registerBeforeRender(() => {
+        if (gameOver) return;
+
+        // 入力で次の位置を計算してから当たり判定
+        const next = player.position.clone();
+        if (pressed["w"] || pressed["arrowup"])    next.z += speed;
+        if (pressed["s"] || pressed["arrowdown"])  next.z -= speed;
+        if (pressed["a"] || pressed["arrowleft"])  next.x -= speed;
+        if (pressed["d"] || pressed["arrowright"]) next.x += speed;
+
+        // 軸ごとに判定して滑るように
+        const tryX = player.position.clone(); tryX.x = next.x;
+        if (!collidesWithObstacle(tryX)) player.position.x = next.x;
+        const tryZ = player.position.clone(); tryZ.z = next.z;
+        if (!collidesWithObstacle(tryZ)) player.position.z = next.z;
+
+        // コイン取得
+        for (const c of coins) {
+            if (!c.isDisposed() &&
+                BABYLON.Vector3.Distance(player.position, c.position) < 0.9) {
+                c.dispose();
+                score++;
+                scoreText.text = `コイン: ${score} / ${totalCoins}`;
+
+                // 取得アニメーション（ちょっと光らせる）
+                pMat.emissiveColor = new BABYLON.Color3(1, 0.8, 0);
+                setTimeout(() => {
+                    pMat.emissiveColor = new BABYLON.Color3(0.3, 0, 0);
+                }, 150);
+            }
+        }
+
+        // タイマー
+        const elapsed = (Date.now() - gameStartTime) / 1000;
+        timerText.text = `Time: ${elapsed.toFixed(1)}s`;
+
+        // クリア判定
+        if (score >= totalCoins) {
+            gameOver = true;
+            winText.text = `クリア!\n${elapsed.toFixed(1)}秒`;
+            winText.isVisible = true;
+        }
+    });
+
+    engine.runRenderLoop(() => scene.render());
+    window.addEventListener("resize", () => engine.resize());
+    </script>
+</body>
+</html>

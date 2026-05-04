@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Step 09 - GUI</title>
+    <link rel="stylesheet" href="../common.css">
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <script src="https://cdn.babylonjs.com/gui/babylon.gui.min.js"></script>
+</head>
+<body>
+    <canvas id="renderCanvas"></canvas>
+    <div class="info-panel">
+        <h2>Step 09: GUI</h2>
+        babylon.gui を使って canvas 上にボタン・スライダー・ラベルを<br>
+        オーバーレイ表示しています。
+    </div>
+    <a href="../index.html" class="back-link">← 一覧へ</a>
+
+    <script>
+    const canvas = document.getElementById("renderCanvas");
+    const engine = new BABYLON.Engine(canvas, true);
+
+    const scene = new BABYLON.Scene(engine);
+    scene.clearColor = new BABYLON.Color3(0.1, 0.12, 0.18);
+
+    const camera = new BABYLON.ArcRotateCamera(
+        "camera", -Math.PI / 2, Math.PI / 2.5, 6,
+        new BABYLON.Vector3(0, 0, 0), scene
+    );
+    camera.attachControl(canvas, true);
+
+    new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
+
+    // 操作対象の球
+    const sphere = BABYLON.MeshBuilder.CreateSphere("s", { diameter: 2 }, scene);
+    const mat = new BABYLON.StandardMaterial("mat", scene);
+    mat.diffuseColor = new BABYLON.Color3(0.4, 0.7, 0.95);
+    sphere.material = mat;
+
+    let isRotating = true;
+    scene.registerBeforeRender(() => {
+        if (isRotating) sphere.rotation.y += 0.01;
+    });
+
+    // ─── GUI ───
+    // フルスクリーン UI を作成（DOM ではなく canvas 上の描画）
+    const advancedTexture = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("UI");
+
+    // 縦並びのコンテナ
+    const panel = new BABYLON.GUI.StackPanel();
+    panel.width = "260px";
+    panel.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_RIGHT;
+    panel.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_CENTER;
+    panel.paddingRight = "20px";
+    advancedTexture.addControl(panel);
+
+    // ① ヘッダー
+    const header = new BABYLON.GUI.TextBlock();
+    header.text = "コントロール";
+    header.height = "40px";
+    header.color = "white";
+    header.fontSize = 20;
+    panel.addControl(header);
+
+    // ② スライダー（球のスケール）
+    const sliderLabel = new BABYLON.GUI.TextBlock();
+    sliderLabel.text = "Scale: 1.0";
+    sliderLabel.height = "30px";
+    sliderLabel.color = "white";
+    panel.addControl(sliderLabel);
+
+    const slider = new BABYLON.GUI.Slider();
+    slider.minimum = 0.3;
+    slider.maximum = 2.5;
+    slider.value = 1;
+    slider.height = "20px";
+    slider.width = "220px";
+    slider.color = "#bf3434";
+    slider.background = "#444";
+    slider.onValueChangedObservable.add((v) => {
+        sphere.scaling.setAll(v);
+        sliderLabel.text = `Scale: ${v.toFixed(2)}`;
+    });
+    panel.addControl(slider);
+
+    // 余白
+    const sp1 = new BABYLON.GUI.Rectangle();
+    sp1.height = "16px";
+    sp1.thickness = 0;
+    panel.addControl(sp1);
+
+    // ③ 色変更ボタン
+    const colors = [
+        ["赤", new BABYLON.Color3(0.9, 0.3, 0.3)],
+        ["緑", new BABYLON.Color3(0.3, 0.85, 0.4)],
+        ["青", new BABYLON.Color3(0.4, 0.7, 0.95)],
+    ];
+    colors.forEach(([name, color]) => {
+        const btn = BABYLON.GUI.Button.CreateSimpleButton(`btn-${name}`, `${name}にする`);
+        btn.width = "220px";
+        btn.height = "36px";
+        btn.color = "white";
+        btn.background = "#444";
+        btn.cornerRadius = 6;
+        btn.thickness = 0;
+        btn.paddingTop = "4px";
+        btn.paddingBottom = "4px";
+        btn.onPointerClickObservable.add(() => {
+            mat.diffuseColor = color;
+        });
+        panel.addControl(btn);
+    });
+
+    // ④ 回転 ON/OFF チェックボックス
+    const sp2 = new BABYLON.GUI.Rectangle();
+    sp2.height = "16px";
+    sp2.thickness = 0;
+    panel.addControl(sp2);
+
+    const checkContainer = new BABYLON.GUI.StackPanel();
+    checkContainer.isVertical = false;
+    checkContainer.height = "40px";
+    panel.addControl(checkContainer);
+
+    const checkbox = new BABYLON.GUI.Checkbox();
+    checkbox.width = "20px";
+    checkbox.height = "20px";
+    checkbox.isChecked = true;
+    checkbox.color = "#bf3434";
+    checkbox.onIsCheckedChangedObservable.add((v) => isRotating = v);
+    checkContainer.addControl(checkbox);
+
+    const checkLabel = new BABYLON.GUI.TextBlock();
+    checkLabel.text = "  自動回転";
+    checkLabel.color = "white";
+    checkLabel.width = "150px";
+    checkLabel.fontSize = 14;
+    checkContainer.addControl(checkLabel);
+
+    engine.runRenderLoop(() => scene.render());
+    window.addEventListener("resize", () => engine.resize());
+    </script>
+</body>
+</html>

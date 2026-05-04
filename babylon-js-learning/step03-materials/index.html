@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Step 03 - マテリアルとテクスチャ</title>
+    <link rel="stylesheet" href="../common.css">
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+</head>
+<body>
+    <canvas id="renderCanvas"></canvas>
+    <div class="info-panel">
+        <h2>Step 03: マテリアル</h2>
+        左から: 単色 / ワイヤーフレーム / 半透明 / テクスチャ / 反射(specular)<br>
+        StandardMaterial の主要プロパティを比較できます。
+    </div>
+    <a href="../index.html" class="back-link">← 一覧へ</a>
+
+    <script>
+    const canvas = document.getElementById("renderCanvas");
+    const engine = new BABYLON.Engine(canvas, true);
+
+    const createScene = () => {
+        const scene = new BABYLON.Scene(engine);
+        scene.clearColor = new BABYLON.Color3(0.1, 0.12, 0.18);
+
+        const camera = new BABYLON.ArcRotateCamera(
+            "camera", -Math.PI / 2, Math.PI / 2.5, 14,
+            new BABYLON.Vector3(0, 0, 0), scene
+        );
+        camera.attachControl(canvas, true);
+
+        const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
+        light.intensity = 0.8;
+        const dir = new BABYLON.DirectionalLight("dir", new BABYLON.Vector3(-1, -2, -1), scene);
+        dir.intensity = 0.6;
+
+        const makeSphere = (x) => {
+            const s = BABYLON.MeshBuilder.CreateSphere("s", { diameter: 1.8 }, scene);
+            s.position.x = x;
+            return s;
+        };
+
+        // ① 単色マテリアル
+        const m1 = new BABYLON.StandardMaterial("m1", scene);
+        m1.diffuseColor = new BABYLON.Color3(0.85, 0.3, 0.3);  // 拡散反射色（基本色）
+        makeSphere(-5).material = m1;
+
+        // ② ワイヤーフレーム
+        const m2 = new BABYLON.StandardMaterial("m2", scene);
+        m2.diffuseColor = new BABYLON.Color3(0.3, 0.85, 0.5);
+        m2.wireframe = true;
+        makeSphere(-2.5).material = m2;
+
+        // ③ 半透明（alpha）
+        const m3 = new BABYLON.StandardMaterial("m3", scene);
+        m3.diffuseColor = new BABYLON.Color3(0.3, 0.5, 0.95);
+        m3.alpha = 0.4;  // 0.0(透明) ~ 1.0(不透明)
+        makeSphere(0).material = m3;
+
+        // ④ テクスチャ画像（CDN 上の例）
+        const m4 = new BABYLON.StandardMaterial("m4", scene);
+        m4.diffuseTexture = new BABYLON.Texture(
+            "https://playground.babylonjs.com/textures/grass.png", scene
+        );
+        makeSphere(2.5).material = m4;
+
+        // ⑤ Specular（鏡面反射）+ emissive
+        const m5 = new BABYLON.StandardMaterial("m5", scene);
+        m5.diffuseColor = new BABYLON.Color3(0.6, 0.6, 0.7);
+        m5.specularColor = new BABYLON.Color3(1, 1, 1);  // 反射ハイライト色
+        m5.specularPower = 64;                           // 値が大きいほどシャープ
+        m5.emissiveColor = new BABYLON.Color3(0.1, 0.05, 0); // 自己発光
+        makeSphere(5).material = m5;
+
+        // 地面
+        const ground = BABYLON.MeshBuilder.CreateGround("g", { width: 20, height: 8 }, scene);
+        ground.position.y = -1.5;
+        const gMat = new BABYLON.StandardMaterial("gMat", scene);
+        gMat.diffuseColor = new BABYLON.Color3(0.2, 0.2, 0.25);
+        ground.material = gMat;
+
+        return scene;
+    };
+
+    const scene = createScene();
+    engine.runRenderLoop(() => scene.render());
+    window.addEventListener("resize", () => engine.resize());
+    </script>
+</body>
+</html>

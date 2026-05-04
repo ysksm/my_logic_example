@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Step 06 - アニメーション</title>
+    <link rel="stylesheet" href="../common.css">
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+</head>
+<body>
+    <canvas id="renderCanvas"></canvas>
+    <div class="info-panel">
+        <h2>Step 06: アニメーション</h2>
+        <b>赤箱</b>: position.y を上下移動（キーフレーム）<br>
+        <b>緑箱</b>: rotation.y を回転（loop モード）<br>
+        <b>青箱</b>: scaling を拡大縮小（イージング付き）<br>
+        <b>黄箱</b>: registerBeforeRender による手動アニメーション
+    </div>
+    <a href="../index.html" class="back-link">← 一覧へ</a>
+
+    <script>
+    const canvas = document.getElementById("renderCanvas");
+    const engine = new BABYLON.Engine(canvas, true);
+
+    const scene = new BABYLON.Scene(engine);
+    scene.clearColor = new BABYLON.Color3(0.1, 0.12, 0.18);
+
+    const camera = new BABYLON.ArcRotateCamera(
+        "camera", -Math.PI / 2, Math.PI / 2.8, 14,
+        new BABYLON.Vector3(0, 1, 0), scene
+    );
+    camera.attachControl(canvas, true);
+
+    new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
+
+    const makeBox = (x, color) => {
+        const b = BABYLON.MeshBuilder.CreateBox("b", { size: 1.5 }, scene);
+        b.position.set(x, 1, 0);
+        const m = new BABYLON.StandardMaterial("m", scene);
+        m.diffuseColor = color;
+        b.material = m;
+        return b;
+    };
+
+    const red = makeBox(-4.5, new BABYLON.Color3(0.9, 0.3, 0.3));
+    const green = makeBox(-1.5, new BABYLON.Color3(0.3, 0.9, 0.4));
+    const blue = makeBox(1.5, new BABYLON.Color3(0.3, 0.5, 0.95));
+    const yellow = makeBox(4.5, new BABYLON.Color3(0.95, 0.85, 0.3));
+
+    // ─── ① キーフレームによる上下移動 ───
+    // 引数: 名前, プロパティパス, fps, データ型, ループモード
+    const moveAnim = new BABYLON.Animation(
+        "move", "position.y", 30,
+        BABYLON.Animation.ANIMATIONTYPE_FLOAT,
+        BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE
+    );
+    moveAnim.setKeys([
+        { frame: 0,  value: 1 },
+        { frame: 30, value: 3 },
+        { frame: 60, value: 1 },
+    ]);
+    red.animations = [moveAnim];
+    scene.beginAnimation(red, 0, 60, true);
+
+    // ─── ② 回転 ───
+    const rotAnim = new BABYLON.Animation(
+        "rot", "rotation.y", 30,
+        BABYLON.Animation.ANIMATIONTYPE_FLOAT,
+        BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE
+    );
+    rotAnim.setKeys([
+        { frame: 0,  value: 0 },
+        { frame: 90, value: Math.PI * 2 },
+    ]);
+    green.animations = [rotAnim];
+    scene.beginAnimation(green, 0, 90, true);
+
+    // ─── ③ スケール（イージング付き） ───
+    const scaleAnim = new BABYLON.Animation(
+        "scale", "scaling", 30,
+        BABYLON.Animation.ANIMATIONTYPE_VECTOR3,
+        BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE
+    );
+    scaleAnim.setKeys([
+        { frame: 0,  value: new BABYLON.Vector3(1, 1, 1) },
+        { frame: 30, value: new BABYLON.Vector3(1.6, 1.6, 1.6) },
+        { frame: 60, value: new BABYLON.Vector3(1, 1, 1) },
+    ]);
+    // バウンドのようなイージング
+    const easing = new BABYLON.BounceEase(2, 4);
+    easing.setEasingMode(BABYLON.EasingFunction.EASINGMODE_EASEOUT);
+    scaleAnim.setEasingFunction(easing);
+
+    blue.animations = [scaleAnim];
+    scene.beginAnimation(blue, 0, 60, true);
+
+    // ─── ④ registerBeforeRender による手動アニメーション ───
+    let t = 0;
+    scene.registerBeforeRender(() => {
+        t += engine.getDeltaTime() * 0.001;  // 秒単位
+        yellow.position.y = 1 + Math.abs(Math.sin(t * 3)) * 1.5;
+        yellow.rotation.x = t;
+        yellow.rotation.z = t * 0.7;
+    });
+
+    // 地面
+    const ground = BABYLON.MeshBuilder.CreateGround("g", { width: 16, height: 6 }, scene);
+    const gMat = new BABYLON.StandardMaterial("gMat", scene);
+    gMat.diffuseColor = new BABYLON.Color3(0.25, 0.25, 0.3);
+    ground.material = gMat;
+
+    engine.runRenderLoop(() => scene.render());
+    window.addEventListener("resize", () => engine.resize());
+    </script>
+</body>
+</html>

@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Step 05 - カメラ</title>
+    <link rel="stylesheet" href="../common.css">
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <style>
+        .camera-switch {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 8px;
+            background: rgba(0,0,0,0.65);
+            padding: 8px;
+            border-radius: 8px;
+        }
+        .camera-switch button {
+            background: #333;
+            color: #fff;
+            border: 1px solid #555;
+            padding: 8px 14px;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        .camera-switch button.active {
+            background: #bf3434;
+            border-color: #bf3434;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="renderCanvas"></canvas>
+    <div class="info-panel">
+        <h2>Step 05: カメラ</h2>
+        下のボタンでカメラを切り替えできます。<br>
+        <b>ArcRotate</b>: ターゲット周回（マウス操作）<br>
+        <b>Universal</b>: FPS視点（WASDで移動、ドラッグで視点）<br>
+        <b>Follow</b>: 動く対象を自動追従
+    </div>
+    <a href="../index.html" class="back-link">← 一覧へ</a>
+    <div class="camera-switch">
+        <button id="btn-arc" class="active">ArcRotate</button>
+        <button id="btn-uni">Universal (WASD)</button>
+        <button id="btn-fol">Follow</button>
+    </div>
+
+    <script>
+    const canvas = document.getElementById("renderCanvas");
+    const engine = new BABYLON.Engine(canvas, true);
+
+    const scene = new BABYLON.Scene(engine);
+    scene.clearColor = new BABYLON.Color3(0.5, 0.7, 0.9);
+
+    // ライト
+    new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
+
+    // 地面（市松模様）
+    const ground = BABYLON.MeshBuilder.CreateGround(
+        "ground", { width: 50, height: 50, subdivisions: 4 }, scene
+    );
+    const gMat = new BABYLON.StandardMaterial("gMat", scene);
+    gMat.diffuseColor = new BABYLON.Color3(0.4, 0.6, 0.4);
+    ground.material = gMat;
+
+    // 周辺にいくつかボックスを配置
+    for (let i = 0; i < 12; i++) {
+        const box = BABYLON.MeshBuilder.CreateBox(`b${i}`, { size: 1 + Math.random() * 2 }, scene);
+        const angle = (i / 12) * Math.PI * 2;
+        box.position.set(Math.cos(angle) * 8, 1, Math.sin(angle) * 8);
+        const m = new BABYLON.StandardMaterial(`m${i}`, scene);
+        m.diffuseColor = new BABYLON.Color3(Math.random(), Math.random(), Math.random());
+        box.material = m;
+    }
+
+    // 動く対象（赤い球）— Follow カメラの追跡対象にもなる
+    const target = BABYLON.MeshBuilder.CreateSphere("target", { diameter: 1 }, scene);
+    const tMat = new BABYLON.StandardMaterial("tMat", scene);
+    tMat.diffuseColor = new BABYLON.Color3(1, 0.2, 0.2);
+    tMat.emissiveColor = new BABYLON.Color3(0.4, 0, 0);
+    target.material = tMat;
+    target.position.y = 0.5;
+
+    let t = 0;
+    scene.registerBeforeRender(() => {
+        t += 0.01;
+        target.position.x = Math.cos(t) * 5;
+        target.position.z = Math.sin(t) * 5;
+    });
+
+    // ─── 3種類のカメラを作成 ───
+    const arcCamera = new BABYLON.ArcRotateCamera(
+        "arc", -Math.PI / 2, Math.PI / 3, 18,
+        new BABYLON.Vector3(0, 1, 0), scene
+    );
+
+    const uniCamera = new BABYLON.UniversalCamera(
+        "uni", new BABYLON.Vector3(0, 3, -12), scene
+    );
+    uniCamera.setTarget(BABYLON.Vector3.Zero());
+    uniCamera.speed = 0.4;
+    // WASD でも操作できるようキー設定を追加
+    uniCamera.keysUp.push(87);     // W
+    uniCamera.keysDown.push(83);   // S
+    uniCamera.keysLeft.push(65);   // A
+    uniCamera.keysRight.push(68);  // D
+
+    const followCamera = new BABYLON.FollowCamera(
+        "follow", new BABYLON.Vector3(0, 5, -10), scene
+    );
+    followCamera.lockedTarget = target;
+    followCamera.radius = 8;          // 対象との距離
+    followCamera.heightOffset = 4;    // 上下のオフセット
+    followCamera.rotationOffset = 180; // 対象を見る角度（度）
+    followCamera.cameraAcceleration = 0.05;
+    followCamera.maxCameraSpeed = 10;
+
+    // 初期カメラ
+    scene.activeCamera = arcCamera;
+    arcCamera.attachControl(canvas, true);
+
+    const switchCamera = (cam) => {
+        if (scene.activeCamera && scene.activeCamera.detachControl) {
+            scene.activeCamera.detachControl(canvas);
+        }
+        scene.activeCamera = cam;
+        if (cam !== followCamera) cam.attachControl(canvas, true);
+        document.querySelectorAll(".camera-switch button").forEach(b => b.classList.remove("active"));
+    };
+
+    document.getElementById("btn-arc").onclick = (e) => {
+        switchCamera(arcCamera); e.target.classList.add("active");
+    };
+    document.getElementById("btn-uni").onclick = (e) => {
+        switchCamera(uniCamera); e.target.classList.add("active");
+    };
+    document.getElementById("btn-fol").onclick = (e) => {
+        switchCamera(followCamera); e.target.classList.add("active");
+    };
+
+    engine.runRenderLoop(() => scene.render());
+    window.addEventListener("resize", () => engine.resize());
+    </script>
+</body>
+</html>

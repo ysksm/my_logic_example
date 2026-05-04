@@ -1,0 +1,56 @@
+html, body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    width: 100%;
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+}
+
+#renderCanvas {
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+    display: block;
+}
+
+.info-panel {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    background: rgba(0, 0, 0, 0.65);
+    color: #fff;
+    padding: 12px 16px;
+    border-radius: 8px;
+    max-width: 360px;
+    font-size: 14px;
+    line-height: 1.6;
+    pointer-events: none;
+}
+
+.info-panel h2 {
+    margin: 0 0 6px 0;
+    font-size: 16px;
+    color: #ffb84a;
+}
+
+.info-panel a {
+    pointer-events: auto;
+    color: #7cd3ff;
+}
+
+.back-link {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: rgba(0, 0, 0, 0.65);
+    color: #fff;
+    padding: 8px 14px;
+    border-radius: 6px;
+    text-decoration: none;
+    font-size: 13px;
+}
+
+.back-link:hover {
+    background: rgba(191, 52, 52, 0.9);
+}

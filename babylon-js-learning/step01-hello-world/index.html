@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Step 01 - Hello World</title>
+    <link rel="stylesheet" href="../common.css">
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+</head>
+<body>
+    <canvas id="renderCanvas"></canvas>
+    <div class="info-panel">
+        <h2>Step 01: Hello World</h2>
+        Babylon.js の最小構成。<br>
+        マウスドラッグでカメラ回転、ホイールでズームできます。
+    </div>
+    <a href="../index.html" class="back-link">← 一覧へ</a>
+
+    <script>
+    // ─── 1. Engine の作成 ────────────────────────────────
+    // canvas を取り出して、それを描画ターゲットに Engine を初期化する
+    const canvas = document.getElementById("renderCanvas");
+    const engine = new BABYLON.Engine(canvas, true);
+
+    // ─── 2. Scene の作成 ─────────────────────────────────
+    // Scene は3Dワールド全体を保持するコンテナ
+    const createScene = () => {
+        const scene = new BABYLON.Scene(engine);
+
+        // ─── 3. Camera ──────────────────────────────────
+        // ArcRotateCamera: ターゲットを中心に回るカメラ
+        // 引数: name, alpha(水平角), beta(垂直角), radius(距離), target, scene
+        const camera = new BABYLON.ArcRotateCamera(
+            "camera",
+            -Math.PI / 2,           // alpha
+            Math.PI / 2.5,          // beta
+            5,                      // radius
+            new BABYLON.Vector3(0, 0, 0),
+            scene
+        );
+        camera.attachControl(canvas, true);  // マウス操作を有効化
+
+        // ─── 4. Light ───────────────────────────────────
+        // HemisphericLight: 天空光のような全体照明
+        const light = new BABYLON.HemisphericLight(
+            "light",
+            new BABYLON.Vector3(0, 1, 0),  // 光の方向（上から）
+            scene
+        );
+        light.intensity = 0.9;
+
+        // ─── 5. Mesh（メッシュ）─────────────────────────
+        // 球体を作成
+        const sphere = BABYLON.MeshBuilder.CreateSphere(
+            "sphere",
+            { diameter: 2, segments: 32 },
+            scene
+        );
+
+        return scene;
+    };
+
+    const scene = createScene();
+
+    // ─── 6. レンダリングループ ──────────────────────────
+    engine.runRenderLoop(() => {
+        scene.render();
+    });
+
+    // ウィンドウリサイズに追従
+    window.addEventListener("resize", () => {
+        engine.resize();
+    });
+    </script>
+</body>
+</html>

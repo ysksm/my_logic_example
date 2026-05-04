@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Babylon.js 学習プロジェクト</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+            max-width: 860px;
+            margin: 40px auto;
+            padding: 0 20px;
+            color: #222;
+            line-height: 1.7;
+        }
+        h1 { border-bottom: 3px solid #bf3434; padding-bottom: 8px; }
+        .step-list { list-style: none; padding: 0; }
+        .step-list li {
+            margin: 12px 0;
+            padding: 16px 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+        .step-list li:hover {
+            border-color: #bf3434;
+            box-shadow: 0 2px 8px rgba(191, 52, 52, 0.15);
+        }
+        .step-list a {
+            text-decoration: none;
+            color: #bf3434;
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+        .step-list .desc {
+            color: #555;
+            font-size: 0.95em;
+            margin-top: 4px;
+        }
+        .step-num {
+            display: inline-block;
+            width: 32px;
+            color: #999;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎮 Babylon.js ステップバイステップ学習</h1>
+    <p>各ステップを順番にクリックして進めてください。HTML ファイル内のコメントを読みながら値を変えて遊ぶと理解が深まります。</p>
+
+    <ol class="step-list">
+        <li>
+            <a href="step01-hello-world/index.html"><span class="step-num">01</span>Hello World</a>
+            <div class="desc">Babylon.js の最小構成。Engine / Scene / Camera / Light / Sphere</div>
+        </li>
+        <li>
+            <a href="step02-basic-shapes/index.html"><span class="step-num">02</span>基本図形</a>
+            <div class="desc">Box / Sphere / Cylinder / Plane / Ground / Torus を並べて表示</div>
+        </li>
+        <li>
+            <a href="step03-materials/index.html"><span class="step-num">03</span>マテリアルとテクスチャ</a>
+            <div class="desc">StandardMaterial と diffuseColor / diffuseTexture / wireframe</div>
+        </li>
+        <li>
+            <a href="step04-lighting/index.html"><span class="step-num">04</span>ライティング</a>
+            <div class="desc">Hemispheric / Directional / Point / Spot の4種類のライト</div>
+        </li>
+        <li>
+            <a href="step05-cameras/index.html"><span class="step-num">05</span>カメラ</a>
+            <div class="desc">ArcRotate / Universal / Follow カメラを切り替え</div>
+        </li>
+        <li>
+            <a href="step06-animations/index.html"><span class="step-num">06</span>アニメーション</a>
+            <div class="desc">Animation クラスでキーフレームアニメーション</div>
+        </li>
+        <li>
+            <a href="step07-physics/index.html"><span class="step-num">07</span>物理（衝突判定）</a>
+            <div class="desc">重力と衝突判定で球体を地面に落とす</div>
+        </li>
+        <li>
+            <a href="step08-user-input/index.html"><span class="step-num">08</span>ユーザー入力</a>
+            <div class="desc">キーボードとマウスでオブジェクトを操作</div>
+        </li>
+        <li>
+            <a href="step09-gui/index.html"><span class="step-num">09</span>GUI</a>
+            <div class="desc">babylon.gui でボタンとスライダーを表示</div>
+        </li>
+        <li>
+            <a href="step10-mini-game/index.html"><span class="step-num">10</span>ミニゲーム</a>
+            <div class="desc">玉転がし収集ゲーム。これまでの総まとめ</div>
+        </li>
+    </ol>
+</body>
+</html>
