@@ -45,13 +45,21 @@ func (r *Rod) Start(parent context.Context, sink Sink) error {
 		return fmt.Errorf("rod pages: %w", err)
 	}
 	if len(pages) == 0 {
-		return errors.New("no rod page targets")
+		// Some launches (notably rod's own launcher with no startup URL)
+		// give us a browser with zero page tabs. Create one so we have
+		// something to attach to.
+		p, err := r.browser.Page(proto.TargetCreateTarget{URL: "about:blank"})
+		if err != nil {
+			return fmt.Errorf("rod create page: %w", err)
+		}
+		r.page = p
+	} else {
+		idx := r.opts.TargetIndex
+		if idx < 0 || idx >= len(pages) {
+			idx = 0
+		}
+		r.page = pages[idx]
 	}
-	idx := r.opts.TargetIndex
-	if idx < 0 || idx >= len(pages) {
-		idx = 0
-	}
-	r.page = pages[idx]
 	sink.Emit(events.New(events.KindMeta, r.Name(), events.Meta{Message: "attached"}))
 
 	// Enable required domains.
