@@ -1,0 +1,13 @@
+bin/
+web/dist/
+web/node_modules/
+web/src/**/*.js
+web/tsconfig.tsbuildinfo
+playwright/node_modules/
+playwright/test-results/
+playwright/playwright-report/
+recordings/
+*.ndjson
+cmd/wails/build/
+cmd/wails/frontend/dist/*
+!cmd/wails/frontend/dist/.keep

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "perf-investigator",
+  "outputfilename": "perf-investigator",
+  "frontend:install": "npm --prefix ../../web install",
+  "frontend:build": "npm --prefix ../../web run build && rm -rf frontend/dist && mkdir -p frontend && cp -r ../../web/dist frontend/dist",
+  "frontend:dev:watcher": "npm --prefix ../../web run dev",
+  "frontend:dev:serverUrl": "http://localhost:5173",
+  "author": {
+    "name": "perf-investigator"
+  },
+  "info": {
+    "productName": "perf-investigator",
+    "comments": "Chrome DevTools Protocol observer (chromedp + rod + raw)"
+  }
+}
