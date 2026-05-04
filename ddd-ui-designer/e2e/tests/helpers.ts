@@ -105,7 +105,7 @@ export class Designer {
   }
 
   async derive() {
-    await this.topbar().getByRole("button", { name: "▶ 派生" }).click();
+    await this.topbar().getByRole("button", { name: "▶ 画面を導出" }).click();
     // Wait for at least one plan card to appear.
     await expect(this.rightPane().locator(".plan-card").first()).toBeVisible();
   }

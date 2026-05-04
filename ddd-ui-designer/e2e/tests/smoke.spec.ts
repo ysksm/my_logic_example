@@ -15,7 +15,7 @@ test.describe("smoke", () => {
     await expect(d.centerPane().locator("h2")).toContainText("Sample");
 
     // Right pane is empty until we hit derive.
-    await expect(d.rightPane()).toContainText("派生");
+    await expect(d.rightPane()).toContainText("導出");
   });
 
   test("derives a screen plan for the seeded Sample", async ({ page }) => {

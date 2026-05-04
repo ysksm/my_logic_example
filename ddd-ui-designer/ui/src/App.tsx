@@ -279,7 +279,7 @@ export default function App() {
           />{" "}
           選択中のみ
         </label>
-        <button onClick={derive}>▶ 派生</button>
+        <button onClick={derive}>▶ 画面を導出</button>
         <button onClick={generateReactApp} title="React + Vite アプリを tar.gz でダウンロード">
           📦 tar.gz
         </button>

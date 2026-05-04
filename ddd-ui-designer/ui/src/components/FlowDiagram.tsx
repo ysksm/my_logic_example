@@ -46,7 +46,7 @@ export function FlowDiagram({ spec }: Props) {
   if (!spec || spec.plans.length === 0) {
     return (
       <div style={{ padding: 16, color: "#6b7280" }}>
-        ▶ 派生 を実行すると、画面遷移図がここに表示されます。
+        ▶ 画面を導出 を実行すると、画面遷移図がここに表示されます。
       </div>
     );
   }
