@@ -60,16 +60,20 @@ const VITALS: Vital[] = [
 ];
 
 export function PerformanceMonitorPanel({
+  times,
   history,
   latest,
+  sampleSeq,
   onSnapshot,
 }: {
+  times: number[];
   history: Record<string, number[]>;
   latest: Record<string, number>;
+  sampleSeq: number;
   onSnapshot: () => void;
 }) {
   const allKeys = Object.keys(latest).sort((a, b) => a.localeCompare(b));
-  const sampleCount = history.Timestamp?.length ?? 0;
+  const sampleCount = times.length;
 
   return (
     <div className="tab-pane">
@@ -88,9 +92,10 @@ export function PerformanceMonitorPanel({
       <div className="perf-layout">
         <div className="perf-vitals">
           <h3>パフォーマンスモニター</h3>
-          {VITALS.map((v) => {
+          {VITALS.map((v, i) => {
             const value = latest[v.key];
             const series = history[v.key] ?? [];
+            const last = i === VITALS.length - 1;
             return (
               <div className="vital" key={v.key}>
                 <div className="vital-head">
@@ -106,7 +111,14 @@ export function PerformanceMonitorPanel({
                     {value === undefined ? '—' : v.fmt(value)}
                   </span>
                 </div>
-                <Sparkline values={series} />
+                <Sparkline
+                  times={times}
+                  values={series}
+                  sampleSeq={sampleSeq}
+                  showXAxis={last}
+                  syncKey="perfMonitor"
+                  format={v.fmt}
+                />
               </div>
             );
           })}

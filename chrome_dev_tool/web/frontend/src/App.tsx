@@ -44,9 +44,10 @@ export function App() {
   const [networkRows, setNetworkRows] = useState<NetRow[]>([]);
   const [consoleRows, setConsoleRows] = useState<ConsoleRow[]>([]);
   const [perfLatest, setPerfLatest] = useState<Record<string, number>>({});
+  const [perfSampleSeq, setPerfSampleSeq] = useState(0);
   const perfHistRef = useRef<Record<string, number[]>>({});
+  const perfTimesRef = useRef<number[]>([]);
   const perfPrevRef = useRef<{ ts: number; m: Record<string, number> } | null>(null);
-  const [, forceTick] = useState(0);
 
   // ─── ws stream ─────────────────────────────────────────────────────────
   useEffect(() => openEventStream(handleEvent), []);
@@ -126,10 +127,11 @@ export function App() {
         // Performance.getMetrics returns cumulative counters; Chrome's
         // Performance Monitor shows rates. Compute deltas against the
         // previous sample.
-        const ts = m.Timestamp ?? Date.parse(ev.time) / 1000;
+        const wallSec = Date.parse(ev.time) / 1000;
+        const tsCounter = m.Timestamp ?? wallSec;
         const prev = perfPrevRef.current;
-        if (prev && ts > prev.ts) {
-          const dt = ts - prev.ts;
+        if (prev && tsCounter > prev.ts) {
+          const dt = tsCounter - prev.ts;
           if (m.TaskDuration !== undefined && prev.m.TaskDuration !== undefined) {
             m.CpuUsage = ((m.TaskDuration - prev.m.TaskDuration) / dt) * 100;
           }
@@ -144,8 +146,12 @@ export function App() {
               (m.RecalcStyleCount - prev.m.RecalcStyleCount) / dt;
           }
         }
-        perfPrevRef.current = { ts, m };
+        perfPrevRef.current = { ts: tsCounter, m };
         setPerfLatest(m);
+        // Wall-clock seconds for the chart x-axis (what the user reads).
+        const times = perfTimesRef.current;
+        times.push(wallSec);
+        if (times.length > MAX_PERF_HISTORY) times.shift();
         const hist = perfHistRef.current;
         for (const [k, v] of Object.entries(m)) {
           const arr = hist[k] ?? [];
@@ -153,7 +159,15 @@ export function App() {
           if (arr.length > MAX_PERF_HISTORY) arr.shift();
           hist[k] = arr;
         }
-        forceTick((n) => n + 1);
+        // Pad keys that didn't appear in this sample so per-key arrays
+        // stay aligned with `times` (otherwise hover lookups misalign).
+        const want = times.length;
+        for (const k of Object.keys(hist)) {
+          const arr = hist[k];
+          while (arr.length < want) arr.push(NaN);
+          while (arr.length > MAX_PERF_HISTORY) arr.shift();
+        }
+        setPerfSampleSeq((n) => n + 1);
         break;
       }
     }
@@ -183,7 +197,7 @@ export function App() {
         network: domains.network,
         console: domains.console,
         performance: domains.performance,
-        perfIntervalMs: 1000,
+        perfIntervalMs: 500,
       }),
     );
     setState(s2 ?? s1);
@@ -208,7 +222,7 @@ export function App() {
         network: domains.network,
         console: domains.console,
         performance: domains.performance,
-        perfIntervalMs: 1000,
+        perfIntervalMs: 500,
       }),
     );
     setNavigateUrl('');
@@ -312,8 +326,10 @@ export function App() {
         {tab === 'performance' && <PerformancePanel />}
         {tab === 'perfMonitor' && (
           <PerformanceMonitorPanel
+            times={perfTimesRef.current}
             history={perfHistRef.current}
             latest={perfLatest}
+            sampleSeq={perfSampleSeq}
             onSnapshot={snapshot}
           />
         )}

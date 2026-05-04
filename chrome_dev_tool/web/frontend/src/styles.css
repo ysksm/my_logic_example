@@ -275,9 +275,43 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   color: var(--accent);
   font-weight: 600;
 }
-.vital .uplot-host { width: 100%; height: 36px; }
+.vital .uplot-host {
+  width: 100%;
+  height: 36px;
+  position: relative;
+}
+.vital:last-of-type .uplot-host { height: 56px; } /* last row hosts x-axis */
 .vital .uplot { width: 100% !important; }
 .vital .u-over, .vital .u-under { background: transparent; }
+.vital .u-axis { color: rgba(139, 148, 158, 0.7); }
+
+.sparkline-tip {
+  position: absolute;
+  top: -2px;
+  display: none;
+  pointer-events: none;
+  z-index: 3;
+  background: rgba(31, 36, 44, 0.96);
+  color: var(--fg);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  transform: translate(-50%, -100%);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+}
+.sparkline-tip::after {
+  content: '';
+  position: absolute;
+  left: 50%; transform: translateX(-50%);
+  bottom: -4px;
+  width: 0; height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 4px solid var(--line);
+}
 .vital-derived {
   font-size: 9px;
   text-transform: uppercase; letter-spacing: 0.06em;
