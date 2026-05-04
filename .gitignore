@@ -208,3 +208,9 @@ __marimo__/
 
 # Data files
 data/
+
+# Build artifacts (Go binaries等のビルド成果物)
+bin/
+
+# Node.js
+node_modules/
