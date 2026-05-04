@@ -107,7 +107,13 @@ make test
 
 ## 対応フォーマット
 
-- STL ASCII / Binary
+| 拡張子 | 形式 | パース場所 | 実装 |
+|---|---|---|---|
+| `.stl` | STL ASCII / Binary | サーバ (Go) | `core/stl.go` |
+| `.gltf` / `.glb` | glTF 2.0 | クライアント (Babylon.js Loader) | `web/static/loaders/babylon.js` |
+| `.obj` | Wavefront OBJ | クライアント (Babylon.js Loader) | `web/static/loaders/babylon.js` |
 
-OBJ・glTF 等は `core/` に薄いパーサを足し、`web/handlers.go` の
-`parseByExtension` で拡張子を分岐させれば追加できます。
+新しい形式は `web/static/loaders/<format>.js` を作って
+`loaders/index.js` のレジストリに 1 行加えるだけで追加できます。サーバ側で
+パースしたい場合は `core/` にパーサを足し、`web/handlers.go` の
+`parseByExtension` に拡張子を追加してください。

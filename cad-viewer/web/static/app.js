@@ -1,10 +1,11 @@
-// CAD Viewer frontend.
+// CAD Viewer frontend entry.
 //
-// Architecture: this file owns the Babylon.js scene and talks to the Go
-// backend over plain HTTP. The backend parses CAD files and returns a
-// renderer-agnostic mesh payload (positions / normals / indices); this client
-// pushes it into a Babylon `VertexData`. The same JS runs unchanged whether
-// the server is `cad-viewer serve` or the embedded Wails AssetServer.
+// Owns the Babylon.js scene and dispatches each uploaded file to the matching
+// loader from `./loaders/`. The loaders attach their meshes to a shared
+// `modelRoot` TransformNode so disposal, bounding-box framing, and the
+// wireframe toggle stay format-agnostic.
+
+import { loaderFor, supportedExtensions } from "./loaders/index.js";
 
 const canvas = document.getElementById("renderCanvas");
 const fileInput = document.getElementById("file-input");
@@ -13,6 +14,8 @@ const resetBtn = document.getElementById("reset-btn");
 const wireToggle = document.getElementById("wire-toggle");
 const statusEl = document.getElementById("status");
 const metaEl = document.getElementById("meta");
+
+fileInput.setAttribute("accept", supportedExtensions.join(","));
 
 const engine = new BABYLON.Engine(canvas, true, {
   preserveDrawingBuffer: true,
@@ -35,18 +38,16 @@ camera.wheelDeltaPercentage = 0.01;
 camera.lowerRadiusLimit = 0.01;
 camera.minZ = 0.01;
 
-const hemi = new BABYLON.HemisphericLight(
+new BABYLON.HemisphericLight(
   "hemi",
   new BABYLON.Vector3(0, 1, 0),
   scene,
-);
-hemi.intensity = 0.7;
-const dir = new BABYLON.DirectionalLight(
+).intensity = 0.7;
+new BABYLON.DirectionalLight(
   "dir",
   new BABYLON.Vector3(-1, -2, -1),
   scene,
-);
-dir.intensity = 0.6;
+).intensity = 0.6;
 
 const grid = BABYLON.MeshBuilder.CreateGround(
   "grid",
@@ -60,61 +61,82 @@ gridMat.wireframe = true;
 grid.material = gridMat;
 grid.isPickable = false;
 
-let currentMesh = null;
-let currentBounds = null;
+let modelRoot = new BABYLON.TransformNode("modelRoot", scene);
+let loadedMeshes = [];
+let lastBounds = null;
+
+function makeDefaultMaterial() {
+  const mat = new BABYLON.StandardMaterial("model-mat", scene);
+  mat.diffuseColor = new BABYLON.Color3(0.85, 0.86, 0.9);
+  mat.specularColor = new BABYLON.Color3(0.2, 0.2, 0.22);
+  mat.backFaceCulling = false;
+  mat.wireframe = wireToggle.checked;
+  return mat;
+}
+
+const loaderContext = {
+  scene,
+  get root() {
+    return modelRoot;
+  },
+  makeDefaultMaterial,
+};
 
 function setStatus(text, isError = false) {
   statusEl.textContent = text;
   statusEl.classList.toggle("error", isError);
 }
 
-function setMeta(mesh) {
-  if (!mesh) {
-    metaEl.textContent = "";
-    return;
-  }
-  const b = mesh.bounds;
-  metaEl.textContent =
-    `name      : ${mesh.name}\n` +
-    `triangles : ${mesh.triangles.toLocaleString()}\n` +
-    `vertices  : ${(mesh.positions.length / 3).toLocaleString()}\n` +
-    `bounds min: ${fmtVec(b.min)}\n` +
-    `bounds max: ${fmtVec(b.max)}\n` +
-    `size      : ${fmtVec(b.size)}`;
-}
-
 function fmtVec(v) {
   return `[${v.map((n) => n.toFixed(3)).join(", ")}]`;
 }
 
-function disposeCurrent() {
-  if (currentMesh) {
-    currentMesh.dispose();
-    currentMesh = null;
+function setMeta(name, stats, bounds) {
+  if (!stats) {
+    metaEl.textContent = "";
+    return;
   }
+  const lines = [
+    `name      : ${name}`,
+    `format    : ${stats.format}`,
+  ];
+  if (typeof stats.triangles === "number") {
+    lines.push(`triangles : ${Math.round(stats.triangles).toLocaleString()}`);
+  }
+  if (typeof stats.vertices === "number") {
+    lines.push(`vertices  : ${Math.round(stats.vertices).toLocaleString()}`);
+  }
+  if (bounds) {
+    lines.push(
+      `bounds min: ${fmtVec(bounds.min)}`,
+      `bounds max: ${fmtVec(bounds.max)}`,
+      `size      : ${fmtVec(bounds.size)}`,
+    );
+  }
+  metaEl.textContent = lines.join("\n");
 }
 
-function loadMesh(payload) {
-  disposeCurrent();
+function clearScene() {
+  // Disposing the root cascades to all loaded meshes / nodes / materials.
+  modelRoot.dispose(false, true);
+  modelRoot = new BABYLON.TransformNode("modelRoot", scene);
+  loadedMeshes = [];
+  lastBounds = null;
+}
 
-  const mesh = new BABYLON.Mesh(payload.name || "model", scene);
-  const vd = new BABYLON.VertexData();
-  vd.positions = payload.positions;
-  vd.normals = payload.normals;
-  vd.indices = payload.indices;
-  vd.applyToMesh(mesh, true);
-
-  const mat = new BABYLON.StandardMaterial("model-mat", scene);
-  mat.diffuseColor = new BABYLON.Color3(0.85, 0.86, 0.9);
-  mat.specularColor = new BABYLON.Color3(0.2, 0.2, 0.22);
-  mat.backFaceCulling = false;
-  mat.wireframe = wireToggle.checked;
-  mesh.material = mat;
-
-  currentMesh = mesh;
-  currentBounds = payload.bounds;
-  frameCamera(payload.bounds);
-  setMeta(payload);
+function computeBoundsFromRoot() {
+  // getHierarchyBoundingVectors walks every descendant mesh.
+  const { min, max } = modelRoot.getHierarchyBoundingVectors(true);
+  if (!isFinite(min.x) || !isFinite(max.x)) return null;
+  const size = max.subtract(min);
+  const center = min.add(max).scale(0.5);
+  return {
+    min: [min.x, min.y, min.z],
+    max: [max.x, max.y, max.z],
+    size: [size.x, size.y, size.z],
+    center: [center.x, center.y, center.z],
+    radius: BABYLON.Vector3.Distance(min, max) / 2,
+  };
 }
 
 function frameCamera(bounds) {
@@ -125,31 +147,38 @@ function frameCamera(bounds) {
   camera.radius = r * 3;
   camera.lowerRadiusLimit = r * 0.05;
   camera.upperRadiusLimit = r * 50;
-
-  // Resize the floor grid to roughly fit the model footprint so it stays
-  // useful as a spatial reference at any scale.
+  // Keep the floor grid visually relevant at any model scale.
   const span = Math.max(bounds.size[0], bounds.size[2], r * 2) * 4;
-  grid.scaling = new BABYLON.Vector3(
-    span / 200,
-    1,
-    span / 200,
-  );
+  grid.scaling = new BABYLON.Vector3(span / 200, 1, span / 200);
   grid.position.y = bounds.min[1];
 }
 
-async function uploadFile(file) {
+function applyWireframe(on) {
+  for (const m of loadedMeshes) {
+    if (m.material) m.material.wireframe = on;
+  }
+}
+
+async function loadFile(file) {
+  const ext = "." + (file.name.split(".").pop() || "").toLowerCase();
+  const loader = loaderFor(ext);
+  if (!loader) {
+    setStatus(
+      `未対応の拡張子: ${ext} (対応: ${supportedExtensions.join(", ")})`,
+      true,
+    );
+    return;
+  }
   setStatus(`読み込み中: ${file.name} (${formatBytes(file.size)})`);
   metaEl.textContent = "";
-  const fd = new FormData();
-  fd.append("file", file);
   try {
-    const res = await fetch("/api/cad/upload", { method: "POST", body: fd });
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({ error: res.statusText }));
-      throw new Error(body.error || `HTTP ${res.status}`);
-    }
-    const payload = await res.json();
-    loadMesh(payload);
+    clearScene();
+    const result = await loader(file, loaderContext, ext);
+    loadedMeshes = result.meshes;
+    applyWireframe(wireToggle.checked);
+    lastBounds = computeBoundsFromRoot();
+    frameCamera(lastBounds);
+    setMeta(file.name, result.stats, lastBounds);
     setStatus(`読み込み完了: ${file.name}`);
   } catch (err) {
     setStatus(`読み込みに失敗しました: ${err.message}`, true);
@@ -165,7 +194,7 @@ function formatBytes(n) {
 
 fileInput.addEventListener("change", (e) => {
   const file = e.target.files && e.target.files[0];
-  if (file) uploadFile(file);
+  if (file) loadFile(file);
 });
 
 sampleBtn.addEventListener("click", async () => {
@@ -174,26 +203,33 @@ sampleBtn.addEventListener("click", async () => {
     const res = await fetch("/samples/cube.stl");
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const blob = await res.blob();
-    await uploadFile(new File([blob], "cube.stl", { type: "model/stl" }));
+    await loadFile(new File([blob], "cube.stl", { type: "model/stl" }));
   } catch (err) {
     setStatus(`サンプル読み込み失敗: ${err.message}`, true);
   }
 });
 
 resetBtn.addEventListener("click", () => {
-  if (currentBounds) frameCamera(currentBounds);
+  if (lastBounds) frameCamera(lastBounds);
   else {
     camera.target = BABYLON.Vector3.Zero();
     camera.radius = 10;
   }
 });
 
-wireToggle.addEventListener("change", () => {
-  if (currentMesh && currentMesh.material) {
-    currentMesh.material.wireframe = wireToggle.checked;
-  }
-});
+wireToggle.addEventListener("change", () => applyWireframe(wireToggle.checked));
 
 window.addEventListener("resize", () => engine.resize());
+
+// Drag & drop anywhere over the canvas.
+const canvasWrap = document.getElementById("canvas-wrap");
+canvasWrap.addEventListener("dragover", (e) => {
+  e.preventDefault();
+});
+canvasWrap.addEventListener("drop", (e) => {
+  e.preventDefault();
+  const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+  if (file) loadFile(file);
+});
 
 engine.runRenderLoop(() => scene.render());
