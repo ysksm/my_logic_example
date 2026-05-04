@@ -87,7 +87,7 @@ export function PerformancePanel({
       </div>
       <div className="perf-layout">
         <div className="perf-vitals">
-          <h3>Performance Monitor</h3>
+          <h3>パフォーマンスモニター</h3>
           {VITALS.map((v) => {
             const value = latest[v.key];
             const series = history[v.key] ?? [];

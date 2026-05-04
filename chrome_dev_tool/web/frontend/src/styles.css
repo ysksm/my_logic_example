@@ -275,7 +275,9 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   color: var(--accent);
   font-weight: 600;
 }
-.vital canvas { width: 100%; height: 36px; display: block; }
+.vital .uplot-host { width: 100%; height: 36px; }
+.vital .uplot { width: 100% !important; }
+.vital .u-over, .vital .u-under { background: transparent; }
 .vital-derived {
   font-size: 9px;
   text-transform: uppercase; letter-spacing: 0.06em;
@@ -295,7 +297,8 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   border-bottom: 1px solid var(--line);
   font-size: 12px;
 }
-.spark canvas { width: 100%; height: 24px; display: block; }
+.spark .uplot-host { width: 100%; height: 24px; }
+.spark .uplot { width: 100% !important; }
 .metrics { padding: 8px 12px; }
 .metrics table { width: 100%; font-size: 12px; }
 .metrics td { padding: 3px 6px; }

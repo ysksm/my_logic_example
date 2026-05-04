@@ -284,7 +284,7 @@ export function App() {
           className={`tab ${tab === 'performance' ? 'active' : ''}`}
           onClick={() => setTab('performance')}
         >
-          Performance
+          パフォーマンスモニター
         </button>
       </div>
 

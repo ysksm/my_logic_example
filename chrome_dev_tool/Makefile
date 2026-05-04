@@ -8,9 +8,10 @@ build: web go-bin
 
 web:
 	cd web/frontend && npm install && npm run build
-	# vite's emptyOutDir wipes dist/.keep — restore it so go:embed still finds
-	# at least one file when go build runs against an unbuilt checkout.
-	touch web/frontend/dist/.keep
+	# vite's emptyOutDir wipes dist/.keep; keep the file present so go:embed
+	# still finds at least one entry when go build runs against an unbuilt
+	# checkout. (Content does not matter.)
+	@printf "# placeholder so go:embed all:frontend/dist works before npm run build\n" > web/frontend/dist/.keep
 
 go-bin:
 	mkdir -p bin
