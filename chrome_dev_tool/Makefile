@@ -1,10 +1,11 @@
-.PHONY: all build web go-bin dev clean tidy verify
+.PHONY: all build web go-bin exporter dev clean tidy verify
 
 BIN := bin/cdt
+EXPORTER_BIN := bin/cdt-exporter
 
 all: build
 
-build: web go-bin
+build: web go-bin exporter
 
 web:
 	cd web/frontend && npm install && npm run build
@@ -16,6 +17,10 @@ web:
 go-bin:
 	mkdir -p bin
 	go build -o $(BIN) .
+
+exporter:
+	mkdir -p bin
+	go build -o $(EXPORTER_BIN) ./exporter
 
 # Run the Go server and Vite dev server side-by-side.
 # Use two terminals or a tool like `make -j2 dev` if your shell tolerates it.
@@ -32,6 +37,7 @@ tidy:
 verify:
 	go build ./...
 	go build -tags wails ./...
+	go build -o $(EXPORTER_BIN) ./exporter
 	@echo "checking that no chrome devtools wrappers leaked into the dependency graph..."
 	@! go list -m all | grep -E '(go-rod/rod|chromedp/chromedp|chromedp/cdproto)' || (echo "FAIL: forbidden dependency"; exit 1)
 	@echo "ok"
