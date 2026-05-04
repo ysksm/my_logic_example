@@ -1,155 +1,197 @@
-import { Sparkline } from './Sparkline';
+import { useState } from 'react';
+import { api, type NetworkPreset, type TraceFile } from '../api';
 
-type Vital = {
-  key: string;
-  label: string;
-  fmt: (v: number) => string;
-  derived?: boolean;
-  hint?: string;
-};
-
-// Eight vitals that mirror Chrome DevTools' Performance Monitor.
-// `derived` keys are calculated client-side from cumulative counters.
-const VITALS: Vital[] = [
-  {
-    key: 'CpuUsage',
-    label: 'CPU usage',
-    fmt: (v) => `${v.toFixed(1)} %`,
-    derived: true,
-    hint: 'ΔTaskDuration / Δt × 100',
-  },
-  {
-    key: 'JSHeapUsedSize',
-    label: 'JS heap size',
-    fmt: (v) => fmtBytes(v),
-  },
-  {
-    key: 'Nodes',
-    label: 'DOM Nodes',
-    fmt: (v) => v.toFixed(0),
-  },
-  {
-    key: 'JSEventListeners',
-    label: 'JS event listeners',
-    fmt: (v) => v.toFixed(0),
-  },
-  {
-    key: 'Documents',
-    label: 'Documents',
-    fmt: (v) => v.toFixed(0),
-  },
-  {
-    key: 'Frames',
-    label: 'Document Frames',
-    fmt: (v) => v.toFixed(0),
-  },
-  {
-    key: 'LayoutsPerSec',
-    label: 'Layouts / sec',
-    fmt: (v) => v.toFixed(1),
-    derived: true,
-    hint: 'ΔLayoutCount / Δt',
-  },
-  {
-    key: 'RecalcStylesPerSec',
-    label: 'Style recalcs / sec',
-    fmt: (v) => v.toFixed(1),
-    derived: true,
-    hint: 'ΔRecalcStyleCount / Δt',
-  },
+const NETWORK_OPTIONS: { value: NetworkPreset; label: string }[] = [
+  { value: 'online', label: 'Online — no throttling' },
+  { value: 'fast-4g', label: 'Fast 4G' },
+  { value: 'slow-4g', label: 'Slow 4G' },
+  { value: 'fast-3g', label: 'Fast 3G' },
+  { value: 'slow-3g', label: 'Slow 3G' },
+  { value: 'offline', label: 'Offline' },
 ];
 
-export function PerformancePanel({
-  history,
-  latest,
-  onSnapshot,
-}: {
-  history: Record<string, number[]>;
-  latest: Record<string, number>;
-  onSnapshot: () => void;
-}) {
-  const allKeys = Object.keys(latest).sort((a, b) => a.localeCompare(b));
-  const sampleCount = history.Timestamp?.length ?? 0;
+const CPU_OPTIONS: { value: number; label: string }[] = [
+  { value: 1, label: 'No throttling' },
+  { value: 2, label: '2× slowdown' },
+  { value: 4, label: '4× slowdown' },
+  { value: 6, label: '6× slowdown' },
+  { value: 20, label: '20× slowdown' },
+];
+
+export function PerformancePanel() {
+  const [network, setNetwork] = useState<NetworkPreset>('online');
+  const [cpu, setCpu] = useState<number>(1);
+  const [appliedNetwork, setAppliedNetwork] = useState<NetworkPreset | null>(null);
+  const [appliedCpu, setAppliedCpu] = useState<number | null>(null);
+
+  const [recording, setRecording] = useState(false);
+  const [recStartedAt, setRecStartedAt] = useState<number | null>(null);
+  const [lastTrace, setLastTrace] = useState<TraceFile | null>(null);
+  const [lastTraceName, setLastTraceName] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function call<T>(fn: () => Promise<T>): Promise<T | undefined> {
+    setError(null);
+    setBusy(true);
+    try {
+      return await fn();
+    } catch (e: any) {
+      setError(String(e?.message ?? e));
+      return undefined;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function applyThrottling() {
+    const ok = await call(() =>
+      api.throttle({ networkPreset: network, cpuRate: cpu }),
+    );
+    if (ok) {
+      setAppliedNetwork(network);
+      setAppliedCpu(cpu);
+    }
+  }
+
+  async function startRec() {
+    const ok = await call(() => api.traceStart());
+    if (ok) {
+      setRecording(true);
+      setRecStartedAt(Date.now());
+    }
+  }
+
+  async function stopRec() {
+    const trace = await call(() => api.traceStop());
+    setRecording(false);
+    setRecStartedAt(null);
+    if (trace) {
+      const name = traceFileName();
+      setLastTrace(trace);
+      setLastTraceName(name);
+      downloadTrace(trace, name);
+    }
+  }
+
+  function downloadTrace(t: TraceFile, name: string) {
+    const blob = new Blob([JSON.stringify(t)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function traceFileName(): string {
+    const d = new Date();
+    const stamp =
+      d.getFullYear().toString().padStart(4, '0') +
+      String(d.getMonth() + 1).padStart(2, '0') +
+      String(d.getDate()).padStart(2, '0') +
+      '-' +
+      String(d.getHours()).padStart(2, '0') +
+      String(d.getMinutes()).padStart(2, '0') +
+      String(d.getSeconds()).padStart(2, '0');
+    return `cdt-trace-${stamp}.json`;
+  }
+
+  const elapsed = recStartedAt ? Math.floor((Date.now() - recStartedAt) / 1000) : null;
 
   return (
-    <div className="tab-pane">
+    <div className="tab-pane perf-lab">
       <div className="subbar">
-        <button className="btn-primary" onClick={onSnapshot}>
-          Snapshot
-        </button>
         <span className="dim">
-          {sampleCount === 0
-            ? 'no samples yet — start the collector with `performance` enabled'
-            : `${sampleCount} samples · ${allKeys.length} raw metrics + ${
-                VITALS.filter((v) => v.derived).length
-              } derived`}
+          throttling と trace は CDP コマンドを直接送るので、
+          先に Launch & Inspect で attach しておく必要があります。
         </span>
       </div>
-      <div className="perf-layout">
-        <div className="perf-vitals">
-          <h3>パフォーマンスモニター</h3>
-          {VITALS.map((v) => {
-            const value = latest[v.key];
-            const series = history[v.key] ?? [];
-            return (
-              <div className="vital" key={v.key}>
-                <div className="vital-head">
-                  <span className="vital-label">
-                    {v.label}
-                    {v.derived && (
-                      <span className="vital-derived" title={v.hint}>
-                        derived
-                      </span>
-                    )}
-                  </span>
-                  <span className="vital-value">
-                    {value === undefined ? '—' : v.fmt(value)}
-                  </span>
-                </div>
-                <Sparkline values={series} />
-              </div>
-            );
-          })}
-        </div>
-        <div className="perf-table">
-          <h3>All metrics (raw, latest)</h3>
-          <div className="metrics">
-            <table>
-              <tbody>
-                {allKeys.map((k) => (
-                  <tr key={k} className={isDerived(k) ? 'derived-row' : ''}>
-                    <td className="k">
-                      {k}
-                      {isDerived(k) && <span className="vital-derived">derived</span>}
-                    </td>
-                    <td className="v">{fmtNum(latest[k])}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      <div className="lab-grid">
+        <section className="lab-card">
+          <h3>ネットワーク スロットリング</h3>
+          <p className="dim">
+            Network.emulateNetworkConditions に preset を流します。
+            offline / slow-3g 等は Chrome DevTools と同じ値。
+          </p>
+          <label className="lab-row">
+            <span>preset</span>
+            <select
+              value={network}
+              onChange={(e) => setNetwork(e.target.value as NetworkPreset)}
+            >
+              {NETWORK_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="lab-row">
+            <span>CPU</span>
+            <select
+              value={cpu}
+              onChange={(e) => setCpu(Number(e.target.value))}
+            >
+              {CPU_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="lab-actions">
+            <button className="btn-primary" disabled={busy} onClick={applyThrottling}>
+              Apply
+            </button>
+            <span className="dim">
+              applied: net=
+              <strong>{appliedNetwork ?? '—'}</strong>, cpu=
+              <strong>{appliedCpu !== null ? `${appliedCpu}×` : '—'}</strong>
+            </span>
           </div>
-        </div>
+        </section>
+
+        <section className="lab-card">
+          <h3>トレース記録</h3>
+          <p className="dim">
+            Tracing.start / Tracing.end で記録。停止時に自動で
+            <code> cdt-trace-YYYYMMDD-hhmmss.json</code> として
+            ダウンロードします (Chrome DevTools の "Load profile" で開けます)。
+          </p>
+          <div className="lab-actions">
+            {recording ? (
+              <button className="btn-danger" disabled={busy} onClick={stopRec}>
+                Stop &amp; save
+              </button>
+            ) : (
+              <button className="btn-primary" disabled={busy} onClick={startRec}>
+                Start recording
+              </button>
+            )}
+            {recording && elapsed !== null && (
+              <span className="rec-pill">
+                ● recording · {elapsed}s
+              </span>
+            )}
+          </div>
+          {lastTrace && lastTraceName && (
+            <div className="lab-row">
+              <span>最後のトレース</span>
+              <button
+                onClick={() => downloadTrace(lastTrace, lastTraceName)}
+                disabled={busy}
+              >
+                {lastTraceName} ({lastTrace.traceEvents.length} events) を再保存
+              </button>
+            </div>
+          )}
+        </section>
+
+        {error && <div className="err lab-error">{error}</div>}
       </div>
     </div>
   );
-}
-
-const DERIVED_KEYS = new Set(['CpuUsage', 'LayoutsPerSec', 'RecalcStylesPerSec']);
-function isDerived(k: string): boolean {
-  return DERIVED_KEYS.has(k);
-}
-
-function fmtBytes(n: number) {
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  if (n < 1024 * 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} MB`;
-  return `${(n / 1024 / 1024 / 1024).toFixed(2)} GB`;
-}
-
-function fmtNum(v: number | undefined) {
-  if (v === undefined) return '';
-  if (Math.abs(v) >= 1e9) return v.toExponential(2);
-  if (Math.abs(v) >= 1e6) return v.toFixed(0);
-  if (Number.isInteger(v)) return v.toString();
-  return v.toFixed(3);
 }

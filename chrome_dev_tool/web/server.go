@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ysksm/my_logic_example/chrome_dev_tool/core/browser"
+	"github.com/ysksm/my_logic_example/chrome_dev_tool/core/cdp"
 	"github.com/ysksm/my_logic_example/chrome_dev_tool/core/collector"
 	"github.com/ysksm/my_logic_example/chrome_dev_tool/core/events"
 )
@@ -25,6 +26,8 @@ type Server struct {
 
 	subsMu sync.RWMutex
 	subs   map[*subscriber]struct{}
+
+	tracer tracer
 }
 
 // State is the snapshot returned from /api/state.
@@ -54,6 +57,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/snapshot", s.handleSnapshot)
 	mux.HandleFunc("/api/list", s.handleList)
 	mux.HandleFunc("/api/state", s.handleState)
+	mux.HandleFunc("/api/throttle", s.handleThrottle)
+	mux.HandleFunc("/api/trace/start", s.handleTraceStart)
+	mux.HandleFunc("/api/trace/stop", s.handleTraceStop)
 	mux.HandleFunc("/ws", s.handleWS)
 	mux.Handle("/", spaHandler())
 	return cors(mux)
@@ -129,6 +135,10 @@ func (s *Server) startCollector(ctx context.Context, p StartParams) error {
 		s.state.TargetURL = t.URL
 	}
 	s.mu.Unlock()
+	// Wire tracing handlers onto the freshly attached client. The handlers
+	// drop events whenever tracer.active is false, so they're harmless
+	// before the first /api/trace/start.
+	s.tracer.wire(c.Client())
 	return nil
 }
 
@@ -154,6 +164,17 @@ func (s *Server) snapshotMetrics(ctx context.Context) (events.PerfSample, error)
 		return events.PerfSample{}, errors.New("collector not started")
 	}
 	return c.SnapshotMetrics(ctx)
+}
+
+// cdpClient returns the CDP client of the active collector, or nil.
+func (s *Server) cdpClient() *cdp.Client {
+	s.mu.Lock()
+	c := s.col
+	s.mu.Unlock()
+	if c == nil {
+		return nil
+	}
+	return c.Client()
 }
 
 // ─── Browser lifecycle ───────────────────────────────────────────────────

@@ -131,3 +131,8 @@ func (c *Collector) Stop() error {
 
 // Target returns the attached page target (nil before Start).
 func (c *Collector) Target() *cdp.Target { return c.target }
+
+// Client returns the underlying CDP client (nil before Start). Exposed so
+// the web layer can issue ad-hoc commands (throttling, tracing, …) without
+// re-implementing collector lifecycle.
+func (c *Collector) Client() *cdp.Client { return c.client }

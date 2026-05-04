@@ -132,3 +132,76 @@ func (s *Server) handleList(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleState(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, s.snapshotState())
 }
+
+func (s *Server) handleThrottle(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST required", http.StatusMethodNotAllowed)
+		return
+	}
+	var p ThrottleParams
+	if r.ContentLength > 0 {
+		if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+			writeErr(w, err, http.StatusBadRequest)
+			return
+		}
+	}
+	cl := s.cdpClient()
+	if cl == nil {
+		writeErr(w, fmt.Errorf("no active collector — start observation first"), http.StatusBadRequest)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	if err := applyThrottling(ctx, cl, p); err != nil {
+		writeErr(w, err, http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, p)
+}
+
+func (s *Server) handleTraceStart(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST required", http.StatusMethodNotAllowed)
+		return
+	}
+	var p TraceStartParams
+	if r.ContentLength > 0 {
+		if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+			writeErr(w, err, http.StatusBadRequest)
+			return
+		}
+	}
+	cl := s.cdpClient()
+	if cl == nil {
+		writeErr(w, fmt.Errorf("no active collector — start observation first"), http.StatusBadRequest)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	if err := s.tracer.start(ctx, cl, p); err != nil {
+		writeErr(w, err, http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, map[string]any{"recording": true})
+}
+
+func (s *Server) handleTraceStop(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST required", http.StatusMethodNotAllowed)
+		return
+	}
+	cl := s.cdpClient()
+	if cl == nil {
+		writeErr(w, fmt.Errorf("no active collector"), http.StatusBadRequest)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 90*time.Second)
+	defer cancel()
+	tf, err := s.tracer.stop(ctx, cl)
+	if err != nil {
+		writeErr(w, err, http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(tf)
+}

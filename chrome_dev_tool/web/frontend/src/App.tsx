@@ -10,13 +10,14 @@ import type {
 } from './types';
 import { NetworkPanel, type NetRow } from './components/NetworkPanel';
 import { ConsolePanel, type ConsoleRow } from './components/ConsolePanel';
+import { PerformanceMonitorPanel } from './components/PerformanceMonitorPanel';
 import { PerformancePanel } from './components/PerformancePanel';
 
 const MAX_NET = 1500;
 const MAX_CONSOLE = 1500;
 const MAX_PERF_HISTORY = 120;
 
-type Tab = 'network' | 'console' | 'performance';
+type Tab = 'network' | 'console' | 'performance' | 'perfMonitor';
 
 export function App() {
   const [state, setState] = useState<State>({
@@ -284,6 +285,12 @@ export function App() {
           className={`tab ${tab === 'performance' ? 'active' : ''}`}
           onClick={() => setTab('performance')}
         >
+          パフォーマンス
+        </button>
+        <button
+          className={`tab ${tab === 'perfMonitor' ? 'active' : ''}`}
+          onClick={() => setTab('perfMonitor')}
+        >
           パフォーマンスモニター
         </button>
       </div>
@@ -295,8 +302,9 @@ export function App() {
         {tab === 'console' && (
           <ConsolePanel rows={consoleRows} onClear={() => setConsoleRows([])} />
         )}
-        {tab === 'performance' && (
-          <PerformancePanel
+        {tab === 'performance' && <PerformancePanel />}
+        {tab === 'perfMonitor' && (
+          <PerformanceMonitorPanel
             history={perfHistRef.current}
             latest={perfLatest}
             onSnapshot={snapshot}
