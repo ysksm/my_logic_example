@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CAD Viewer</title>
+    <link rel="stylesheet" href="/style.css" />
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "/vendor/three/three.module.js",
+          "three/addons/": "/vendor/three/addons/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <header class="topbar">
+      <h1>CAD Viewer</h1>
+      <div class="controls">
+        <label class="file-button">
+          <input id="file-input" type="file" hidden />
+          3D ファイルを開く
+        </label>
+        <button id="sample-btn" type="button">サンプル読み込み</button>
+        <button id="reset-btn" type="button">カメラリセット</button>
+        <label class="toggle">
+          <input id="wire-toggle" type="checkbox" />
+          ワイヤーフレーム
+        </label>
+      </div>
+    </header>
+
+    <main class="layout">
+      <div id="canvas-wrap">
+        <canvas id="renderCanvas" touch-action="none"></canvas>
+        <div id="overlay">
+          <div id="status">ファイルを選択してください</div>
+          <pre id="meta"></pre>
+        </div>
+      </div>
+    </main>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
