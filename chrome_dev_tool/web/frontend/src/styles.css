@@ -510,3 +510,103 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   0%   { background: rgba(248, 81, 73, 0.35); }
   100% { background: transparent; }
 }
+
+/* ─── Trace help card ─────────────────────────────────────────────────── */
+.trace-help-card {
+  margin-top: 4px;
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.trace-help-card ol {
+  margin: 6px 0 6px 18px;
+  padding: 0;
+}
+.trace-help-card code {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-size: 11px;
+}
+.trace-meta code {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 1px 4px;
+}
+
+/* ─── Trace viewer modal ──────────────────────────────────────────────── */
+.trace-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: var(--bg);
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  font-size: 12px;
+}
+.trace-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 12px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+.trace-header h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.trace-header .spacer { flex: 1; }
+.trace-canvas-host {
+  position: relative;
+  overflow: auto;
+  background: var(--bg);
+  cursor: grab;
+}
+.trace-canvas-host:active { cursor: grabbing; }
+.trace-tip {
+  position: fixed;
+  pointer-events: none;
+  background: rgba(31, 36, 44, 0.97);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 11px;
+  z-index: 60;
+  max-width: 360px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+}
+.trace-tip .t-name {
+  font-weight: 600;
+  color: var(--fg);
+  word-break: break-all;
+  margin-bottom: 4px;
+}
+.trace-tip .t-meta {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.trace-tip .t-meta span { color: var(--muted); margin-right: 4px; }
+.trace-tip .t-args {
+  margin: 6px 0 0;
+  padding: 4px 6px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  font-size: 10px;
+  max-height: 140px;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+.trace-help {
+  padding: 6px 12px;
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11px;
+}

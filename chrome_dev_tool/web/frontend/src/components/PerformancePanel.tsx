@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { api, type NetworkPreset, type TraceFile } from '../api';
+import { TraceViewer } from './TraceViewer';
 
 const NETWORK_OPTIONS: { value: NetworkPreset; label: string }[] = [
   { value: 'online', label: 'Online — no throttling' },
@@ -28,6 +29,8 @@ export function PerformancePanel() {
   const [recStartedAt, setRecStartedAt] = useState<number | null>(null);
   const [lastTrace, setLastTrace] = useState<TraceFile | null>(null);
   const [lastTraceName, setLastTraceName] = useState<string | null>(null);
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -178,20 +181,58 @@ export function PerformancePanel() {
             )}
           </div>
           {lastTrace && lastTraceName && (
-            <div className="lab-row">
-              <span>最後のトレース</span>
-              <button
-                onClick={() => downloadTrace(lastTrace, lastTraceName)}
-                disabled={busy}
-              >
-                {lastTraceName} ({lastTrace.traceEvents.length} events) を再保存
-              </button>
-            </div>
+            <>
+              <div className="lab-row">
+                <span>最後のトレース</span>
+                <span className="dim trace-meta">
+                  <code>{lastTraceName}</code> ·{' '}
+                  {lastTrace.traceEvents.length.toLocaleString()} events
+                </span>
+              </div>
+              <div className="lab-actions">
+                <button
+                  className="btn-primary"
+                  onClick={() => setViewerOpen(true)}
+                  disabled={busy}
+                >
+                  ツール内で表示
+                </button>
+                <button
+                  onClick={() => downloadTrace(lastTrace, lastTraceName)}
+                  disabled={busy}
+                >
+                  再ダウンロード
+                </button>
+                <button onClick={() => setShowHelp((s) => !s)}>
+                  Chrome DevTools で開く方法
+                </button>
+              </div>
+              {showHelp && (
+                <div className="trace-help-card">
+                  <strong>Chrome DevTools の Performance パネルで開く:</strong>
+                  <ol>
+                    <li>任意の Chrome タブで <code>Cmd+Option+I</code> (mac) /
+                      <code> Ctrl+Shift+I</code> で DevTools を開く</li>
+                    <li>「Performance」パネルを選択</li>
+                    <li>左上の <strong>"Load profile…"</strong> アイコン (↑ 形) を
+                      クリック、または保存した <code>.json</code> をパネルに
+                      ドラッグ&ドロップ</li>
+                  </ol>
+                  <span className="dim">
+                    フォーマットは Chrome DevTools 互換の
+                    <code> {'{'}traceEvents, metadata{'}'}</code> です。
+                  </span>
+                </div>
+              )}
+            </>
           )}
         </section>
 
         {error && <div className="err lab-error">{error}</div>}
       </div>
+      {viewerOpen && lastTrace && (
+        <TraceViewer trace={lastTrace} onClose={() => setViewerOpen(false)} />
+      )}
     </div>
   );
 }
