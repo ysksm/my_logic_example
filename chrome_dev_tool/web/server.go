@@ -58,6 +58,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/list", s.handleList)
 	mux.HandleFunc("/api/state", s.handleState)
 	mux.HandleFunc("/api/throttle", s.handleThrottle)
+	mux.HandleFunc("/api/render", s.handleRender)
 	mux.HandleFunc("/api/trace/start", s.handleTraceStart)
 	mux.HandleFunc("/api/trace/stop", s.handleTraceStop)
 	mux.HandleFunc("/ws", s.handleWS)

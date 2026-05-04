@@ -159,6 +159,33 @@ func (s *Server) handleThrottle(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, p)
 }
 
+func (s *Server) handleRender(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST required", http.StatusMethodNotAllowed)
+		return
+	}
+	var p RenderParams
+	if r.ContentLength > 0 {
+		if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+			writeErr(w, err, http.StatusBadRequest)
+			return
+		}
+	}
+	cl := s.cdpClient()
+	if cl == nil {
+		writeErr(w, fmt.Errorf("no active collector — start observation first"), http.StatusBadRequest)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	res, err := applyRendering(ctx, cl, p)
+	if err != nil {
+		writeErr(w, err, http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, res)
+}
+
 func (s *Server) handleTraceStart(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "POST required", http.StatusMethodNotAllowed)

@@ -374,3 +374,35 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   border-radius: 4px;
   background: rgba(248, 81, 73, 0.08);
 }
+
+/* ─── Rendering panel ─────────────────────────────────────────────────── */
+.render-check {
+  display: grid;
+  grid-template-columns: 18px 1fr auto;
+  gap: 8px; align-items: center;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 0;
+}
+.render-check:hover { color: var(--accent); }
+.render-check input { margin: 0; }
+.render-hint {
+  color: var(--muted);
+  font-size: 10px;
+  background: var(--bg);
+  padding: 1px 4px;
+  border-radius: 3px;
+  border: 1px solid var(--line);
+}
+.lab-warning {
+  grid-column: 1 / -1;
+  padding: 8px 12px;
+  border: 1px solid var(--warn);
+  border-radius: 4px;
+  background: rgba(210, 153, 34, 0.08);
+  color: var(--warn);
+  font-size: 12px;
+}
+.lab-warning ul { margin: 6px 0 0 0; padding-left: 18px; }
+.lab-warning li { margin: 2px 0; }
+.lab-warning code { color: var(--fg); }

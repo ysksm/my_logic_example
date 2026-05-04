@@ -12,12 +12,13 @@ import { NetworkPanel, type NetRow } from './components/NetworkPanel';
 import { ConsolePanel, type ConsoleRow } from './components/ConsolePanel';
 import { PerformanceMonitorPanel } from './components/PerformanceMonitorPanel';
 import { PerformancePanel } from './components/PerformancePanel';
+import { RenderingPanel } from './components/RenderingPanel';
 
 const MAX_NET = 1500;
 const MAX_CONSOLE = 1500;
 const MAX_PERF_HISTORY = 120;
 
-type Tab = 'network' | 'console' | 'performance' | 'perfMonitor';
+type Tab = 'network' | 'console' | 'performance' | 'perfMonitor' | 'rendering';
 
 export function App() {
   const [state, setState] = useState<State>({
@@ -293,6 +294,12 @@ export function App() {
         >
           パフォーマンスモニター
         </button>
+        <button
+          className={`tab ${tab === 'rendering' ? 'active' : ''}`}
+          onClick={() => setTab('rendering')}
+        >
+          レンダリング
+        </button>
       </div>
 
       <div className="tab-host">
@@ -310,6 +317,7 @@ export function App() {
             onSnapshot={snapshot}
           />
         )}
+        {tab === 'rendering' && <RenderingPanel />}
       </div>
     </div>
   );
