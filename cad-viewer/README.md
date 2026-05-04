@@ -114,13 +114,34 @@ make test
 | `.obj` | Wavefront OBJ | クライアント (Babylon.js Loader) | `web/static/loaders/babylon.js` |
 | `.step` / `.stp` | STEP (ISO 10303) | クライアント (OpenCASCADE/WASM) | `web/static/loaders/occt.js` |
 | `.iges` / `.igs` | IGES | クライアント (OpenCASCADE/WASM) | `web/static/loaders/occt.js` |
+| `.fbx` | Autodesk FBX | クライアント (three.js → Babylon ブリッジ) | `web/static/loaders/three-bridge.js` |
+| `.3mf` | 3D Manufacturing Format | クライアント (three.js → Babylon ブリッジ) | `web/static/loaders/three-bridge.js` |
+| `.dae` | COLLADA | クライアント (three.js → Babylon ブリッジ) | `web/static/loaders/three-bridge.js` |
+| `.3ds` | Autodesk 3D Studio | クライアント (three.js → Babylon ブリッジ) | `web/static/loaders/three-bridge.js` |
+| `.ply` | Stanford PLY | クライアント (three.js → Babylon ブリッジ) | `web/static/loaders/three-bridge.js` |
 | `.edz` | EPLAN Data Portal アーカイブ (中の 3D を抽出) | クライアント (JSZip → OCCT/STL) | `web/static/loaders/edz.js` |
 
-STEP/IGES は `web/static/vendor/occt/occt-import-js.{js,wasm}` (約 7.6 MB)、
-EDZ は `web/static/vendor/jszip/jszip.min.js` (約 95 KB) を必要とします。
-いずれもリポジトリに同梱済みで、バージョンを上げるときは `make vendor-js`
-で取得し直せます。OCCT/JSZip はそれぞれの形式が初めて選択された時点で
-遅延ロードされます。
+クライアント側依存ライブラリ (すべてリポジトリに同梱済み、`make vendor-js` で更新):
+
+- `web/static/vendor/occt/occt-import-js.{js,wasm}` 約 7.6 MB — STEP / IGES
+- `web/static/vendor/jszip/jszip.min.js` 約 95 KB — EDZ
+- `web/static/vendor/three/` 約 1.7 MB — FBX / 3MF / DAE / 3DS / PLY 用の three.js コア + 各 Loader (公式 `examples/jsm/`)
+
+依存はすべて初回利用時に**動的 import される遅延読込**です。STL/glTF/OBJ
+だけ使うなら、これら 3 つはネットワーク・メモリのいずれにも乗りません。
+
+#### three.js ブリッジ方式について
+
+レンダラは Babylon.js のままで、three.js は **Loader としてだけ** 同居しています:
+
+1. `index.html` に import map を置き、`three` / `three/addons/` をベンダ
+   配下に解決
+2. `loaders/three-bridge.js` がファイル形式に対応する Loader モジュールを
+   動的 import し、`loader.parse()` で `THREE.Object3D` 階層を取得
+3. 各 `THREE.Mesh` のワールド変換を頂点位置に焼き込み、TypedArray を
+   Babylon の `VertexData` に詰めて 1 つの Babylon Mesh に変換
+4. 以降は他形式と同じ `modelRoot` 配下に並ぶので、カメラフレーミング・
+   ワイヤーフレーム切替など既存パイプラインが透過的に効く
 
 #### EDZ (EPLAN) の扱い
 

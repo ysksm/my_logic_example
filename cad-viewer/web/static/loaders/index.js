@@ -15,6 +15,7 @@ import { loadSTL } from "./stl.js";
 import { loadBabylonAsset } from "./babylon.js";
 import { loadOcct } from "./occt.js";
 import { loadEDZ } from "./edz.js";
+import { loadViaThree } from "./three-bridge.js";
 
 export const loaders = {
   ".stl": loadSTL,
@@ -26,6 +27,11 @@ export const loaders = {
   ".iges": loadOcct,
   ".igs": loadOcct,
   ".edz": loadEDZ,
+  ".fbx": loadViaThree,
+  ".3mf": loadViaThree,
+  ".dae": loadViaThree,
+  ".3ds": loadViaThree,
+  ".ply": loadViaThree,
 };
 
 export const supportedExtensions = Object.keys(loaders);
