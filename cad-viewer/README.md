@@ -114,11 +114,22 @@ make test
 | `.obj` | Wavefront OBJ | クライアント (Babylon.js Loader) | `web/static/loaders/babylon.js` |
 | `.step` / `.stp` | STEP (ISO 10303) | クライアント (OpenCASCADE/WASM) | `web/static/loaders/occt.js` |
 | `.iges` / `.igs` | IGES | クライアント (OpenCASCADE/WASM) | `web/static/loaders/occt.js` |
+| `.edz` | EPLAN Data Portal アーカイブ (中の 3D を抽出) | クライアント (JSZip → OCCT/STL) | `web/static/loaders/edz.js` |
 
-STEP/IGES は `web/static/vendor/occt/occt-import-js.{js,wasm}` (約 7.6 MB)
-を必要とします。リポジトリに同梱済みですが、バージョンを上げるときは
-`make vendor-js` で取得し直せます。WASM はファイル選択時まで
-ロードされない遅延読込です。
+STEP/IGES は `web/static/vendor/occt/occt-import-js.{js,wasm}` (約 7.6 MB)、
+EDZ は `web/static/vendor/jszip/jszip.min.js` (約 95 KB) を必要とします。
+いずれもリポジトリに同梱済みで、バージョンを上げるときは `make vendor-js`
+で取得し直せます。OCCT/JSZip はそれぞれの形式が初めて選択された時点で
+遅延ロードされます。
+
+#### EDZ (EPLAN) の扱い
+
+EDZ アーカイブから 3D ファイル (STEP > STP > IGES > IGS > STL の優先順)
+を 1 つ自動選択して既存パイプラインに流します。複数候補がある場合は
+ブラウザコンソールに全候補をログ出力し、選択された 1 つの相対パスを
+ステータスに表示します。EPLAN プロジェクト本体 (`.epj` / `.elk` /
+`.ema` / ...) は 2D 電気 CAE データなので本アプリの対象外です
+(EPLAN Platform / 公式 eView 等を使ってください)。
 
 #### 商用カーネル形式 (Parasolid / ACIS / SolidWorks / CATIA / Inventor)
 

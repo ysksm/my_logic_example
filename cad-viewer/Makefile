@@ -3,6 +3,7 @@ BINARY  := cad-viewer
 
 # Frontend vendor library versions (pinned).
 OCCT_IMPORT_JS_VERSION := 0.0.22
+JSZIP_VERSION          := 3.10.1
 
 .PHONY: all build dev test desktop build-desktop vendor-js clean
 
@@ -12,11 +13,13 @@ all: build
 # These are committed for offline-friendly demos; run this only when bumping
 # versions.
 vendor-js:
-	mkdir -p web/static/vendor/occt
+	mkdir -p web/static/vendor/occt web/static/vendor/jszip
 	curl -sL -o web/static/vendor/occt/occt-import-js.js \
 		https://unpkg.com/occt-import-js@$(OCCT_IMPORT_JS_VERSION)/dist/occt-import-js.js
 	curl -sL -o web/static/vendor/occt/occt-import-js.wasm \
 		https://unpkg.com/occt-import-js@$(OCCT_IMPORT_JS_VERSION)/dist/occt-import-js.wasm
+	curl -sL -o web/static/vendor/jszip/jszip.min.js \
+		https://unpkg.com/jszip@$(JSZIP_VERSION)/dist/jszip.min.js
 
 # Web-only build. No cgo, no Wails dependency surface.
 build:
