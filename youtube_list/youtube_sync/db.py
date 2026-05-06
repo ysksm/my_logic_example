@@ -71,6 +71,40 @@ _DDL = [
         channels_synced INTEGER DEFAULT 0,
         videos_synced INTEGER DEFAULT 0)""",
 
+    """CREATE TABLE IF NOT EXISTS comments (
+        id VARCHAR PRIMARY KEY,
+        video_id VARCHAR NOT NULL,
+        parent_id VARCHAR,
+        author VARCHAR,
+        author_channel_id VARCHAR,
+        text TEXT,
+        like_count BIGINT DEFAULT 0,
+        published_at VARCHAR,
+        updated_at VARCHAR,
+        raw_data JSON,
+        synced_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (video_id) REFERENCES videos(id))""",
+
+    """CREATE TABLE IF NOT EXISTS transcripts (
+        video_id VARCHAR NOT NULL,
+        language VARCHAR NOT NULL,
+        is_generated BOOLEAN DEFAULT FALSE,
+        text TEXT,
+        segments JSON,
+        synced_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (video_id, language),
+        FOREIGN KEY (video_id) REFERENCES videos(id))""",
+
+    """CREATE TABLE IF NOT EXISTS thumbnails (
+        entity_type VARCHAR NOT NULL,
+        entity_id VARCHAR NOT NULL,
+        url VARCHAR,
+        content BLOB,
+        content_type VARCHAR,
+        byte_size BIGINT DEFAULT 0,
+        fetched_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (entity_type, entity_id))""",
+
     "CREATE SEQUENCE IF NOT EXISTS channel_history_seq START 1",
     "CREATE SEQUENCE IF NOT EXISTS video_history_seq START 1",
     "CREATE SEQUENCE IF NOT EXISTS sync_history_seq START 1",
@@ -78,6 +112,8 @@ _DDL = [
     "CREATE INDEX IF NOT EXISTS idx_videos_channel ON videos(channel_id)",
     "CREATE INDEX IF NOT EXISTS idx_ch_hist_channel ON channel_history(channel_id)",
     "CREATE INDEX IF NOT EXISTS idx_vh_video ON video_history(video_id)",
+    "CREATE INDEX IF NOT EXISTS idx_comments_video ON comments(video_id)",
+    "CREATE INDEX IF NOT EXISTS idx_comments_parent ON comments(parent_id)",
 ]
 
 
@@ -102,8 +138,12 @@ class Database:
             "CREATE OR REPLACE TEMP TABLE tmp_ch AS SELECT * FROM channels_df"
         )
         # 子テーブルを先に削除（外部キー制約対策）
+        self.conn.execute("DELETE FROM comments WHERE video_id IN (SELECT id FROM videos WHERE channel_id IN (SELECT id FROM tmp_ch))")
+        self.conn.execute("DELETE FROM transcripts WHERE video_id IN (SELECT id FROM videos WHERE channel_id IN (SELECT id FROM tmp_ch))")
+        self.conn.execute("DELETE FROM thumbnails WHERE entity_type = 'video' AND entity_id IN (SELECT id FROM videos WHERE channel_id IN (SELECT id FROM tmp_ch))")
         self.conn.execute("DELETE FROM video_history WHERE video_id IN (SELECT id FROM videos WHERE channel_id IN (SELECT id FROM tmp_ch))")
         self.conn.execute("DELETE FROM videos WHERE channel_id IN (SELECT id FROM tmp_ch)")
+        self.conn.execute("DELETE FROM thumbnails WHERE entity_type = 'channel' AND entity_id IN (SELECT id FROM tmp_ch)")
         self.conn.execute("DELETE FROM channel_history WHERE channel_id IN (SELECT id FROM tmp_ch)")
         self.conn.execute("DELETE FROM channels WHERE id IN (SELECT id FROM tmp_ch)")
         self.conn.execute(
@@ -122,6 +162,18 @@ class Database:
         if channel_id:
             # 子テーブルを先に削除
             self.conn.execute(
+                "DELETE FROM comments WHERE video_id IN (SELECT id FROM videos WHERE channel_id = ?)",
+                [channel_id],
+            )
+            self.conn.execute(
+                "DELETE FROM transcripts WHERE video_id IN (SELECT id FROM videos WHERE channel_id = ?)",
+                [channel_id],
+            )
+            self.conn.execute(
+                "DELETE FROM thumbnails WHERE entity_type = 'video' AND entity_id IN (SELECT id FROM videos WHERE channel_id = ?)",
+                [channel_id],
+            )
+            self.conn.execute(
                 "DELETE FROM video_history WHERE video_id IN (SELECT id FROM videos WHERE channel_id = ?)",
                 [channel_id],
             )
@@ -131,6 +183,15 @@ class Database:
         else:
             self.conn.execute(
                 "CREATE OR REPLACE TEMP TABLE tmp_vid_ids AS SELECT id FROM videos_df"
+            )
+            self.conn.execute(
+                "DELETE FROM comments WHERE video_id IN (SELECT id FROM tmp_vid_ids)"
+            )
+            self.conn.execute(
+                "DELETE FROM transcripts WHERE video_id IN (SELECT id FROM tmp_vid_ids)"
+            )
+            self.conn.execute(
+                "DELETE FROM thumbnails WHERE entity_type = 'video' AND entity_id IN (SELECT id FROM tmp_vid_ids)"
             )
             self.conn.execute(
                 "DELETE FROM video_history WHERE video_id IN (SELECT id FROM tmp_vid_ids)"
@@ -175,6 +236,46 @@ class Database:
             )
         logger.info("Recorded %d video history entries", len(videos_df))
 
+    def upsert_comments(self, comments_df: pd.DataFrame, video_id: str):
+        """コメントを UPSERT（指定動画のコメントを入れ替え）"""
+        self.conn.execute("DELETE FROM comments WHERE video_id = ?", [video_id])
+        if comments_df.empty:
+            return
+        self.conn.execute(
+            "CREATE OR REPLACE TEMP TABLE tmp_com AS SELECT * FROM comments_df"
+        )
+        self.conn.execute(
+            "INSERT INTO comments SELECT *, CURRENT_TIMESTAMP FROM tmp_com"
+        )
+        self.conn.execute("DROP TABLE IF EXISTS tmp_com")
+        logger.info("Upserted %d comments for %s", len(comments_df), video_id)
+
+    def upsert_thumbnail(self, entity_type: str, entity_id: str, url: str,
+                         content: bytes, content_type: str):
+        """サムネ画像（BLOB）を UPSERT"""
+        self.conn.execute(
+            "DELETE FROM thumbnails WHERE entity_type = ? AND entity_id = ?",
+            [entity_type, entity_id],
+        )
+        self.conn.execute(
+            "INSERT INTO thumbnails VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
+            [entity_type, entity_id, url, content, content_type, len(content)],
+        )
+        logger.info("Upserted thumbnail %s/%s (%d bytes)", entity_type, entity_id, len(content))
+
+    def upsert_transcript(self, video_id: str, language: str, is_generated: bool,
+                          text: str, segments_json: str):
+        """文字起こしを UPSERT（動画 ID + 言語で一意）"""
+        self.conn.execute(
+            "DELETE FROM transcripts WHERE video_id = ? AND language = ?",
+            [video_id, language],
+        )
+        self.conn.execute(
+            "INSERT INTO transcripts VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
+            [video_id, language, is_generated, text, segments_json],
+        )
+        logger.info("Upserted transcript %s/%s (%d chars)", video_id, language, len(text))
+
     def record_sync(self, sync_type: str, started_at: str,
                     completed_at: str, channels_synced: int, videos_synced: int):
         """同期履歴を記録"""
@@ -187,13 +288,100 @@ class Database:
     def get_summary(self) -> dict:
         """DB の概要を取得"""
         row = self.conn.execute(
-            "SELECT COUNT(*) AS channels, "
-            "(SELECT COUNT(*) FROM videos) AS videos "
-            "FROM channels"
+            "SELECT "
+            "(SELECT COUNT(*) FROM channels) AS channels, "
+            "(SELECT COUNT(*) FROM videos) AS videos, "
+            "(SELECT COUNT(*) FROM comments) AS comments, "
+            "(SELECT COUNT(*) FROM transcripts) AS transcripts, "
+            "(SELECT COUNT(*) FROM thumbnails) AS thumbnails"
         ).fetchone()
-        return {"channels": row[0], "videos": row[1]}
+        return {
+            "channels": row[0],
+            "videos": row[1],
+            "comments": row[2],
+            "transcripts": row[3],
+            "thumbnails": row[4],
+        }
 
     def get_channel_ids(self) -> list[str]:
         """登録済みチャンネル ID 一覧を取得"""
         rows = self.conn.execute("SELECT id FROM channels ORDER BY title").fetchall()
         return [r[0] for r in rows]
+
+    def get_video_ids_without_comments(self, channel_id: str | None = None,
+                                       limit: int = 0) -> list[str]:
+        """コメント未取得の動画 ID を返す"""
+        sql = (
+            "SELECT v.id FROM videos v "
+            "WHERE NOT EXISTS (SELECT 1 FROM comments c WHERE c.video_id = v.id) "
+            "AND v.comment_count > 0"
+        )
+        params: list = []
+        if channel_id:
+            sql += " AND v.channel_id = ?"
+            params.append(channel_id)
+        sql += " ORDER BY v.published_at DESC"
+        if limit > 0:
+            sql += f" LIMIT {int(limit)}"
+        return [r[0] for r in self.conn.execute(sql, params).fetchall()]
+
+    def get_entities_without_thumbnail(self, entity_type: str,
+                                       channel_id: str | None = None,
+                                       limit: int = 0) -> list[tuple[str, str]]:
+        """サムネ画像未取得の entity を (id, url) で返す
+
+        entity_type: 'channel' | 'video'
+        """
+        if entity_type == "channel":
+            sql = (
+                "SELECT c.id, c.thumbnail_url FROM channels c "
+                "WHERE c.thumbnail_url <> '' "
+                "AND NOT EXISTS ("
+                "  SELECT 1 FROM thumbnails t "
+                "  WHERE t.entity_type = 'channel' AND t.entity_id = c.id"
+                ")"
+            )
+            params: list = []
+            if channel_id:
+                sql += " AND c.id = ?"
+                params.append(channel_id)
+            sql += " ORDER BY c.title"
+        elif entity_type == "video":
+            sql = (
+                "SELECT v.id, v.thumbnail_url FROM videos v "
+                "WHERE v.thumbnail_url <> '' "
+                "AND NOT EXISTS ("
+                "  SELECT 1 FROM thumbnails t "
+                "  WHERE t.entity_type = 'video' AND t.entity_id = v.id"
+                ")"
+            )
+            params = []
+            if channel_id:
+                sql += " AND v.channel_id = ?"
+                params.append(channel_id)
+            sql += " ORDER BY v.published_at DESC"
+        else:
+            raise ValueError(f"無効な entity_type: {entity_type}")
+        if limit > 0:
+            sql += f" LIMIT {int(limit)}"
+        return [(r[0], r[1]) for r in self.conn.execute(sql, params).fetchall()]
+
+    def get_video_ids_without_transcript(self, channel_id: str | None = None,
+                                         language: str = "ja",
+                                         limit: int = 0) -> list[str]:
+        """指定言語の文字起こし未取得の動画 ID を返す"""
+        sql = (
+            "SELECT v.id FROM videos v "
+            "WHERE NOT EXISTS ("
+            "  SELECT 1 FROM transcripts t "
+            "  WHERE t.video_id = v.id AND t.language = ?"
+            ")"
+        )
+        params: list = [language]
+        if channel_id:
+            sql += " AND v.channel_id = ?"
+            params.append(channel_id)
+        sql += " ORDER BY v.published_at DESC"
+        if limit > 0:
+            sql += f" LIMIT {int(limit)}"
+        return [r[0] for r in self.conn.execute(sql, params).fetchall()]

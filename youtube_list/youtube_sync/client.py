@@ -249,3 +249,76 @@ class YouTubeClient:
             return []
         self._log(f"  Step 2: videos API で詳細取得 ({len(video_ids)} 件)")
         return self.fetch_videos(video_ids)
+
+    # ── サムネ画像取得 ─────────────────────────────────
+
+    def fetch_thumbnail_image(self, url: str) -> tuple[bytes, str]:
+        """サムネ画像 URL からバイナリと Content-Type を取得"""
+        if not url:
+            raise ValueError("空の URL")
+        try:
+            resp = requests.get(url, timeout=30)
+        except requests.exceptions.ConnectionError as e:
+            raise RuntimeError(f"サムネ取得 接続エラー: {e}") from e
+        except requests.exceptions.Timeout:
+            raise RuntimeError("サムネ取得 タイムアウト (30秒超過)")
+        if resp.status_code >= 400:
+            raise RuntimeError(f"サムネ取得 HTTP {resp.status_code}: {url}")
+        content_type = resp.headers.get("Content-Type", "image/jpeg").split(";")[0].strip()
+        return resp.content, content_type
+
+    # ── コメント取得 ───────────────────────────────────
+
+    def fetch_comments(
+        self,
+        video_id: str,
+        max_results: int = 100,
+        include_replies: bool = True,
+    ) -> list[dict]:
+        """動画のコメント（トップレベル + 任意で返信）を取得
+
+        max_results=0 で全件取得。コメント無効動画は空リストを返す。
+        """
+        threads: list[dict] = []
+        page_token: str | None = None
+        page = 0
+
+        while True:
+            page += 1
+            per_page = 100
+            if max_results > 0:
+                remaining = max_results - len(threads)
+                if remaining <= 0:
+                    break
+                per_page = min(100, remaining)
+
+            params = {
+                "part": "snippet,replies" if include_replies else "snippet",
+                "videoId": video_id,
+                "maxResults": str(per_page),
+                "order": "time",
+                "textFormat": "plainText",
+            }
+            if page_token:
+                params["pageToken"] = page_token
+
+            try:
+                data = self._get("commentThreads", params)
+            except RuntimeError as e:
+                msg = str(e)
+                # コメント無効 / 見つからない動画はスキップ
+                if "commentsDisabled" in msg or "videoNotFound" in msg:
+                    self._log(f"  コメント取得不可 ({video_id}): {msg}")
+                    return []
+                raise
+
+            threads.extend(data.get("items", []))
+            self._log(f"  コメント取得 ページ{page}: 累計 {len(threads)} スレッド")
+
+            page_token = data.get("nextPageToken")
+            if not page_token:
+                break
+
+        if max_results > 0:
+            return threads[:max_results]
+        return threads

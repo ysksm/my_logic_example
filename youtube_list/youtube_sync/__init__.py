@@ -3,7 +3,12 @@
 from youtube_sync.client import YouTubeClient
 from youtube_sync.db import Database
 from youtube_sync.sync import SyncService, SyncState
-from youtube_sync.transform import ChannelTransformer, VideoTransformer
+from youtube_sync.transcript import TranscriptFetcher
+from youtube_sync.transform import (
+    ChannelTransformer,
+    CommentTransformer,
+    VideoTransformer,
+)
 
 __all__ = [
     "YouTubeClient",
@@ -12,4 +17,6 @@ __all__ = [
     "SyncState",
     "ChannelTransformer",
     "VideoTransformer",
+    "CommentTransformer",
+    "TranscriptFetcher",
 ]
