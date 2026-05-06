@@ -13,4 +13,5 @@ dependencies = [
     "altair>=5.2.0",
     "python-dotenv>=1.0.0",
     "youtube-transcript-api>=0.6.2",
+    "sqlglot>=23.0.0",
 ]
