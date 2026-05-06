@@ -354,7 +354,66 @@ def _(alt, db, mo):
 @app.cell
 def _(mo):
     mo.md("""
-    ## 6. コメント / 文字起こし / サムネ画像 取得
+    ## 6. チャンネル詳細
+    """)
+    return
+
+
+@app.cell
+def _(channel_table, db, mo, pd):
+    _sel = channel_table.value
+    if isinstance(_sel, pd.DataFrame) and not _sel.empty:
+        _ch_id = _sel.iloc[0]["id"]
+        _videos = db.conn.execute("""
+            SELECT title, view_count, like_count, comment_count, published_at
+            FROM videos WHERE channel_id = ?
+            ORDER BY view_count DESC
+        """, [_ch_id]).fetchdf()
+        mo.vstack([
+            mo.md(f"### {_sel.iloc[0]['title']} の動画一覧 ({len(_videos)} 件)"),
+            mo.ui.table(_videos),
+        ])
+    else:
+        mo.md("チャンネル一覧からチャンネルを選択してください")
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md("""
+    ## 7. 履歴データ
+    """)
+    return
+
+
+@app.cell
+def _(alt, db, mo, sync_result):
+    mo.stop(not sync_result, mo.md(""))
+    _hist = db.conn.execute("""
+        SELECT ch.recorded_at, c.title,
+               ch.subscriber_count, ch.video_count, ch.view_count
+        FROM channel_history ch
+        JOIN channels c ON ch.channel_id = c.id
+        ORDER BY ch.recorded_at
+    """).fetchdf()
+
+    if not _hist.empty and len(_hist) > 1:
+        _c = alt.Chart(_hist).mark_line(point=True).encode(
+            x=alt.X("recorded_at:T", title="日時"),
+            y=alt.Y("subscriber_count:Q", title="登録者数"),
+            color=alt.Color("title:N", title="チャンネル"),
+            tooltip=["title:N", "subscriber_count:Q", "recorded_at:T"],
+        ).properties(title="登録者数推移", width=700, height=350)
+        mo.as_html(_c)
+    else:
+        mo.md("履歴データが不足しています（複数回同期すると推移が表示されます）")
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md("""
+    ## 8. コメント / 文字起こし / サムネ画像 取得
     """)
     return
 
@@ -442,7 +501,7 @@ def _(db, mo):
 @app.cell
 def _(mo):
     mo.md("""
-    ## 7. 動画詳細（説明文・文字起こし・コメント・サムネ）
+    ## 9. 動画詳細（説明文・文字起こし・コメント・サムネ）
     """)
     return
 
@@ -546,65 +605,6 @@ def _(db, mo, pd, video_select):
             ])
         else:
             mo.md("**コメント:** （未取得）")
-    return
-
-
-@app.cell
-def _(mo):
-    mo.md("""
-    ## 8. チャンネル詳細
-    """)
-    return
-
-
-@app.cell
-def _(channel_table, db, mo, pd):
-    _sel = channel_table.value
-    if isinstance(_sel, pd.DataFrame) and not _sel.empty:
-        _ch_id = _sel.iloc[0]["id"]
-        _videos = db.conn.execute("""
-            SELECT title, view_count, like_count, comment_count, published_at
-            FROM videos WHERE channel_id = ?
-            ORDER BY view_count DESC
-        """, [_ch_id]).fetchdf()
-        mo.vstack([
-            mo.md(f"### {_sel.iloc[0]['title']} の動画一覧 ({len(_videos)} 件)"),
-            mo.ui.table(_videos),
-        ])
-    else:
-        mo.md("チャンネル一覧からチャンネルを選択してください")
-    return
-
-
-@app.cell
-def _(mo):
-    mo.md("""
-    ## 9. 履歴データ
-    """)
-    return
-
-
-@app.cell
-def _(alt, db, mo, sync_result):
-    mo.stop(not sync_result, mo.md(""))
-    _hist = db.conn.execute("""
-        SELECT ch.recorded_at, c.title,
-               ch.subscriber_count, ch.video_count, ch.view_count
-        FROM channel_history ch
-        JOIN channels c ON ch.channel_id = c.id
-        ORDER BY ch.recorded_at
-    """).fetchdf()
-
-    if not _hist.empty and len(_hist) > 1:
-        _c = alt.Chart(_hist).mark_line(point=True).encode(
-            x=alt.X("recorded_at:T", title="日時"),
-            y=alt.Y("subscriber_count:Q", title="登録者数"),
-            color=alt.Color("title:N", title="チャンネル"),
-            tooltip=["title:N", "subscriber_count:Q", "recorded_at:T"],
-        ).properties(title="登録者数推移", width=700, height=350)
-        mo.as_html(_c)
-    else:
-        mo.md("履歴データが不足しています（複数回同期すると推移が表示されます）")
     return
 
 
