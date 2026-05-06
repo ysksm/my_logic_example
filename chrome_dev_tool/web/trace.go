@@ -20,6 +20,7 @@ var defaultTraceCategories = []string{
 	"disabled-by-default-devtools.timeline",
 	"disabled-by-default-devtools.timeline.frame",
 	"disabled-by-default-devtools.timeline.stack",
+	"disabled-by-default-devtools.screenshot",
 	"disabled-by-default-v8.cpu_profiler",
 	"toplevel",
 	"blink.console",
