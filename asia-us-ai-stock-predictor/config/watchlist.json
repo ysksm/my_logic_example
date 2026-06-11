@@ -1,0 +1,99 @@
+{
+  "layers": [
+    {
+      "id": "L1",
+      "name": "製造装置・検査",
+      "leaders": [
+        { "symbol": "8035.T", "name": "東京エレクトロン", "market": "JP" },
+        { "symbol": "6857.T", "name": "アドバンテスト", "market": "JP" },
+        { "symbol": "6146.T", "name": "ディスコ", "market": "JP" },
+        { "symbol": "6920.T", "name": "レーザーテック", "market": "JP" },
+        { "symbol": "7735.T", "name": "SCREENホールディングス", "market": "JP" },
+        { "symbol": "ASML.AS", "name": "ASML", "market": "EU", "adr": "ASML" },
+        { "symbol": "ASM.AS", "name": "ASM International", "market": "EU" },
+        { "symbol": "BESI.AS", "name": "BE Semiconductor", "market": "EU" }
+      ],
+      "targets": [
+        { "symbol": "AMAT", "name": "Applied Materials" },
+        { "symbol": "LRCX", "name": "Lam Research" },
+        { "symbol": "KLAC", "name": "KLA" },
+        { "symbol": "NVDA", "name": "NVIDIA（装置株センチメント波及）" }
+      ]
+    },
+    {
+      "id": "L2",
+      "name": "素材・部材",
+      "leaders": [
+        { "symbol": "4063.T", "name": "信越化学", "market": "JP" },
+        { "symbol": "3436.T", "name": "SUMCO", "market": "JP" },
+        { "symbol": "4185.T", "name": "JSR", "market": "JP", "note": "2024年上場廃止。履歴分析のみ" },
+        { "symbol": "7741.T", "name": "HOYA", "market": "JP" },
+        { "symbol": "4062.T", "name": "イビデン", "market": "JP" },
+        { "symbol": "6967.T", "name": "新光電気工業", "market": "JP", "note": "2025年TOBで上場廃止。データ取得不可" }
+      ],
+      "targets": [
+        { "symbol": "ENTG", "name": "Entegris" },
+        { "symbol": "MU", "name": "Micron（基板・素材市況の波及）" }
+      ]
+    },
+    {
+      "id": "L3",
+      "name": "メモリ・HBM",
+      "leaders": [
+        { "symbol": "000660.KS", "name": "SK hynix", "market": "KR" },
+        { "symbol": "005930.KS", "name": "サムスン電子", "market": "KR" }
+      ],
+      "targets": [
+        { "symbol": "MU", "name": "Micron" },
+        { "symbol": "WDC", "name": "Western Digital" },
+        { "symbol": "SNDK", "name": "SanDisk" }
+      ]
+    },
+    {
+      "id": "L4",
+      "name": "ロジック・GPU・IP",
+      "leaders": [
+        { "symbol": "9984.T", "name": "ソフトバンクグループ", "market": "JP", "note": "ARM保有比率による直結ペア。ARM→SBG方向の因果も検証" },
+        { "symbol": "6723.T", "name": "ルネサスエレクトロニクス", "market": "JP" }
+      ],
+      "targets": [
+        { "symbol": "ARM", "name": "Arm Holdings" },
+        { "symbol": "NVDA", "name": "NVIDIA" },
+        { "symbol": "AMD", "name": "AMD" },
+        { "symbol": "AVGO", "name": "Broadcom" },
+        { "symbol": "QCOM", "name": "Qualcomm" }
+      ]
+    },
+    {
+      "id": "L5",
+      "name": "クラウド・アプリケーション",
+      "leaders": [
+        { "symbol": "3778.T", "name": "さくらインターネット", "market": "JP" },
+        { "symbol": "5803.T", "name": "フジクラ", "market": "JP" },
+        { "symbol": "5801.T", "name": "古河電気工業", "market": "JP" }
+      ],
+      "targets": [
+        { "symbol": "MSFT", "name": "Microsoft" },
+        { "symbol": "GOOG", "name": "Alphabet" },
+        { "symbol": "ORCL", "name": "Oracle" },
+        { "symbol": "VRT", "name": "Vertiv" }
+      ]
+    }
+  ],
+  "fx": [
+    { "symbol": "USDJPY=X", "name": "USD/JPY" },
+    { "symbol": "USDKRW=X", "name": "USD/KRW" },
+    { "symbol": "EURUSD=X", "name": "EUR/USD" }
+  ],
+  "benchmark": { "symbol": "^GSPC", "name": "S&P 500" },
+  "analysis": {
+    "sigma_window": 120,
+    "sigma_threshold": 2.0,
+    "rolling_windows": [20, 60, 120],
+    "lag_range": [-3, 3],
+    "beta_window": 120,
+    "min_samples_for_signal": 10,
+    "hit_rate_strong": 0.65,
+    "hit_rate_moderate": 0.55
+  }
+}
