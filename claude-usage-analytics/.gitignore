@@ -1,0 +1,7 @@
+# 生成物・環境
+*.duckdb
+*.duckdb.wal
+.venv/
+__pycache__/
+.marimo.toml
+__marimo__/
