@@ -1,0 +1,186 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  font-family: "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
+  color: #1f2933;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 16px;
+  border-bottom: 1px solid #d9dee3;
+  background: #ffffff;
+  flex-wrap: wrap;
+}
+
+.toolbar h1 {
+  font-size: 16px;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.toolbar-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+button {
+  padding: 6px 12px;
+  border: 1px solid #c3cad1;
+  border-radius: 6px;
+  background: #f7f9fa;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+button:hover {
+  background: #eef2f5;
+}
+
+button.danger {
+  color: #b42318;
+  border-color: #e4b3ad;
+}
+
+button.danger:hover {
+  background: #fdf1f0;
+}
+
+.status-message {
+  font-size: 12px;
+  color: #52606d;
+  margin-left: auto;
+}
+
+.main {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.canvas {
+  flex: 1;
+  min-width: 0;
+}
+
+.property-panel {
+  width: 280px;
+  border-left: 1px solid #d9dee3;
+  background: #fafbfc;
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.property-panel h2 {
+  font-size: 14px;
+  margin: 0;
+}
+
+.property-panel label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: #52606d;
+}
+
+.property-panel input,
+.property-panel textarea,
+.property-panel select {
+  padding: 6px 8px;
+  border: 1px solid #c3cad1;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.property-meta {
+  font-size: 12px;
+  color: #7b8794;
+  margin: 0;
+}
+
+.help-list {
+  padding-left: 18px;
+  margin: 0;
+  font-size: 12px;
+  color: #52606d;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* --- 画面ノード --- */
+.screen-node {
+  width: 220px;
+  background: #ffffff;
+  border: 1.5px solid #9aa5b1;
+  border-radius: 10px;
+  padding: 10px 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.screen-node.selected {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25);
+}
+
+.screen-node-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.screen-node-name {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.screen-node-badge {
+  font-size: 10px;
+  font-weight: 700;
+  color: #166534;
+  background: #dcfce7;
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+.screen-node-url {
+  font-size: 11px;
+  color: #2563eb;
+  margin-top: 2px;
+  word-break: break-all;
+}
+
+.screen-node-description {
+  font-size: 11px;
+  color: #52606d;
+  margin-top: 6px;
+  white-space: pre-wrap;
+}
+
+.react-flow__edge-textbg {
+  fill: #ffffff;
+}
+
+.react-flow__edge-text {
+  font-size: 11px;
+}

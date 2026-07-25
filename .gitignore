@@ -214,3 +214,5 @@ bin/
 
 # Node.js
 node_modules/
+
+*.tsbuildinfo
