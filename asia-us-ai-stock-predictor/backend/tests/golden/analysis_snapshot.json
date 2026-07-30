@@ -1,0 +1,31 @@
+{
+  "lag_profile": {
+    "-3": 0.0134,
+    "-2": -0.0293,
+    "-1": 0.1682,
+    "0": 0.6917,
+    "1": 0.0517,
+    "2": -0.065,
+    "3": 0.0283
+  },
+  "n_obs": 399,
+  "rolling_last": {
+    "20": 0.3994,
+    "60": 0.5834,
+    "120": 0.6575
+  },
+  "conditional": {
+    "n_trigger_days": 18,
+    "hit_rate": 0.9444,
+    "baseline_hit_rate": 0.7522,
+    "mean_us_return": -0.001491,
+    "mean_gap": -0.002204,
+    "mean_open_to_close": 0.000576,
+    "mean_us_residual": -0.001668
+  },
+  "pricing_in": {
+    "n": 18,
+    "median_gap_ratio": 0.7394,
+    "pct_positive_residual": 0.7222
+  }
+}

@@ -1,0 +1,9 @@
+backend/data/
+__pycache__/
+*.pyc
+.pytest_cache/
+frontend/node_modules/
+frontend/dist/
+# ルート .gitignore の `lib/` がソースの src/lib を巻き込むため除外解除
+!frontend/src/lib/
+!frontend/src/lib/**
