@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ソースマップ入門 — Chrome DevTools</title>
+<style>
+  :root {
+    --bg: #f1f3f4;
+    --panel: #ffffff;
+    --panel-edge: #dadce0;
+    --chrome-bar: #f1f3f4;
+    --ink: #202124;
+    --ink-soft: #5f6368;
+    --accent: #1a73e8;
+    --accent-soft: #e8f0fe;
+    --good: #188038;
+    --good-soft: #e6f4ea;
+    --warn: #b06000;
+    --warn-soft: #fef7e0;
+    --code-bg: #202124;
+    --code-ink: #e8eaed;
+    --code-accent: #8ab4f8;
+    --code-good: #81c995;
+    --code-warn: #fdd663;
+    --shadow: 0 1px 2px rgba(60,64,67,.3), 0 2px 6px 2px rgba(60,64,67,.15);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #17181b;
+      --panel: #202124;
+      --panel-edge: #3c4043;
+      --chrome-bar: #292a2d;
+      --ink: #e8eaed;
+      --ink-soft: #9aa0a6;
+      --accent: #8ab4f8;
+      --accent-soft: #1f3358;
+      --good: #81c995;
+      --good-soft: #1e3a29;
+      --warn: #fdd663;
+      --warn-soft: #3d3320;
+      --code-bg: #17181b;
+      --code-ink: #e8eaed;
+      --shadow: 0 1px 2px rgba(0,0,0,.5), 0 2px 8px rgba(0,0,0,.4);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f1f3f4; --panel: #ffffff; --panel-edge: #dadce0; --chrome-bar: #f1f3f4;
+    --ink: #202124; --ink-soft: #5f6368; --accent: #1a73e8; --accent-soft: #e8f0fe;
+    --good: #188038; --good-soft: #e6f4ea; --warn: #b06000; --warn-soft: #fef7e0;
+    --code-bg: #202124; --code-ink: #e8eaed;
+    --shadow: 0 1px 2px rgba(60,64,67,.3), 0 2px 6px 2px rgba(60,64,67,.15);
+  }
+  :root[data-theme="dark"] {
+    --bg: #17181b; --panel: #202124; --panel-edge: #3c4043; --chrome-bar: #292a2d;
+    --ink: #e8eaed; --ink-soft: #9aa0a6; --accent: #8ab4f8; --accent-soft: #1f3358;
+    --good: #81c995; --good-soft: #1e3a29; --warn: #fdd663; --warn-soft: #3d3320;
+    --code-bg: #17181b; --code-ink: #e8eaed;
+    --shadow: 0 1px 2px rgba(0,0,0,.5), 0 2px 8px rgba(0,0,0,.4);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", Meiryo, system-ui, sans-serif;
+    line-height: 1.65;
+    overflow: hidden;
+  }
+  code, .mono {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, "Roboto Mono", monospace;
+  }
+
+  .deck { height: 100dvh; display: flex; flex-direction: column; }
+
+  /* ── slides ── */
+  .stage { flex: 1; position: relative; overflow: hidden; }
+  .slide {
+    position: absolute; inset: 0;
+    display: none;
+    padding: clamp(16px, 3vh, 36px) clamp(16px, 5vw, 72px);
+    overflow-y: auto;
+  }
+  .slide.active { display: flex; flex-direction: column; animation: rise .35s ease; }
+  @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .slide.active { animation: none; } }
+
+  .eyebrow {
+    color: var(--accent);
+    font-size: .78rem;
+    font-weight: 700;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    margin: 0 0 .4rem;
+  }
+  h1 {
+    font-size: clamp(1.8rem, 4.5vw, 3.2rem);
+    line-height: 1.25;
+    margin: 0 0 .6rem;
+    text-wrap: balance;
+    font-weight: 700;
+  }
+  h2 {
+    font-size: clamp(1.4rem, 3vw, 2.1rem);
+    margin: 0 0 1rem;
+    text-wrap: balance;
+    font-weight: 700;
+  }
+  h2 .num {
+    color: var(--ink-soft);
+    font-weight: 400;
+    font-size: .7em;
+    margin-right: .5em;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  p.lead { font-size: clamp(1rem, 1.8vw, 1.2rem); color: var(--ink-soft); max-width: 42em; margin: 0 0 1rem; }
+  .slide-body { flex: 1; display: flex; flex-direction: column; justify-content: center; max-width: 1100px; width: 100%; margin: 0 auto; }
+
+  /* ── DevTools panel mock ── */
+  .devtools {
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    font-size: .88rem;
+  }
+  .devtools .tabs {
+    display: flex; gap: 0;
+    background: var(--chrome-bar);
+    border-bottom: 1px solid var(--panel-edge);
+    padding: 0 8px;
+    font-size: .8rem;
+    color: var(--ink-soft);
+    overflow-x: auto;
+  }
+  .devtools .tab { padding: 7px 12px; white-space: nowrap; }
+  .devtools .tab.on {
+    color: var(--accent);
+    box-shadow: inset 0 -2px 0 var(--accent);
+    font-weight: 600;
+  }
+  .devtools .pane { padding: 14px 18px; }
+
+  /* ── code blocks ── */
+  pre {
+    background: var(--code-bg);
+    color: var(--code-ink);
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin: 0;
+    overflow-x: auto;
+    font-size: clamp(.78rem, 1.5vw, .95rem);
+    line-height: 1.7;
+    border: 1px solid var(--panel-edge);
+  }
+  pre code { font-size: inherit; }
+  .tok-c { color: var(--code-warn); }      /* comment / directive */
+  .tok-k { color: var(--code-accent); }    /* keyword */
+  .tok-g { color: var(--code-good); }      /* string / good */
+  .tok-dim { color: #9aa0a6; }
+
+  code.inline {
+    background: var(--accent-soft);
+    color: var(--accent);
+    border-radius: 4px;
+    padding: .1em .4em;
+    font-size: .9em;
+  }
+
+  /* ── cards & grids ── */
+  .grid { display: grid; gap: 14px; }
+  .grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+  .grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+  @media (max-width: 760px) {
+    .grid.cols-2, .grid.cols-4 { grid-template-columns: 1fr; }
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    border-radius: 8px;
+    padding: 16px 18px;
+    box-shadow: var(--shadow);
+  }
+  .card h3 { margin: 0 0 .35rem; font-size: 1rem; }
+  .card p { margin: 0; color: var(--ink-soft); font-size: .9rem; }
+  .card .role {
+    display: inline-block;
+    font-size: .7rem; font-weight: 700; letter-spacing: .1em;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: .5rem;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: .15em .7em;
+    border-radius: 999px;
+    font-size: .78rem;
+    font-weight: 600;
+  }
+  .badge.good { background: var(--good-soft); color: var(--good); }
+  .badge.warn { background: var(--warn-soft); color: var(--warn); }
+  .badge.blue { background: var(--accent-soft); color: var(--accent); }
+
+  /* ── flow diagram ── */
+  .flow {
+    display: flex; align-items: stretch; gap: 10px;
+    flex-wrap: wrap;
+  }
+  .flow .node {
+    flex: 1 1 160px;
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    border-radius: 8px;
+    padding: 12px 14px;
+    box-shadow: var(--shadow);
+    min-width: 150px;
+  }
+  .flow .node .t { font-weight: 700; font-size: .92rem; margin-bottom: .2rem; }
+  .flow .node .d { color: var(--ink-soft); font-size: .8rem; }
+  .flow .arrow {
+    align-self: center;
+    color: var(--ink-soft);
+    font-size: 1.2rem;
+    flex: 0 0 auto;
+  }
+
+  ol.steps { margin: 0; padding: 0; list-style: none; counter-reset: st; display: grid; gap: 10px; }
+  ol.steps li {
+    counter-increment: st;
+    display: flex; gap: 14px; align-items: baseline;
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    border-radius: 8px;
+    padding: 10px 16px;
+    box-shadow: var(--shadow);
+  }
+  ol.steps li::before {
+    content: counter(st);
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-weight: 700;
+    color: var(--accent);
+    background: var(--accent-soft);
+    border-radius: 6px;
+    min-width: 1.7em; height: 1.7em;
+    display: inline-flex; align-items: center; justify-content: center;
+    flex: 0 0 auto;
+    font-size: .85rem;
+    position: relative; top: .18em;
+  }
+  ol.steps li .note { color: var(--ink-soft); font-size: .85rem; }
+
+  ul.checks { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+  ul.checks li {
+    display: flex; gap: 12px; align-items: baseline;
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    border-radius: 8px;
+    padding: 12px 16px;
+    box-shadow: var(--shadow);
+  }
+  ul.checks li::before {
+    content: "✓";
+    color: var(--good);
+    font-weight: 700;
+    flex: 0 0 auto;
+  }
+
+  .callout {
+    display: flex; gap: 12px;
+    background: var(--warn-soft);
+    border-left: 4px solid var(--warn);
+    border-radius: 6px;
+    padding: 12px 16px;
+    font-size: .9rem;
+    margin-top: 14px;
+  }
+  .callout.blue { background: var(--accent-soft); border-left-color: var(--accent); }
+  .callout b { flex: 0 0 auto; }
+
+  a { color: var(--accent); }
+
+  /* ── deck chrome ── */
+  .hud {
+    flex: 0 0 auto;
+    display: flex; align-items: center; gap: 16px;
+    padding: 10px clamp(16px, 4vw, 48px);
+    border-top: 1px solid var(--panel-edge);
+    background: var(--chrome-bar);
+  }
+  .hud .title { font-size: .8rem; color: var(--ink-soft); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hud button {
+    background: var(--panel);
+    color: var(--ink);
+    border: 1px solid var(--panel-edge);
+    border-radius: 6px;
+    padding: 6px 14px;
+    font-size: .85rem;
+    cursor: pointer;
+  }
+  .hud button:hover { border-color: var(--accent); color: var(--accent); }
+  .hud button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .hud .count { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: .82rem; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+  .progress { position: absolute; top: 0; left: 0; height: 3px; background: var(--accent); transition: width .25s ease; z-index: 5; }
+  @media (prefers-reduced-motion: reduce) { .progress { transition: none; } }
+
+  .kbd-hint { font-size: .75rem; color: var(--ink-soft); }
+  .kbd-hint kbd {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    border: 1px solid var(--panel-edge);
+    border-radius: 4px;
+    padding: 0 .4em;
+    background: var(--panel);
+  }
+</style>
+</head>
+<body>
+<div class="deck">
+  <div class="progress" id="bar"></div>
+  <div class="stage" id="stage">
+
+    <!-- 1. タイトル -->
+    <section class="slide active">
+      <div class="slide-body">
+        <p class="eyebrow">Chrome DevTools ガイド</p>
+        <h1>ソースマップで<br>「元のコード」をデバッグする</h1>
+        <p class="lead">本番のJavaScriptは圧縮・変換されていて読めない。ソースマップを使えば、DevTools 上で自分が書いたコードのままデバッグできます。</p>
+        <div class="devtools" style="max-width: 640px;">
+          <div class="tabs">
+            <span class="tab">要素</span><span class="tab">コンソール</span><span class="tab on">ソース</span><span class="tab">ネットワーク</span><span class="tab">パフォーマンス</span>
+          </div>
+          <div class="pane">
+            <pre><code><span class="tok-dim">// デプロイされたファイル(実際に実行されるもの)</span>
+<span class="tok-k">const</span> t=<span class="tok-k">document</span>.querySelector(<span class="tok-g">"#a"</span>);t.addEventListener(<span class="tok-g">"click"</span>,()=&gt;{...});
+<span class="tok-c">//# sourceMappingURL=app.min.js.map</span></code></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. なぜ必要か -->
+    <section class="slide">
+      <div class="slide-body">
+        <h2><span class="num">02</span>なぜソースマップが必要か</h2>
+        <p class="lead">パフォーマンスのため、本番コードは圧縮・結合・変換されます。その結果、ブラウザで動くコードは人間には読めません。</p>
+        <div class="grid cols-2">
+          <div class="card">
+            <span class="role">作成したコード(開発時)</span>
+            <pre><code><span class="tok-k">const</span> button = document
+  .querySelector(<span class="tok-g">"#submit"</span>);
+
+button.addEventListener(<span class="tok-g">"click"</span>, () =&gt; {
+  validateForm();
+});</code></pre>
+          </div>
+          <div class="card">
+            <span class="role">デプロイされたコード(本番)</span>
+            <pre><code><span class="tok-k">const</span> e=document.querySelector(<span class="tok-g">"#submit"</span>);e.addEventListener(<span class="tok-g">"click"</span>,()=&gt;{v()});</code></pre>
+            <p style="margin-top:.6rem;">変数名は短縮され、改行・空白は削除。エラー行番号も元コードと一致しない。</p>
+          </div>
+        </div>
+        <div class="callout blue"><b>解決策:</b><span>ソースマップが「圧縮後のコード」と「元のコード」の対応表になり、DevTools が元のコードを表示・デバッグできるようにします。Chrome が実際に実行するのはあくまで圧縮コードです。</span></div>
+      </div>
+    </section>
+
+    <!-- 3. 仕組み -->
+    <section class="slide">
+      <div class="slide-body">
+        <h2><span class="num">03</span>仕組み — DevTools はどうやって元コードを表示するのか</h2>
+        <div class="flow" style="margin-bottom:18px;">
+          <div class="node">
+            <div class="t mono">app.min.js</div>
+            <div class="d">デプロイされたファイル。末尾に <code>//#&nbsp;sourceMappingURL</code> コメントを含む</div>
+          </div>
+          <div class="arrow">→</div>
+          <div class="node">
+            <div class="t mono">app.min.js.map</div>
+            <div class="d">ソースマップ本体。圧縮コードの各位置 → 元ファイルの位置の対応表</div>
+          </div>
+          <div class="arrow">→</div>
+          <div class="node">
+            <div class="t">ソースパネルに元コードを表示</div>
+            <div class="d">ブレークポイント・エラー・コンソールログが元のファイル/行に自動でマッピングされる</div>
+          </div>
+        </div>
+        <pre><code><span class="tok-dim">// デプロイされたファイルの末尾</span>
+<span class="tok-c">//# sourceMappingURL=app.min.js.map</span></code></pre>
+        <div class="callout"><b>注:</b><span>DevTools はデプロイされたファイルからこのコメントを検出すると通知します。前提は2つ — ソースマップを生成できるビルドツールを使うこと、ウェブサーバーがソースマップを配信できること。</span></div>
+      </div>
+    </section>
+
+    <!-- 4. 対応ツール -->
+    <section class="slide">
+      <div class="slide-body">
+        <h2><span class="num">04</span>ソースマップを生成できるツール</h2>
+        <p class="lead">主要なプリプロセッサ/ビルドツールはすべてソースマップの出力に対応しています。</p>
+        <div class="grid cols-4">
+          <div class="card">
+            <span class="role">トランスパイラ</span>
+            <h3>Babel</h3>
+            <p>新しい構文を古い環境向けの JavaScript に変換</p>
+          </div>
+          <div class="card">
+            <span class="role">コンパイラ</span>
+            <h3>TypeScript / Dart</h3>
+            <p>別言語から JavaScript を生成</p>
+          </div>
+          <div class="card">
+            <span class="role">圧縮ツール</span>
+            <h3>terser</h3>
+            <p>変数名の短縮・空白削除でサイズを最小化</p>
+          </div>
+          <div class="card">
+            <span class="role">バンドラー</span>
+            <h3>Webpack / Vite / esbuild / Parcel</h3>
+            <p>複数ファイルを結合して配信用にビルド</p>
+          </div>
+        </div>
+        <div class="callout blue"><b>ヒント:</b><span>ほとんどのツールは設定1つで有効化できます(例: <code class="inline">devtool: "source-map"</code>、<code class="inline">sourceMap: true</code>)。</span></div>
+      </div>
+    </section>
+
+    <!-- 5. 設定 -->
+    <section class="slide">
+      <div class="slide-body">
+        <h2><span class="num">05</span>DevTools でソースマップを有効にする</h2>
+        <ol class="steps">
+          <li><span>DevTools を開き、<b>設定(⚙)</b> &gt; <b>[設定]</b> &gt; <b>[ソース]</b> を開く</span></li>
+          <li><span><b>[JavaScript ソースマップを有効にする]</b> がオンになっていることを確認 <span class="badge good">デフォルトで有効</span></span></li>
+          <li><span><b>[CSS ソースマップを有効にする]</b> もオンにするのがおすすめ(Sass などの元ファイルが見える)</span></li>
+        </ol>
+        <div class="callout blue" style="margin-top:18px;"><b>確認方法:</b><span>ソースマップが正しく読み込まれたかは <b>[デベロッパー リソース]</b> パネルで確認できます。読み込みの失敗もここに表示され、手動で読み込むこともできます。</span></div>
+      </div>
+    </section>
+
+    <!-- 6. デバッグ手順 -->
+    <section class="slide">
+      <div class="slide-body">
+        <h2><span class="num">06</span>ソースマップを使ったデバッグの流れ</h2>
+        <ol class="steps">
+          <li><span><b>[ソース]</b> パネルでサイトのソースを開き、<b>[作成者]</b>(Authored)セクションから元のソースファイルを開く <span class="note">— デプロイ済みファイルは [デプロイ済み] セクションに並ぶ</span></span></li>
+          <li><span>元のコードに通常どおりブレークポイント(ログポイントも可)を設定する</span></li>
+          <li><span>コードを実行すると、一時停止・エラー・コンソール出力はすべて<b>元のファイルの行番号</b>で表示される</span></li>
+          <li><span><b>[コールスタック]</b> ペインにも元のファイル名が表示される</span></li>
+          <li><span>エディタ下部のステータスバーのリンクから、対応する<b>デプロイ済みファイル</b>(圧縮コード)側の位置へジャンプできる</span></li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- 7. sourceURL -->
+    <section class="slide">
+      <div class="slide-body">
+        <h2><span class="num">07</span>おまけ: <code class="inline">#sourceURL</code> で eval() に名前を付ける</h2>
+        <p class="lead"><code class="inline">eval()</code> や <code class="inline">new Function()</code> で動的に生成したコードは、通常ファイル名を持たずデバッグしづらい。<code class="inline">#sourceURL</code> コメントで仮想的なファイル名を付けられます。</p>
+        <div class="grid cols-2">
+          <div class="card">
+            <span class="role">コード</span>
+            <pre><code><span class="tok-k">eval</span>(<span class="tok-g">`
+  console.log("hello");
+  <span class="tok-c">//# sourceURL=myScript.js</span>
+`</span>);</code></pre>
+          </div>
+          <div class="card">
+            <span class="role">結果</span>
+            <p style="color:var(--ink);">[ソース] パネルのファイルツリーに <code class="inline">myScript.js</code> として表示され、ブレークポイントの設定やスタックトレースでの参照が可能になる。</p>
+            <p style="margin-top:.6rem;"><code class="inline">sourceMappingURL</code> とよく似た仕組みで、動的コードのデバッグを簡素化するヘルパー。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 8. まとめ -->
+    <section class="slide">
+      <div class="slide-body">
+        <h2><span class="num">08</span>まとめ</h2>
+        <ul class="checks">
+          <li><span>本番コードは圧縮されて読めない → <b>ソースマップ</b>が圧縮コードと元コードを対応付ける</span></li>
+          <li><span>Chrome が実行するのは圧縮コード。<b>表示とデバッグ体験</b>だけが元コードになる</span></li>
+          <li><span>Babel / TypeScript / terser / Webpack / Vite など主要ツールはすべて対応</span></li>
+          <li><span>DevTools 設定で <b>JavaScript / CSS ソースマップ</b>をオンに(デフォルト有効)</span></li>
+          <li><span>[作成者] セクションの元ファイルにブレークポイントを置けば、エラーもログも元の行番号で追える</span></li>
+          <li><span>動的コードには <code class="inline">//# sourceURL=名前.js</code> で名前を付ける</span></li>
+        </ul>
+        <p style="margin-top:18px; color:var(--ink-soft); font-size:.85rem;">
+          出典: <a href="https://developer.chrome.com/docs/devtools/javascript/source-maps?hl=ja" target="_blank" rel="noopener">Chrome for Developers — ソースマップを使用して元のコードをデバッグする</a>
+        </p>
+      </div>
+    </section>
+
+  </div>
+
+  <div class="hud">
+    <span class="title">ソースマップで元のコードをデバッグする — Chrome DevTools</span>
+    <span class="kbd-hint"><kbd>←</kbd> <kbd>→</kbd> で移動</span>
+    <span class="count" id="count">1 / 8</span>
+    <button id="prev" aria-label="前のスライド">← 前へ</button>
+    <button id="next" aria-label="次のスライド">次へ →</button>
+  </div>
+</div>
+
+<script>
+  const slides = Array.from(document.querySelectorAll(".slide"));
+  const bar = document.getElementById("bar");
+  const count = document.getElementById("count");
+  let i = 0;
+
+  function show(n) {
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach((s, k) => s.classList.toggle("active", k === i));
+    count.textContent = (i + 1) + " / " + slides.length;
+    bar.style.width = ((i + 1) / slides.length * 100) + "%";
+  }
+  document.getElementById("next").addEventListener("click", () => show(i + 1));
+  document.getElementById("prev").addEventListener("click", () => show(i - 1));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight" || e.key === " " || e.key === "PageDown") { e.preventDefault(); show(i + 1); }
+    if (e.key === "ArrowLeft" || e.key === "PageUp") { e.preventDefault(); show(i - 1); }
+    if (e.key === "Home") show(0);
+    if (e.key === "End") show(slides.length - 1);
+  });
+  show(0);
+</script>
+</body>
+</html>
