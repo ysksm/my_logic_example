@@ -17,6 +17,7 @@
 | [ddd-diagram-generator](./ddd-diagram-generator) | DDD 静的解析 | Go + React + Vite | 🟡 動作する試作 | — |
 | [jd-go](./jd-go) | Jira 連携 | Go + DuckDB + HTMX/Alpine | 🟡 動作する試作 | — |
 | [screen-flow-designer](./screen-flow-designer) | 画面遷移図 | React + TypeScript + React Flow + Playwright | 🟡 動作する試作 | — |
+| [screen-transition-map](./screen-transition-map) | 画面遷移図 / ドキュメント | React + TypeScript + React Flow + Playwright | 🟡 動作する試作 | — |
 | [stock-price-viewer](./stock-price-viewer) | データ ETL | Python + marimo + yfinance | 🟡 動作する試作 | — |
 | [babylon-js-learning](./babylon-js-learning) | 3D 学習 | Babylon.js (CDN) + HTML/JS | 🔵 学習用 | ✅ |
 | [polling-app](./polling-app) | フロント学習 | React + Redux Toolkit (CRA) | 🔵 学習用 | ✅ |
@@ -68,6 +69,9 @@ Jira issue を取得して DuckDB に蓄積し、HTMX + Alpine.js + ECharts の�
 
 #### [screen-flow-designer](./screen-flow-designer) — React Flow 画面遷移図デザイナー
 画面をノード、遷移(クリック / フォーム送信など)をエッジとして GUI で編集できる画面遷移図ツール。dagre 自動レイアウト、localStorage 自動保存、JSON エクスポート / インポート(置換・マージ)対応。同梱の Playwright クローラーが実サイトを巡回して同フォーマットの JSON を生成し、マージインポートで手動配置を保持したまま図へ反映できる。
+
+#### [screen-transition-map](./screen-transition-map) — 画面遷移マップ (データ駆動ビューア)
+React SPA の画面遷移をマインドマップ風のツリー図で可視化し、画面キャプチャ・画面一覧・文言一覧・呼び出し元/先の関係・画面間の操作方法 (data-op) をまとめて閲覧できるビューア。screen-map JSON を読み込むだけのデータ駆動構成で、生成手段は差し替え可能 (手書き / 同梱の実験的 Playwright コレクター)。data-op / data-wording 属性規約、検証用サンプル SPA 同梱。
 
 #### [stock-price-viewer](./stock-price-viewer) — 株価データ ETL パイプライン
 Yahoo Finance から株価を取得し、Plotly でチャート化、CSV / HTML エクスポートまでを行う marimo アプリ。DMBOK / ETL の概念を意識したアーキテクチャ説明あり。単一ノートブック構成のため、モジュール単位のテストは未整備。

@@ -1,0 +1,13 @@
+{
+  "name": "screen-transition-map-collector",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "【実験的】Playwright で対象 SPA を巡回して screen-map JSON とキャプチャを生成するコレクター",
+  "scripts": {
+    "collect": "node collect.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.0"
+  }
+}
