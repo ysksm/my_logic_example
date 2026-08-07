@@ -1,0 +1,118 @@
+:root {
+  font-family: "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
+  color: #1f2937;
+}
+
+body {
+  margin: 0;
+  background: #f5f6f8;
+}
+
+.page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.page-header nav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+h1 {
+  font-size: 20px;
+}
+
+.login-page {
+  max-width: 400px;
+  text-align: center;
+}
+
+.card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 16px;
+  text-align: left;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+input[type="text"],
+input[type="password"] {
+  padding: 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  background: #4f46e5;
+  color: #ffffff;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #4338ca;
+}
+
+.item-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.item-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #ffffff;
+  color: #1f2937;
+  text-align: left;
+  cursor: pointer;
+}
+
+.item-card:hover {
+  background: #f8faff;
+}
+
+.item-card.disabled {
+  color: #9ca3af;
+  cursor: default;
+}
+
+.item-name {
+  font-weight: 600;
+}
+
+.item-price {
+  color: #b45309;
+  font-weight: 600;
+}
+
+a {
+  color: #4f46e5;
+}

@@ -1,0 +1,181 @@
+{
+  "version": 1,
+  "meta": {
+    "title": "サンプルショップ",
+    "generator": "manual"
+  },
+  "screens": [
+    {
+      "id": "login",
+      "name": "ログイン",
+      "path": "/login",
+      "description": "アプリの入口。ユーザー名を入力してログインする。",
+      "screenshot": "screenshots/login.png"
+    },
+    {
+      "id": "home",
+      "name": "ホーム (商品一覧)",
+      "path": "/",
+      "description": "商品の一覧を表示するメイン画面。各機能への起点。",
+      "screenshot": "screenshots/home.png"
+    },
+    {
+      "id": "item-detail",
+      "name": "商品詳細",
+      "path": "/items/1",
+      "description": "選択した商品の詳細情報を表示する。",
+      "screenshot": "screenshots/item-detail.png"
+    },
+    {
+      "id": "settings",
+      "name": "設定",
+      "path": "/settings",
+      "description": "表示名や通知などの設定を変更する。",
+      "screenshot": "screenshots/settings.png"
+    }
+  ],
+  "transitions": [
+    {
+      "id": "t-login-home",
+      "from": "login",
+      "to": "home",
+      "operation": {
+        "actionType": "submit",
+        "dataOp": "login-submit",
+        "selector": "[data-op=\"login-submit\"]",
+        "label": "「ログイン」ボタンで送信"
+      }
+    },
+    {
+      "id": "t-home-item",
+      "from": "home",
+      "to": "item-detail",
+      "operation": {
+        "actionType": "click",
+        "dataOp": "open-item",
+        "selector": "[data-op=\"open-item\"]",
+        "label": "商品カードをクリック"
+      }
+    },
+    {
+      "id": "t-home-settings",
+      "from": "home",
+      "to": "settings",
+      "operation": {
+        "actionType": "click",
+        "dataOp": "open-settings",
+        "selector": "[data-op=\"open-settings\"]",
+        "label": "「設定」リンクをクリック"
+      }
+    },
+    {
+      "id": "t-home-login",
+      "from": "home",
+      "to": "login",
+      "operation": {
+        "actionType": "click",
+        "dataOp": "logout",
+        "selector": "[data-op=\"logout\"]",
+        "label": "「ログアウト」をクリック"
+      }
+    },
+    {
+      "id": "t-item-home",
+      "from": "item-detail",
+      "to": "home",
+      "operation": {
+        "actionType": "click",
+        "dataOp": "back-home",
+        "selector": "[data-op=\"back-home\"]",
+        "label": "「一覧へ戻る」をクリック"
+      }
+    },
+    {
+      "id": "t-item-settings",
+      "from": "item-detail",
+      "to": "settings",
+      "operation": {
+        "actionType": "click",
+        "dataOp": "open-settings",
+        "selector": "[data-op=\"open-settings\"]",
+        "label": "「設定」リンクをクリック"
+      }
+    },
+    {
+      "id": "t-settings-home-save",
+      "from": "settings",
+      "to": "home",
+      "operation": {
+        "actionType": "submit",
+        "dataOp": "save-settings",
+        "selector": "[data-op=\"save-settings\"]",
+        "label": "「保存」ボタンで送信"
+      }
+    },
+    {
+      "id": "t-settings-home-back",
+      "from": "settings",
+      "to": "home",
+      "operation": {
+        "actionType": "click",
+        "dataOp": "back-home",
+        "selector": "[data-op=\"back-home\"]",
+        "label": "「一覧へ戻る」をクリック"
+      }
+    }
+  ],
+  "wordings": [
+    {
+      "id": "app-title",
+      "text": "サンプルショップ",
+      "usages": [
+        { "screenId": "login", "selector": "[data-wording=\"app-title\"]" },
+        { "screenId": "home", "selector": "[data-wording=\"app-title\"]" },
+        { "screenId": "item-detail", "selector": "[data-wording=\"app-title\"]" },
+        { "screenId": "settings", "selector": "[data-wording=\"app-title\"]" }
+      ]
+    },
+    {
+      "id": "login-heading",
+      "text": "ログイン",
+      "usages": [
+        { "screenId": "login", "selector": "[data-wording=\"login-heading\"]" }
+      ]
+    },
+    {
+      "id": "login-button-label",
+      "text": "ログイン",
+      "usages": [
+        { "screenId": "login", "selector": "[data-wording=\"login-button-label\"]" }
+      ]
+    },
+    {
+      "id": "home-heading",
+      "text": "商品一覧",
+      "usages": [
+        { "screenId": "home", "selector": "[data-wording=\"home-heading\"]" }
+      ]
+    },
+    {
+      "id": "logout-label",
+      "text": "ログアウト",
+      "usages": [
+        { "screenId": "home", "selector": "[data-wording=\"logout-label\"]" }
+      ]
+    },
+    {
+      "id": "item-heading",
+      "text": "商品詳細",
+      "usages": [
+        { "screenId": "item-detail", "selector": "[data-wording=\"item-heading\"]" }
+      ]
+    },
+    {
+      "id": "settings-heading",
+      "text": "設定",
+      "usages": [
+        { "screenId": "settings", "selector": "[data-wording=\"settings-heading\"]" }
+      ]
+    }
+  ]
+}
