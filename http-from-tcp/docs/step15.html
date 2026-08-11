@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>step15: Access-Control-Max-Age</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-step="15">
+<main>
+
+<section class="slide">
+  <h1>step15: Access-Control-Max-Age</h1>
+  <p class="lead">プリフライトのキャッシュ。2回目から <code>OPTIONS</code> が消えるのを目で見ます。</p>
+
+  <div class="box warn">
+    <div class="box-title">問題意識</div>
+    <div class="diagram" style="margin-bottom:0">API を1回呼ぶ = OPTIONS の往復 + 本番の往復 = 2往復
+
+APIを100回呼べば、OPTIONS も100回飛ぶ</div>
+  </div>
+
+  <p>プリフライトは<strong>往復1回分まるごと余計な通信</strong>です。
+  レイテンシの大きい回線では体感できるほど遅くなります。</p>
+
+  <pre class="wire"><code><span class="res">Access-Control-Max-Age: 30</span></code></pre>
+  <p>「この許可は30秒間有効です」と伝えると、ブラウザは同じ条件のプリフライトをスキップします。</p>
+</section>
+
+<section class="slide try">
+  <h1>手を動かす</h1>
+
+  <pre class="shell"><code>cd steps/step15-max-age
+node server.js</code></pre>
+
+  <p>2つのボタンは、どちらも「<code>PUT</code> を3回連続で送る」だけです。
+  違いはサーバが <code>Access-Control-Max-Age</code> を返すかどうかだけ。</p>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th>パス</th><th>Max-Age</th><th>OPTIONS</th><th>本番</th></tr>
+    <tr><td><code>/api/nocache</code></td><td>無し</td><td><strong>3</strong></td><td>3</td></tr>
+    <tr><td><code>/api/cached</code></td><td><code>30</code></td><td><strong>1</strong></td><td>3</td></tr>
+  </table>
+  </div>
+
+  <p>本番はどちらも3回。<code>OPTIONS</code> の回数だけが違います。</p>
+
+  <p>DevTools の Network タブでも <code>OPTIONS</code> の行数を数えてみてください。
+  <code>/api/cached</code> では1本目にだけ <code>OPTIONS</code> があります。</p>
+
+  <p>30秒待ってからもう一度押すと、<code>/api/cached</code> にも <code>OPTIONS</code> が飛びます。
+  キャッシュが切れたためです。</p>
+</section>
+
+<section class="slide">
+  <h1>キャッシュの単位</h1>
+
+  <div class="diagram">キャッシュのキー ＝ オリジン ＋ URL ＋ メソッド ＋ ヘッダーの組み合わせ ＋ credentialsの有無</div>
+
+  <ul>
+    <li><code>/api/cached</code> への <code>PUT</code> がキャッシュされていても、
+        <code>DELETE</code> は<strong>別扱い</strong>で改めてプリフライトが飛ぶ</li>
+    <li>URLが1文字でも違えば別扱い</li>
+    <li><code>credentials</code> の有無でも別扱い</li>
+  </ul>
+
+  <p>つまり「1回プリフライトを通せば全部通る」わけではありません。</p>
+
+  <h2>ブラウザごとの上限</h2>
+  <div class="tablewrap">
+  <table>
+    <tr><th>ブラウザ</th><th>上限</th></tr>
+    <tr><td>Chrome</td><td>7200秒（2時間）</td></tr>
+    <tr><td>Firefox</td><td>86400秒（24時間）</td></tr>
+    <tr><td>Safari</td><td>600秒</td></tr>
+  </table>
+  </div>
+  <p><code>Access-Control-Max-Age: 86400</code> と書いても、Chromeでは2時間に丸められます。</p>
+</section>
+
+<section class="slide">
+  <h1>実務での注意</h1>
+
+  <div class="box danger">
+    <div class="box-title">開発中に大きな Max-Age を設定すると、設定を直しても反映されない</div>
+    <p style="margin-bottom:0">ブラウザが古い許可を覚えているためです。
+    「CORS設定を直したのに直らない」の犯人はたいていこれです。</p>
+  </div>
+
+  <h2>対処</h2>
+  <ul>
+    <li>DevTools の Network タブで <strong>Disable cache</strong> を有効にする</li>
+    <li>ブラウザを再起動する</li>
+    <li>開発中は <code>Max-Age</code> を小さく（または付けない）</li>
+  </ul>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th>状況</th><th>目安</th></tr>
+    <tr><td>開発中</td><td>付けない、または <code>0</code>〜<code>10</code></td></tr>
+    <tr><td>本番・安定したAPI</td><td><code>600</code>〜<code>7200</code></td></tr>
+  </table>
+  </div>
+
+  <details class="quiz">
+    <summary>クイズ: <code>/api/x</code> への <code>PUT</code> のプリフライトがキャッシュされているとき、
+      <code>/api/x</code> への <code>DELETE</code> はプリフライトなしで送れる？</summary>
+    <p style="margin-bottom:0"><strong>送れません。</strong>
+    キャッシュはメソッドごとに分かれています。改めてプリフライトが飛びます。</p>
+  </details>
+
+  <details class="quiz">
+    <summary>クイズ: サーバ側のカウンタをリセットすれば、次はまた <code>OPTIONS</code> が飛びますか？</summary>
+    <p style="margin-bottom:0"><strong>飛びません。</strong>
+    キャッシュを持っているのは<strong>ブラウザ</strong>です。
+    サーバ側の数字をリセットしても、ブラウザの記憶は消えません。
+    CORSがブラウザ側の仕組みであることが、ここでも効いています。</p>
+  </details>
+</section>
+
+</main>
+<script src="assets/deck.js"></script>
+</body>
+</html>

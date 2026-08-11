@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>step03: ヘッダーをパースする</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-step="3">
+<main>
+
+<section class="slide">
+  <h1>step03: ヘッダーをパースする</h1>
+  <p class="lead">2行目以降を「名前: 値」に分解する。そのために「分割して届く」問題に向き合います。</p>
+
+  <div class="box key">
+    <div class="box-title">このステップでわかること</div>
+    <ul>
+      <li>ヘッダー名は<strong>大文字小文字を区別しない</strong></li>
+      <li>同名ヘッダーは <code>,</code> で連結する（<code>Set-Cookie</code> だけ例外）</li>
+      <li><strong>1回の <code>data</code> イベント ＝ 1メッセージ ではない</strong></li>
+    </ul>
+  </div>
+
+  <div class="box">
+    <div class="box-title">step02からの差分</div>
+    <ul style="margin-bottom:0">
+      <li>受信をバッファに溜める</li>
+      <li><code>\r\n\r\n</code> が揃うまで待ってから解析する</li>
+      <li>ヘッダー名を小文字に正規化して辞書にする</li>
+    </ul>
+  </div>
+</section>
+
+<section class="slide">
+  <h1>なぜバッファに溜めるのか</h1>
+
+  <div class="diagram">TCPは「バイト列のストリーム」であって「メッセージの列」ではない
+
+  サーバが1回 write したもの      受信側の data イベント
+  ┌────────────────────────┐     ┌──────────┐
+  │ GET / HTTP/1.1\r\n     │     │ GET / HT │ ← 1回目
+  │ Host: localhost\r\n    │ ──→ ├──────────┤
+  │ X-Foo: 1\r\n           │     │ TP/1.1\r │ ← 2回目
+  │ \r\n                   │     ├──────────┤
+  └────────────────────────┘     │ \nHost:… │ ← 3回目
+                                 └──────────┘
+  逆に、2つのリクエストが1回の data でまとめて届くこともある</div>
+
+  <pre><code>let buffer = Buffer.alloc(0);            // 接続ごとに用意
+
+socket.on("data", (chunk) =&gt; {
+  buffer = Buffer.concat([buffer, chunk]);  // まず溜める
+
+  const headerEnd = buffer.indexOf("\r\n\r\n");
+  if (headerEnd === -1) return;          // まだ揃っていない → 続きを待つ
+
+  // ここから解析
+});</code></pre>
+</section>
+
+<section class="slide">
+  <h1>ヘッダーの解析</h1>
+
+  <pre><code>const headText = buffer.subarray(0, headerEnd).toString("utf8");
+const lines = headText.split("\r\n");
+
+const [method, target, version] = lines[0].split(" ");   // 1行目
+
+const headers = {};
+for (const line of lines.slice(1)) {                     // 2行目以降
+  const colon = line.indexOf(":");
+  if (colon === -1) continue;                            // 壊れた行は無視
+
+  // ヘッダー名は大文字小文字を区別しない（RFC 9110）
+  const name  = line.slice(0, colon).trim().toLowerCase();
+  const value = line.slice(colon + 1).trim();
+
+  // 同名が複数回来たら "," で連結するのがHTTPの規則
+  headers[name] = name in headers ? headers[name] + ", " + value : value;
+}</code></pre>
+
+  <div class="box warn">
+    <div class="box-title">なぜ小文字に揃えるのか</div>
+    <p style="margin-bottom:0"><code>Content-Type</code> / <code>content-type</code> /
+    <code>CONTENT-TYPE</code> はすべて同じヘッダーです。
+    クライアントによって書き方が違うので、辞書に入れる時点で正規化しておくと、
+    以降のコードが <code>headers["content-type"]</code> だけを見ればよくなります。</p>
+  </div>
+</section>
+
+<section class="slide try">
+  <h1>手を動かす</h1>
+
+  <pre class="shell"><code>cd steps/step03-headers
+node server.js</code></pre>
+
+  <h2>実験1: curlとブラウザの差</h2>
+  <pre class="shell"><code>curl http://localhost:8080/</code></pre>
+  <p>curl は3〜4個。次にブラウザで開くと <code>sec-ch-ua</code>、
+  <code>accept-encoding</code>、<code>sec-fetch-mode</code>… と10個以上並びます。</p>
+
+  <h2>実験2: 大文字小文字は区別されない</h2>
+  <pre class="shell"><code>curl -H 'X-Foo: 1' -H 'x-FOO: 2' http://localhost:8080/</code></pre>
+  <p>結果は <code>x-foo : 1, 2</code> と1つにまとまります。</p>
+
+  <h2>実験3: ヘッダーが分割して届く様子</h2>
+  <pre class="shell"><code>{ printf 'GET /slow HTTP/1.1\r\n';
+  sleep 1; printf 'Host: localhost\r\n';
+  sleep 1; printf 'X-Late: yes\r\n';
+  sleep 1; printf '\r\n'; } | nc localhost 8080</code></pre>
+  <p>サーバに <code>▶ まだ \r\n\r\n が来ていません。続きを待ちます</code>
+  が何度か出てから、最後にまとめて解析されます。</p>
+
+  <h2>実験4: Host ヘッダー</h2>
+  <pre class="shell"><code>curl -H 'Host: example.com' http://localhost:8080/</code></pre>
+  <p>接続先は localhost なのに <code>host = example.com</code> になります。</p>
+</section>
+
+<section class="slide">
+  <h1>Host ヘッダーの役割</h1>
+
+  <div class="diagram">        1つのIPアドレス・1つのポート
+                 │
+    ┌────────────┼────────────┐
+    │            │            │
+ example.com  shop.com   blog.example.com
+    ↑            ↑            ↑
+    どれ宛のリクエストかを Host ヘッダーで見分ける</div>
+
+  <p>HTTP/1.1 で <code>Host</code> が<strong>必須</strong>になったのはこのためです。
+  1台のサーバで複数サイトを運用できます（バーチャルホスト）。</p>
+
+  <div class="box key">
+    <div class="box-title">後の章への伏線</div>
+    <p style="margin-bottom:0"><code>Host</code> と、第4章で出てくる <code>Origin</code> は別物です。
+    <code>Host</code> は「<strong>どこ宛か</strong>」、<code>Origin</code> は
+    「<strong>どこから出たか</strong>」。step19 のプロキシでは <code>Host</code> を書き換えます。</p>
+  </div>
+
+  <details class="quiz">
+    <summary>クイズ: <code>\r\n\r\n</code> の直後から始まるのは何ですか？</summary>
+    <p style="margin-bottom:0"><strong>ボディ</strong>です。次のステップで扱います。
+    そしてそこで「ボディの終わりはどうやって知るのか」という難問に出会います。</p>
+  </details>
+
+  <details class="quiz">
+    <summary>クイズ: なぜ「壊れた行は無視」してよいのか？</summary>
+    <p style="margin-bottom:0">学習用の割り切りです。実務のサーバは
+    <code>400 Bad Request</code> を返します。曖昧な入力を黙って受け入れると、
+    前段のプロキシと解釈がズレて<strong>リクエストスマグリング</strong>の温床になるためです。</p>
+  </details>
+</section>
+
+</main>
+<script src="assets/deck.js"></script>
+</body>
+</html>

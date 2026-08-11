@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>step04: ボディを読む</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-step="4">
+<main>
+
+<section class="slide">
+  <h1>step04: ボディを読む</h1>
+  <p class="lead">TCPには「メッセージの終わり」がありません。ではボディはどこで終わるのか。</p>
+
+  <div class="box key">
+    <div class="box-title">このステップの核心</div>
+    <ul style="margin-bottom:0">
+      <li>ヘッダーの終わりには <strong>印がある</strong>（<code>\r\n\r\n</code>）</li>
+      <li>ボディの終わりを示す<strong>印は存在しない</strong></li>
+      <li>だから送信側が <code>Content-Length</code> で長さを先に宣言する</li>
+    </ul>
+  </div>
+</section>
+
+<section class="slide">
+  <h1>境界問題</h1>
+
+  <div class="diagram">ヘッダー部分            空行        ボディ
+┌────────────────────┐ ┌──────┐ ┌───────────────┐
+POST /json HTTP/1.1\r\n
+Content-Length: 21\r\n
+                        \r\n\r\n   {"name":"太郎"}
+                                    ↑ここから21バイト</div>
+
+  <p>接続は<strong>次のリクエストのために開いたまま</strong>かもしれません。
+  「切断されたら終わり」では判断できないのです。</p>
+
+  <pre><code>const bodyStart = headerEnd + 4;                       // "\r\n\r\n" の4バイト
+const contentLength = Number(headers["content-length"] ?? 0);
+
+if (buffer.length &lt; bodyStart + contentLength) {
+  return;   // まだ全部来ていない → 続きを待つ
+}
+
+const body = buffer.subarray(bodyStart, bodyStart + contentLength);</code></pre>
+
+  <div class="box warn">
+    <div class="box-title">Content-Length はバイト数</div>
+    <p style="margin-bottom:0">文字数ではありません。
+    <code>{"name":"太郎"}</code> は「太郎」がUTF-8で6バイトなので<strong>21バイト</strong>です。
+    <code>Buffer.byteLength()</code> で数えてください。</p>
+  </div>
+</section>
+
+<section class="slide try">
+  <h1>手を動かす</h1>
+
+  <pre class="shell"><code>cd steps/step04-body
+node server.js</code></pre>
+
+  <h2>実験1: フォーム形式のPOST</h2>
+  <pre class="shell"><code>curl -v -X POST -d 'name=taro&amp;age=20' http://localhost:8080/form</code></pre>
+  <p>curl が自動で <code>Content-Length: 16</code> と
+  <code>Content-Type: application/x-www-form-urlencoded</code> を付けています。</p>
+
+  <h2>実験2: JSONのPOST</h2>
+  <pre class="shell"><code>curl -v -X POST -H 'Content-Type: application/json' \
+     -d '{"name":"太郎"}' http://localhost:8080/json</code></pre>
+
+  <h2>実験3: ボディが分割して届く様子</h2>
+  <pre class="shell"><code>{ printf 'POST /slow HTTP/1.1\r\nHost: localhost\r\nContent-Length: 10\r\n\r\n';
+  sleep 1; printf 'abcde';
+  sleep 1; printf 'fghij'; } | nc localhost 8080</code></pre>
+  <pre><code>▶ ボディが足りません: 5 / 10 バイト。続きを待ちます</code></pre>
+
+  <h2>実験4: 嘘のContent-Lengthを送る</h2>
+  <pre class="shell"><code>printf 'POST /lie HTTP/1.1\r\nHost: x\r\nContent-Length: 100\r\n\r\nshort' | nc localhost 8080</code></pre>
+  <p>サーバは「あと95バイト来るはず」と待ち続け、応答しません。</p>
+</section>
+
+<section class="slide">
+  <h1>Content-Length が信用できないと</h1>
+
+  <div class="box danger">
+    <div class="box-title">HTTPリクエストスマグリング</div>
+    <p>実務のサーバやプロキシが <code>Content-Length</code> と
+    <code>Transfer-Encoding</code> の整合性に神経質なのは、この食い違いが攻撃になるためです。</p>
+    <div class="diagram" style="background:#0b0f14;margin-bottom:0">前段プロキシ「このリクエストは Content-Length どおり10バイトだ」
+後段サーバ  「いや Transfer-Encoding があるからこっちが正だ」
+              ↓
+   解釈のズレた残りバイトが「次のリクエスト」として扱われ、
+   他人のリクエストに攻撃者のデータが混ざる</div>
+  </div>
+
+  <h2>長さが事前にわからない場合</h2>
+  <pre class="wire"><code><span class="res">HTTP/1.1 200 OK</span>
+Transfer-Encoding: chunked
+
+7<span class="crlf">\r\n</span>
+Mozilla<span class="crlf">\r\n</span>      ← 7バイト
+9<span class="crlf">\r\n</span>
+Developer<span class="crlf">\r\n</span>    ← 9バイト
+0<span class="crlf">\r\n</span>            ← 0 で終わり
+<span class="crlf">\r\n</span></code></pre>
+  <p>「長さを先に言えないなら、小分けにして毎回長さを言う」という発想です。
+  この教材では扱いませんが、存在は覚えておいてください。</p>
+</section>
+
+<section class="slide">
+  <h1>まとめ</h1>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th>終わりの判定</th><th>方法</th></tr>
+    <tr><td>ヘッダー</td><td><code>\r\n\r\n</code> を探す</td></tr>
+    <tr><td>ボディ（長さがわかる）</td><td><code>Content-Length</code> の数だけ数える</td></tr>
+    <tr><td>ボディ（長さが不明）</td><td><code>Transfer-Encoding: chunked</code></td></tr>
+    <tr><td>HTTP/1.0 の応答</td><td>接続が閉じられるまで（だから keep-alive が使えなかった）</td></tr>
+  </table>
+  </div>
+
+  <details class="quiz">
+    <summary>クイズ: <code>Content-Length</code> を実際より<strong>小さく</strong>宣言したら？</summary>
+    <p style="margin-bottom:0">余ったバイトはバッファに残り、
+    <strong>次のリクエストの先頭として解釈されます</strong>。
+    step05 で「読み切った分をバッファから捨てて、残りを次として読む」ループを書くと、
+    これが実際に起きるのを確かめられます。</p>
+  </details>
+
+  <details class="quiz">
+    <summary>クイズ: GETリクエストにボディを付けられますか？</summary>
+    <p style="margin-bottom:0">仕様上は禁止されていませんが、
+    意味が定義されていないため<strong>実質的に使えません</strong>。
+    プロキシが捨てることもあります。データを送るなら POST か PUT を使ってください。</p>
+  </details>
+
+  <div class="box do">
+    <div class="box-title">次のステップ</div>
+    <p style="margin-bottom:0">読み切った分をバッファから捨ててループさせると、
+    1本の接続で複数リクエストを処理できます（keep-alive）。
+    そこで作る「HTTPコア」を step06 以降ずっと使い回します。</p>
+  </div>
+</section>
+
+</main>
+<script src="assets/deck.js"></script>
+</body>
+</html>

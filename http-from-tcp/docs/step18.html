@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>step18: 許可リストと落とし穴</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-step="18">
+<main>
+
+<section class="slide">
+  <h1>step18: 許可リストと落とし穴</h1>
+  <p class="lead">動くだけのCORS設定から、安全で意図どおりのCORS設定へ。</p>
+
+  <h2>正しい実装</h2>
+  <pre><code>const ALLOWED_ORIGINS = new Set([
+  "http://localhost:8080",
+  "https://app.example.com",
+]);
+
+function safeCors(origin) {
+  const headers = { "Vary": "Origin" };              // 許可でも不許可でも必ず付ける
+  if (!origin) return headers;                       // Origin無しはCORS対象外
+  if (!ALLOWED_ORIGINS.has(origin)) return headers;  // ← 完全一致だけ
+
+  headers["Access-Control-Allow-Origin"] = origin;   // "*" ではない
+  headers["Access-Control-Allow-Credentials"] = "true";
+  headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS";
+  headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization";
+  headers["Access-Control-Max-Age"] = "600";
+  return headers;
+}</code></pre>
+
+  <p>要点は <strong><code>Set.has()</code> による完全一致</strong>です。
+  前方一致でも部分一致でも正規表現でもありません。</p>
+</section>
+
+<section class="slide try">
+  <h1>実験 — 4つの落とし穴</h1>
+
+  <pre class="shell"><code>cd steps/step18-origin-allowlist
+node server.js</code></pre>
+
+  <div class="box">
+    <div class="box-title">なぜ curl を使うのか</div>
+    <p style="margin-bottom:0">ブラウザからは <code>Origin</code> を偽装できません。
+    攻撃者は自分のサイトから送るので、実際には偽装ではなく
+    「<strong>悪意あるサイトの本物のOrigin</strong>」が届きます。これを手元で再現します。</p>
+  </div>
+
+  <pre class="shell"><code># (1) 正しい実装 → 何も返さない
+curl -s -D- -o/dev/null -H 'Origin: http://evil.example' \
+  http://localhost:8081/api/safe | grep -i access-control
+
+# (2) Origin をそのまま返す → 誰でも通る
+curl -s -D- -o/dev/null -H 'Origin: http://evil.example' \
+  http://localhost:8081/api/reflect-any | grep -i access-control
+
+# (3) 前方一致のバグ
+curl -s -D- -o/dev/null -H 'Origin: http://localhost:8080.evil.example' \
+  http://localhost:8081/api/prefix-bug | grep -i access-control
+
+# (4) 部分一致のバグ
+curl -s -D- -o/dev/null -H 'Origin: http://notlocalhost:8080' \
+  http://localhost:8081/api/includes-bug | grep -i access-control</code></pre>
+</section>
+
+<section class="slide">
+  <h1>結果</h1>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th>実装</th><th>送ったOrigin</th><th>返ったACAO</th></tr>
+    <tr><td><code>ALLOWED.has(origin)</code></td><td><code>http://evil.example</code></td>
+        <td><strong>無し</strong>（正しい）</td></tr>
+    <tr><td><code>origin</code> をそのまま返す</td><td><code>http://evil.example</code></td>
+        <td><code>http://evil.example</code></td></tr>
+    <tr><td><code>origin.startsWith("http://localhost:8080")</code></td>
+        <td><code>http://localhost:8080<strong>.evil.example</strong></code></td><td>そのまま返る</td></tr>
+    <tr><td><code>origin.includes("localhost:8080")</code></td>
+        <td><code>http://<strong>not</strong>localhost:8080</code></td><td>そのまま返る</td></tr>
+  </table>
+  </div>
+
+  <div class="box danger">
+    <div class="box-title">攻撃者が自由に用意できるドメイン名です</div>
+    <p style="margin-bottom:0"><code>localhost:8080.evil.example</code> も
+    <code>notlocalhost:8080</code> も、ドメインを買えば誰でも作れます。
+    同じことが <code>app.example.com</code> と <code>app.example.com.evil.jp</code>、
+    <code>evil-app.example.com</code> でも起きます。</p>
+  </div>
+</section>
+
+<section class="slide">
+  <h1>落とし穴4: <code>Origin: null</code></h1>
+
+  <p>「sandbox iframe から2つのAPIを呼ぶ」ボタンを押してください。</p>
+
+  <p><code>sandbox</code> 属性付き（<code>allow-same-origin</code> なし）の iframe は、
+  オリジンが「不透明」になり、そこから出るリクエストの <code>Origin</code> は
+  文字列 <code>null</code> になります。</p>
+
+  <ul>
+    <li><code>/api/safe</code> … <code>null</code> は許可リストに無いので防げる</li>
+    <li><code>/api/null-origin</code> … <code>null</code> を許可しているので<strong>読めてしまう</strong></li>
+  </ul>
+
+  <div class="box warn">
+    <div class="box-title"><code>Origin: null</code> が発生する場面</div>
+    <ul style="margin-bottom:0">
+      <li><code>sandbox</code> 属性付きの iframe</li>
+      <li><code>file://</code> から開いたページ</li>
+      <li>クロスオリジンのリダイレクトを経たリクエスト</li>
+      <li><code>data:</code> URL</li>
+    </ul>
+  </div>
+
+  <p><strong><code>null</code> は「オリジンが無い」ではなく「オリジンを隠したい文脈」です。
+  許可リストに入れてはいけません。</strong></p>
+</section>
+
+<section class="slide">
+  <h1>なぜ「Originの反射」が危険なのか</h1>
+
+  <div class="diagram">1. 利用者があなたのサービスにログインしている（Cookieを持っている）
+2. 利用者が攻撃者のページを開く
+3. そのページのJSが fetch(あなたのAPI, {credentials:'include'}) を実行
+4. ブラウザは利用者のCookieを付けて送る
+5. APIは「来たOriginを許可」するので、攻撃者のJSが応答を読める</div>
+
+  <div class="box danger">
+    <div class="box-title">実質的に与えているもの</div>
+    <p style="margin-bottom:0"><code>Access-Control-Allow-Origin: &lt;来たOrigin&gt;</code> ＋
+    <code>Access-Control-Allow-Credentials: true</code> は、
+    <strong>「全世界に対して、ログイン中のユーザーとしてAPIを叩き、結果を読む権利」</strong>
+    を与えたのと同じです。</p>
+  </div>
+
+  <p>step12 で見た「CORSが守っているのは利用者」の裏返しです。
+  設定を間違えると、守るはずだった利用者を自分で危険にさらします。</p>
+</section>
+
+<section class="slide">
+  <h1>CORS についてよくある誤解</h1>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th>誤解</th><th>実際</th></tr>
+    <tr><td>CORSはサーバを守るセキュリティ機能だ</td>
+        <td>違います。守っているのは<strong>利用者</strong>です。
+            サーバを守りたいなら認証・認可を実装してください</td></tr>
+    <tr><td>CORSを設定すれば不正なリクエストを弾ける</td>
+        <td>弾けません。curl やサーバ間通信には<strong>一切効きません</strong></td></tr>
+    <tr><td>CORSがあればCSRFも防げる</td>
+        <td>防げません（次のスライド）</td></tr>
+    <tr><td><code>Allow-Origin: *</code> にすると危険</td>
+        <td>公開APIならむしろ正解です。危険なのは <code>*</code> ではなく
+            <strong>「Originの反射 ＋ credentials」</strong>の組み合わせです</td></tr>
+  </table>
+  </div>
+</section>
+
+<section class="slide">
+  <h1>CORS と CSRF の違い</h1>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th></th><th>CORS</th><th>CSRF</th></tr>
+    <tr><td>攻撃者がしたいこと</td><td>応答を<strong>読む</strong></td><td>リクエストを<strong>送らせる</strong></td></tr>
+    <tr><td>例</td><td>残高を盗み見る</td><td>勝手に送金させる</td></tr>
+    <tr><td>応答を読む必要</td><td>ある</td><td><strong>ない</strong></td></tr>
+    <tr><td>防ぐ仕組み</td><td>同一オリジンポリシー + CORS</td><td><code>SameSite</code> Cookie、CSRFトークン</td></tr>
+  </table>
+  </div>
+
+  <div class="diagram">&lt;form method="POST" action="https://bank.example/transfer"&gt;
+        ↓
+  CORSに関係なく送信できる（step12 の実験4）
+        ↓
+  攻撃者は応答を読めない。しかし送金はもう終わっている</div>
+
+  <div class="box danger">
+    <div class="box-title">CORSはCSRF対策ではありません</div>
+  </div>
+</section>
+
+<section class="slide">
+  <h1>チェックリスト と 第4-5章まとめ</h1>
+
+  <div class="box do">
+    <div class="box-title">CORS設定チェックリスト</div>
+    <ul style="margin-bottom:0">
+      <li>許可リストは<strong>完全一致</strong>で照合しているか</li>
+      <li><code>Origin</code> をそのまま返していないか（返すなら許可リスト通過後だけか）</li>
+      <li><code>null</code> を許可リストに入れていないか</li>
+      <li><code>Vary: Origin</code> を付けているか（許可・不許可どちらの場合も）</li>
+      <li>credentials が不要なら <code>Allow-Credentials</code> を付けていないか</li>
+      <li><code>Allow-Methods</code> / <code>Allow-Headers</code> を必要最小限にしているか</li>
+      <li>CORSとは<strong>別に</strong>認証・認可を実装しているか</li>
+      <li>CSRF対策（<code>SameSite</code>、トークン）を別途しているか</li>
+    </ul>
+  </div>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th>ヘッダー</th><th>誰が付ける</th><th>役割</th></tr>
+    <tr><td><code>Origin</code></td><td>ブラウザ</td><td>どのページから出たか</td></tr>
+    <tr><td><code>Access-Control-Allow-Origin</code></td><td>サーバ</td><td>このオリジンには読ませてよい</td></tr>
+    <tr><td><code>Access-Control-Request-Method</code></td><td>ブラウザ（プリフライト）</td><td>これから使いたいメソッド</td></tr>
+    <tr><td><code>Access-Control-Request-Headers</code></td><td>ブラウザ（プリフライト）</td><td>これから付けたいヘッダー</td></tr>
+    <tr><td><code>Access-Control-Allow-Methods</code></td><td>サーバ（プリフライト応答）</td><td>許可するメソッド</td></tr>
+    <tr><td><code>Access-Control-Allow-Headers</code></td><td>サーバ（プリフライト応答）</td><td>許可するヘッダー</td></tr>
+    <tr><td><code>Access-Control-Max-Age</code></td><td>サーバ（プリフライト応答）</td><td>許可の有効期間</td></tr>
+    <tr><td><code>Access-Control-Allow-Credentials</code></td><td>サーバ</td><td>Cookieを伴ってよい</td></tr>
+    <tr><td><code>Access-Control-Expose-Headers</code></td><td>サーバ</td><td>JSに読ませてよいレスポンスヘッダー</td></tr>
+    <tr><td><code>Vary: Origin</code></td><td>サーバ</td><td>応答はOriginによって変わる</td></tr>
+  </table>
+  </div>
+</section>
+
+</main>
+<script src="assets/deck.js"></script>
+</body>
+</html>

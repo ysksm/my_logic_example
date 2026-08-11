@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>step10: Cookie の往復</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-step="10">
+<main>
+
+<section class="slide">
+  <h1>step10: Cookie の往復</h1>
+  <p class="lead">HTTPは「前回のことを覚えていない」プロトコル。それを回避する仕組み。</p>
+
+  <div class="box key">
+    <div class="box-title">このステップでわかること</div>
+    <ul style="margin-bottom:0">
+      <li><strong>サーバは何も覚えていない。覚えているのはブラウザ</strong></li>
+      <li><code>Set-Cookie</code> と <code>Cookie</code> は形が違う</li>
+      <li>Cookieの値は<strong>クライアントが自由に書き換えられる</strong></li>
+    </ul>
+  </div>
+</section>
+
+<section class="slide">
+  <h1>Cookieの仕組み</h1>
+
+  <div class="diagram">1回目
+  →  GET / HTTP/1.1
+  ←  HTTP/1.1 200 OK
+      Set-Cookie: visits=1; Path=/        ← 「これを持っておいて」
+
+2回目（ブラウザが勝手に付ける）
+  →  GET / HTTP/1.1
+      Cookie: visits=1                     ← 「持っています」
+  ←  HTTP/1.1 200 OK
+      Set-Cookie: visits=2; Path=/        ← 「更新して」</div>
+
+  <p><strong>サーバは訪問回数を覚えていません。</strong>
+  ブラウザが持ってきた数字に1を足して返しているだけです。</p>
+
+  <div class="box warn">
+    <div class="box-title">Cookieを保持するのはクライアントの機能</div>
+    <p style="margin-bottom:0">HTTPの必須機能ではありません。
+    curl は既定でCookieを保存しないので、何度叩いても「1回目」です。</p>
+  </div>
+</section>
+
+<section class="slide">
+  <h1>2つのヘッダーは形が違う</h1>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th></th><th>ヘッダー</th><th>形</th><th>個数</th></tr>
+    <tr><td>サーバ → ブラウザ</td><td><code>Set-Cookie</code></td>
+        <td><code>名前=値; 属性; 属性</code></td><td><strong>1つのCookieにつき1行</strong></td></tr>
+    <tr><td>ブラウザ → サーバ</td><td><code>Cookie</code></td>
+        <td><code>名前=値; 名前=値</code></td><td><strong>全部まとめて1行</strong></td></tr>
+  </table>
+  </div>
+
+  <pre class="wire"><code><span class="res">← Set-Cookie: visits=3; Path=/</span>
+<span class="res">← Set-Cookie: first_seen=2026-01-01; Path=/</span>
+
+<span class="req">→ Cookie: visits=3; first_seen=2026-01-01</span></code></pre>
+
+  <p><strong>リクエスト側には属性が付いてきません。</strong>
+  ブラウザは <code>Path</code> や <code>HttpOnly</code> を自分で使うだけで、
+  サーバには送り返しません。</p>
+
+  <div class="box key">
+    <div class="box-title">Set-Cookie は連結してはいけない唯一のヘッダー</div>
+    <p style="margin-bottom:0">step03 で「同名ヘッダーは <code>,</code> で連結」と書きましたが、
+    <code>Set-Cookie</code> だけは例外です（値の中に <code>,</code> を含みうるため）。
+    step05 の <code>res.send</code> が<strong>配列を受け取れる</strong>ようにしてあるのはこのためです。</p>
+  </div>
+  <pre><code>res.send(200, { "Set-Cookie": ["a=1; Path=/", "b=2; Path=/"] }, body);</code></pre>
+</section>
+
+<section class="slide try">
+  <h1>手を動かす</h1>
+
+  <pre class="shell"><code>cd steps/step10-cookie
+node server.js</code></pre>
+
+  <h2>実験1: ブラウザでリロード</h2>
+  <p><code>http://localhost:8080/</code> を何度もリロード。数字が増えます。<br>
+  DevTools → Network でこのリクエストを選び、
+  <strong>Request Headers の Cookie</strong> と
+  <strong>Response Headers の Set-Cookie</strong>（2行）を見比べてください。</p>
+
+  <h2>実験2: curlはCookieを覚えない</h2>
+  <pre class="shell"><code>curl -s http://localhost:8080/whoami   # → visits:1
+curl -s http://localhost:8080/whoami   # → visits:1</code></pre>
+
+  <h2>実験3: curlに覚えさせる</h2>
+  <pre class="shell"><code>rm -f jar.txt
+curl -s -c jar.txt -b jar.txt http://localhost:8080/whoami
+curl -s -c jar.txt -b jar.txt http://localhost:8080/whoami
+cat jar.txt</code></pre>
+  <p><code>-c</code> が保存、<code>-b</code> が送信。<code>jar.txt</code> の中身は
+  ブラウザが内部で持っているものと同じ情報です。</p>
+
+  <h2>実験4（重要）: 手でCookieを送る</h2>
+  <pre class="shell"><code>curl -s -H 'Cookie: visits=999' http://localhost:8080/whoami   # → 1000</code></pre>
+</section>
+
+<section class="slide">
+  <h1>Cookieの値は信用できない</h1>
+
+  <div class="box danger">
+    <div class="box-title">クライアントが自由に書き換えられる</div>
+    <pre style="margin-bottom:0"><code>Cookie: is_admin=true
+Cookie: user_id=1
+Cookie: price=0</code></pre>
+  </div>
+
+  <p>こうした値を<strong>そのまま信用してはいけません</strong>。
+  ブラウザのDevToolsからでも、curlからでも、いくらでも変更できます。</p>
+
+  <div class="box do">
+    <div class="box-title">答えは step11 のセッションID方式</div>
+    <p style="margin-bottom:0">Cookieには<strong>推測できない「鍵」だけ</strong>を入れ、
+    中身（誰なのか）はサーバ側に置きます。</p>
+  </div>
+
+  <h2>Cookieを消す</h2>
+  <pre class="wire"><code><span class="res">Set-Cookie: visits=; Max-Age=0; Path=/</span></code></pre>
+  <p><strong>「削除」という命令はありません。</strong>
+  寿命ゼロのCookieを送りつけると、ブラウザが捨てます。</p>
+
+  <details class="quiz">
+    <summary>クイズ: 値に <code>;</code> や日本語を入れたいときは？</summary>
+    <p style="margin-bottom:0"><code>encodeURIComponent()</code> でエンコードします。
+    Cookieの値には <code>;</code> <code>,</code> 空白などをそのまま入れられません。
+    サンプルの <code>first_seen</code> はエンコードしてから入れています。</p>
+  </details>
+</section>
+
+</main>
+<script src="assets/deck.js"></script>
+</body>
+</html>

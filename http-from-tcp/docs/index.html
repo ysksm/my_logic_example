@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TCPからHTTPを自作する — CORSを深く理解するための19ステップ</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<main>
+
+<div class="hero">
+  <h1>TCPからHTTPを自作する</h1>
+  <p>ライブラリを一切使わず、Node.js の <code>net</code> モジュール（＝生のTCPソケット）だけで
+  HTTPサーバを1行ずつ組み立てていきます。<strong>最終目的は CORS を深く理解すること。</strong>
+  全19ステップ、1ステップにつき新しい概念はひとつだけです。</p>
+</div>
+
+<div class="box key">
+  <div class="box-title">進め方</div>
+  <ol style="margin-bottom:0">
+    <li>スライドを開いて「今日わかること」を読む</li>
+    <li><code>steps/stepNN-*/</code> で <code>node server.js</code> を起動する</li>
+    <li>スライドの「手を動かす」に従って <code>curl</code> やブラウザで叩く</li>
+    <li><strong>サーバのコンソールに流れる生のHTTPテキストを読む</strong>（これが一番大事）</li>
+    <li><code>server.js</code> を開いて、前のステップからの差分を確認する</li>
+    <li>最後のクイズに答えてから次へ</li>
+  </ol>
+</div>
+
+<div class="box">
+  <div class="box-title">必要なもの</div>
+  <ul style="margin-bottom:0">
+    <li><strong>Node.js 18 以上</strong>（<code>node -v</code> で確認）— 依存パッケージのインストールは不要です</li>
+    <li><strong>curl</strong>（macOS / Linux には標準で入っています）</li>
+    <li><strong>Google Chrome</strong> — 第4章以降の CORS 実験で DevTools の Network タブを使います</li>
+  </ul>
+</div>
+
+<hr>
+
+<div class="chapter">
+  <h2>第1章　TCP から HTTP へ</h2>
+  <p class="sub">「HTTPとは、TCPの上を流れるただのテキストである」を体で理解する</p>
+</div>
+<div class="steplist">
+  <a href="step01.html"><span class="no">step 01</span><span class="t">TCPエコーサーバ<span class="d">まだHTTPではない。TCPは「バイト列を運ぶ土管」でしかないことを見る</span><span class="path">steps/step01-tcp-echo</span></span></a>
+  <a href="step02.html"><span class="no">step 02</span><span class="t">リクエストラインを読む<span class="d">1行目を分解する。改行が <code>\n</code> ではなく <code>\r\n</code> である理由</span><span class="path">steps/step02-request-line</span></span></a>
+  <a href="step03.html"><span class="no">step 03</span><span class="t">ヘッダーをパースする<span class="d">空行までがヘッダーブロック。大文字小文字を区別しないMapに変換する</span><span class="path">steps/step03-headers</span></span></a>
+  <a href="step04.html"><span class="no">step 04</span><span class="t">ボディを読む<span class="d">TCPは「どこまでが1リクエストか」を教えてくれない。Content-Length の出番</span><span class="path">steps/step04-body</span></span></a>
+  <a href="step05.html"><span class="no">step 05</span><span class="t">レスポンスを組み立てる<span class="d">ステータス行・ヘッダー・ボディ。keep-alive で1本の接続を使い回す</span><span class="path">steps/step05-response</span></span></a>
+</div>
+
+<div class="chapter">
+  <h2>第2章　4つのメソッド</h2>
+  <p class="sub">GET / POST / PUT / DELETE と、それぞれに適したステータスコード</p>
+</div>
+<div class="steplist">
+  <a href="step06.html"><span class="no">step 06</span><span class="t">GET<span class="d">パスとクエリ文字列、簡易ルーター、静的ファイル配信</span><span class="path">steps/step06-get</span></span></a>
+  <a href="step07.html"><span class="no">step 07</span><span class="t">POST<span class="d">フォーム形式とJSONを Content-Type で見分けて受け取る</span><span class="path">steps/step07-post</span></span></a>
+  <a href="step08.html"><span class="no">step 08</span><span class="t">PUT<span class="d">冪等な更新。<code>200</code> と <code>201 Created</code> と <code>Location</code> の使い分け</span><span class="path">steps/step08-put</span></span></a>
+  <a href="step09.html"><span class="no">step 09</span><span class="t">DELETE と適切な応答<span class="d"><code>204 No Content</code> / <code>404</code> / <code>405</code> と <code>Allow</code> ヘッダー</span><span class="path">steps/step09-delete</span></span></a>
+</div>
+
+<div class="chapter">
+  <h2>第3章　Cookie</h2>
+  <p class="sub">ステートレスなHTTPに状態を持たせる仕組み。第4章の伏線でもある</p>
+</div>
+<div class="steplist">
+  <a href="step10.html"><span class="no">step 10</span><span class="t">Cookie の往復<span class="d"><code>Set-Cookie</code> で渡し、<code>Cookie</code> で返ってくる。訪問カウンタで観察する</span><span class="path">steps/step10-cookie</span></span></a>
+  <a href="step11.html"><span class="no">step 11</span><span class="t">Cookie 属性とセッション<span class="d">Path / Max-Age / HttpOnly / Secure / SameSite とログインセッション</span><span class="path">steps/step11-cookie-attributes</span></span></a>
+</div>
+
+<div class="chapter">
+  <h2>第4章　CORS ― 本題</h2>
+  <p class="sub">ここからが目的地。サーバを2つ立てて、ブラウザの挙動を1つずつ観察する</p>
+</div>
+<div class="steplist">
+  <a href="step12.html"><span class="no">step 12</span><span class="t">同一オリジンポリシー<span class="d">fetchは失敗するのに、サーバのログには届いている。CORSは誰のための仕組みか</span><span class="path">steps/step12-same-origin</span></span></a>
+  <a href="step13.html"><span class="no">step 13</span><span class="t">単純リクエストと ACAO<span class="d"><code>Access-Control-Allow-Origin</code> の1行。「単純リクエスト」の条件を正確に知る</span><span class="path">steps/step13-simple-request</span></span></a>
+  <a href="step14.html"><span class="no">step 14</span><span class="t">プリフライト<span class="d">送る前に許可を尋ねる <code>OPTIONS</code>。発火条件と応答の作り方</span><span class="path">steps/step14-preflight</span></span></a>
+  <a href="step15.html"><span class="no">step 15</span><span class="t">Access-Control-Max-Age<span class="d">プリフライトのキャッシュ。2回目から OPTIONS が消えるのを目で見る</span><span class="path">steps/step15-max-age</span></span></a>
+  <a href="step16.html"><span class="no">step 16</span><span class="t">credentials と Cookie<span class="d">クロスオリジンでCookieを送る。<code>*</code> が使えなくなる理由と <code>Vary: Origin</code></span><span class="path">steps/step16-credentials</span></span></a>
+</div>
+
+<div class="chapter">
+  <h2>第5章　実務で効く知識</h2>
+  <p class="sub">動くだけの CORS 設定から、安全で意図どおりの CORS 設定へ</p>
+</div>
+<div class="steplist">
+  <a href="step17.html"><span class="no">step 17</span><span class="t">Expose-Headers<span class="d">レスポンスヘッダーがJSから読めない既定と、その解除</span><span class="path">steps/step17-expose-headers</span></span></a>
+  <a href="step18.html"><span class="no">step 18</span><span class="t">許可リストと落とし穴<span class="d">Origin無条件反射の危険、<code>null</code> origin、前方一致バグ、CORS≠認証</span><span class="path">steps/step18-origin-allowlist</span></span></a>
+</div>
+
+<div class="chapter">
+  <h2>特別演習</h2>
+  <p class="sub">CORSを「設定する」のではなく「発生させない」もうひとつの解</p>
+</div>
+<div class="steplist">
+  <a href="step19.html"><span class="no">step 19</span><span class="t">同一オリジン化リバースプロキシ<span class="d">サーバが自らTCPクライアントになる。<code>/api/*</code> を裏へ転送し、オリジンを1つに畳む</span><span class="path">steps/step19-reverse-proxy</span></span></a>
+</div>
+
+<hr>
+
+<div class="box warn">
+  <div class="box-title">この教材で作るものは学習用です</div>
+  <p style="margin-bottom:0">チャンク転送エンコーディング、HTTPS/TLS、HTTP/2、圧縮、タイムアウト、
+  リクエストサイズ上限などは意図的に省いています。仕組みを理解したら、本番では
+  実績のあるサーバ実装（Node.js の <code>http</code> モジュールやフレームワーク）を使ってください。</p>
+</div>
+
+</main>
+
+</body>
+</html>

@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>step06: GET</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-step="6">
+<main>
+
+<section class="slide">
+  <h1>step06: GET</h1>
+  <p class="lead">第2章のはじまり。<strong>HTTPコアは以降変わりません。</strong>変わるのはアプリ部分だけです。</p>
+
+  <div class="box key">
+    <div class="box-title">このステップでわかること</div>
+    <ul>
+      <li>クエリ文字列のパース（パーセントエンコーディング、<code>+</code> の罠）</li>
+      <li>ルーティングの正体は「パスを見て分岐するだけ」</li>
+      <li>GETは<strong>安全（safe）</strong>であるべき、という原則</li>
+    </ul>
+  </div>
+</section>
+
+<section class="slide">
+  <h1>URLの構造</h1>
+
+  <div class="diagram">http://localhost:8080/search?q=%E7%8A%AC&amp;page=2#top
+└─┬─┘  └───┬────┘└──┬──┘└──────┬───────┘└┬┘
+スキーム   ホスト:ポート  パス      クエリ文字列  フラグメント
+                                              ↑
+                            ブラウザ内部だけ。サーバには送られない</div>
+
+  <p>リクエストラインに載るのは <code>パス + クエリ</code> の部分だけです。</p>
+  <pre class="wire"><code><span class="req">GET /search?q=%E7%8A%AC&amp;page=2 HTTP/1.1</span>
+Host: localhost:8080</code></pre>
+
+  <div class="box warn">
+    <div class="box-title">フラグメント（#top）はサーバに届かない</div>
+    <p style="margin-bottom:0">「ページ内のどこを表示するか」はブラウザだけの関心事です。
+    サーバのログに <code>#</code> 以降が出てこないのはこのためです。</p>
+  </div>
+</section>
+
+<section class="slide">
+  <h1>クエリ文字列のパース</h1>
+
+  <pre><code>function parseQuery(qs) {
+  const out = {};
+  for (const pair of qs.split("&amp;")) {
+    const eq = pair.indexOf("=");
+    const rawName  = eq === -1 ? pair : pair.slice(0, eq);
+    const rawValue = eq === -1 ? ""   : pair.slice(eq + 1);
+
+    // クエリ文字列では + が半角スペースを意味する（歴史的仕様）
+    const decode = (s) =&gt; decodeURIComponent(s.replace(/\+/g, " "));
+
+    const name = decode(rawName), value = decode(rawValue);
+
+    // 同じ名前が複数回出ることがある → 配列で持つ
+    if (name in out) out[name] = [].concat(out[name], value);
+    else out[name] = value;
+  }
+  return out;
+}</code></pre>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th>場所</th><th><code>+</code> の意味</th><th>空白の書き方</th></tr>
+    <tr><td>クエリ文字列</td><td>半角スペース</td><td><code>+</code> または <code>%20</code></td></tr>
+    <tr><td>パス</td><td>プラス記号そのもの</td><td><code>%20</code> のみ</td></tr>
+  </table>
+  </div>
+  <p>混乱の元ですが、実装では場所によってデコード方法を変える必要があります。</p>
+</section>
+
+<section class="slide try">
+  <h1>手を動かす</h1>
+
+  <pre class="shell"><code>cd steps/step06-get
+node server.js</code></pre>
+  <p>ブラウザで <code>http://localhost:8080/</code> を開いてください。</p>
+
+  <h2>実験1: GETの入力はすべてURLに載る</h2>
+  <p>フォームに「柴 犬」と入れて送信すると、アドレスバーが
+  <code>/search?q=%E6%9F%B4+%E7%8A%AC&amp;page=2</code> に変わります。</p>
+  <div class="box warn">
+    <div class="box-title">だからGETでパスワードを送ってはいけない</div>
+    <ul style="margin-bottom:0">
+      <li>ブラウザの履歴に残る</li>
+      <li>サーバのアクセスログに残る</li>
+      <li>Refererヘッダーで他サイトに漏れることがある</li>
+    </ul>
+  </div>
+
+  <h2>実験2: パーセントエンコーディング</h2>
+  <pre class="shell"><code>curl 'http://localhost:8080/search?q=%E7%8A%AC&amp;page=2'    # → 犬
+curl 'http://localhost:8080/search?tag=a&amp;tag=b&amp;tag=c'      # → 配列
+curl 'http://localhost:8080/search?q=a+b'                  # → "a b"
+curl 'http://localhost:8080/items/a+b'                     # → "a+b"</code></pre>
+
+  <h2>実験3: GETで状態を変えるとどうなるか</h2>
+  <p><code>/danger</code> をブラウザで開き、リロードしてみてください。カウンタが増えます。</p>
+</section>
+
+<section class="slide">
+  <h1>安全（safe）と冪等（idempotent）</h1>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th>メソッド</th><th>安全</th><th>冪等</th><th>意味</th></tr>
+    <tr><td>GET</td><td>○</td><td>○</td><td>取得するだけ</td></tr>
+    <tr><td>POST</td><td>×</td><td>×</td><td>送りつける（結果はサーバ次第）</td></tr>
+    <tr><td>PUT</td><td>×</td><td>○</td><td>このURLの中身を置き換える</td></tr>
+    <tr><td>DELETE</td><td>×</td><td>○</td><td>このURLのものを消す</td></tr>
+  </table>
+  </div>
+
+  <ul>
+    <li><strong>安全</strong> = サーバの状態を変えない</li>
+    <li><strong>冪等</strong> = 1回でも100回でも、最終的な状態が同じ</li>
+  </ul>
+
+  <div class="box danger">
+    <div class="box-title">GETで状態を変えると起きること</div>
+    <ul style="margin-bottom:0">
+      <li>ブラウザやプロキシが<strong>キャッシュ</strong>する → 2回目は実行されない</li>
+      <li>ブラウザがリンクを<strong>先読み（prefetch）</strong>する → 押していないのに実行される</li>
+      <li>クローラが全リンクを踏む → 「削除リンク」を全部踏まれる</li>
+    </ul>
+  </div>
+
+  <details class="quiz">
+    <summary>クイズ: <code>?q=a+b</code> と <code>?q=a%20b</code> の結果は同じ？</summary>
+    <p style="margin-bottom:0">クエリ文字列の中では<strong>同じ</strong>です（どちらも "a b"）。
+    ただしパスの中では違います。<code>/items/a+b</code> の <code>+</code> はプラス記号のままです。</p>
+  </details>
+</section>
+
+</main>
+<script src="assets/deck.js"></script>
+</body>
+</html>

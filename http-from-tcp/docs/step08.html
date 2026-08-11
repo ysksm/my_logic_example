@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>step08: PUT</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-step="8">
+<main>
+
+<section class="slide">
+  <h1>step08: PUT</h1>
+  <p class="lead">POSTとPUTの違いは「場所を決めるのは誰か」。そこから冪等性が導かれます。</p>
+
+  <div class="box key">
+    <div class="box-title">このステップでわかること</div>
+    <ul style="margin-bottom:0">
+      <li>POST は「追加して」、PUT は「この場所をこの内容にして」</li>
+      <li>冪等性がなぜ実務で重要なのか</li>
+      <li><code>201 Created</code> と <code>Location</code> ヘッダー</li>
+    </ul>
+  </div>
+</section>
+
+<section class="slide">
+  <h1>POST と PUT</h1>
+
+  <div class="diagram">POST /items          「このコレクションに追加して」
+                      → idはサーバが決める
+                      → 2回送れば2件できる      ← 冪等でない
+
+PUT /items/99        「この場所の中身をこれにして」
+                      → idはクライアントが指定する
+                      → 何回送っても1件のまま    ← 冪等</div>
+
+  <h2>なぜ冪等性が大事か</h2>
+  <div class="box warn">
+    <div class="box-title">通信は失敗する</div>
+    <p style="margin-bottom:0">応答が返ってこなかったとき、リクエストが届いたのかどうかわかりません。</p>
+    <ul style="margin-bottom:0">
+      <li>冪等なら <strong>安心して再送できる</strong></li>
+      <li>冪等でないと再送してよいかわからない（二重注文になるかもしれない）</li>
+    </ul>
+  </div>
+
+  <p>ネットワークライブラリの自動リトライが GET・PUT・DELETE だけを対象にし、
+  POST を対象外にするのはこのためです。</p>
+</section>
+
+<section class="slide">
+  <h1>201 Created と Location</h1>
+
+  <pre class="wire"><code><span class="req">PUT /items/99 HTTP/1.1</span>
+Content-Type: application/json
+
+{"name":"メロン","price":3000}
+
+<span class="res">HTTP/1.1 201 Created</span>
+<span class="hl">Location: /items/99</span>
+Content-Type: application/json</code></pre>
+
+  <p>新しくリソースを作ったときは:</p>
+  <ul>
+    <li>ステータスは <code>201 Created</code>（<code>200 OK</code> ではなく）</li>
+    <li><code>Location</code> で<strong>どこに作られたか</strong>を伝える</li>
+  </ul>
+
+  <pre><code>const existed = items.has(id);
+items.set(id, { ...data, id });      // 部分更新ではなく「丸ごと置き換え」
+
+return existed
+  ? res.json(200, item)                                   // あった → 200
+  : res.json(201, item, { "Location": `/items/${id}` });  // 無かった → 201</code></pre>
+
+  <div class="box warn">
+    <div class="box-title">「冪等」＝「毎回同じ応答」ではない</div>
+    <p style="margin-bottom:0">1回目は <code>201</code>、2回目は <code>200</code> と応答は変わります。
+    冪等が保証するのは<strong>最終的なサーバの状態</strong>が同じであることです。</p>
+  </div>
+</section>
+
+<section class="slide try">
+  <h1>手を動かす</h1>
+
+  <pre class="shell"><code>cd steps/step08-put
+node server.js</code></pre>
+  <p>ブラウザ <code>http://localhost:8080/</code> にボタンがあります。</p>
+
+  <h2>実験1: POSTは押すたび増える</h2>
+  <pre class="shell"><code>curl -i -X POST -H 'Content-Type: application/json' \
+     -d '{"name":"ぶどう","price":300}' http://localhost:8080/items</code></pre>
+  <pre><code>1回目: 201 Created   Location: /items/3
+2回目: 201 Created   Location: /items/4</code></pre>
+
+  <h2>実験2: PUTは何回でも同じ</h2>
+  <pre class="shell"><code>curl -i -X PUT -H 'Content-Type: application/json' \
+     -d '{"name":"メロン","price":3000}' http://localhost:8080/items/99</code></pre>
+  <pre><code>1回目: 201 Created   Location: /items/99
+2回目: 200 OK</code></pre>
+
+  <h2>実験3: PUTは「部分更新」ではない</h2>
+  <pre class="shell"><code>curl -X PUT -H 'Content-Type: application/json' \
+     -d '{"name":"メロン","price":3000}' http://localhost:8080/items/99
+curl -X PUT -H 'Content-Type: application/json' \
+     -d '{"name":"メロン"}' http://localhost:8080/items/99
+curl http://localhost:8080/items/99</code></pre>
+  <p><code>price</code> が<strong>消えています</strong>。丸ごと置き換えだからです。
+  一部だけ更新したい場合のメソッドが <code>PATCH</code> です。</p>
+</section>
+
+<section class="slide">
+  <h1>冪等性を体で確かめる</h1>
+
+  <pre class="shell"><code># POSTを5回
+for i in 1 2 3 4 5; do
+  curl -s -o /dev/null -X POST -H 'Content-Type: application/json' \
+       -d '{"name":"POST産"}' http://localhost:8080/items
+done
+
+# PUTを5回
+for i in 1 2 3 4 5; do
+  curl -s -o /dev/null -X PUT -H 'Content-Type: application/json' \
+       -d '{"name":"PUT産"}' http://localhost:8080/items/777
+done
+
+curl -s http://localhost:8080/items</code></pre>
+
+  <p><strong>POST産が5件、PUT産が1件。</strong>これが冪等性の違いです。</p>
+
+  <details class="quiz">
+    <summary>クイズ: タイムアウトしたとき、安心して再送できるのはどちら？</summary>
+    <p style="margin-bottom:0"><strong>PUT</strong>です。POSTは二重登録の危険があります。<br>
+    実務でPOSTを安全に再送したい場合は、クライアントが生成した一意のキーを
+    <code>Idempotency-Key</code> ヘッダーで送り、サーバ側で重複を弾く設計にします
+    （決済APIでよく使われます）。</p>
+  </details>
+
+  <details class="quiz">
+    <summary>クイズ: <code>PUT /items/99</code> のボディに <code>"id": "1"</code> と書いたら？</summary>
+    <p style="margin-bottom:0">このサンプルは<strong>URL側を正</strong>としています
+    （<code>{ ...data, id }</code> の順序で上書き）。
+    URLがリソースの所在を決めるという原則に沿った実装です。
+    厳密には <code>400</code> で拒否する設計もありえます。</p>
+  </details>
+</section>
+
+</main>
+<script src="assets/deck.js"></script>
+</body>
+</html>

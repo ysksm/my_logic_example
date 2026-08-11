@@ -1,0 +1,10 @@
+{
+  "name": "http-from-tcp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "TCPからHTTPを自作してCORSを理解する19ステップ教材（依存パッケージなし）",
+  "engines": {
+    "node": ">=18"
+  }
+}

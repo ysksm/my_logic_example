@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>step17: Access-Control-Expose-Headers</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-step="17">
+<main>
+
+<section class="slide">
+  <h1>step17: Access-Control-Expose-Headers</h1>
+  <p class="lead">CORSが制限しているのはボディだけではありません。</p>
+
+  <pre><code>const r = await fetch('http://api.example/items');
+console.log(r.headers.get('X-Total-Count'));  // → null</code></pre>
+
+  <div class="box danger">
+    <div class="box-title">サーバはちゃんと返しています</div>
+    <p style="margin-bottom:0">DevTools の Network タブにも表示されています。それでも <code>null</code>。<br>
+    <strong>DevToolsに見えている＝JSから読める、ではありません。</strong>
+    DevToolsはブラウザの内部を見ているだけで、JSに渡されるものとは別です。</p>
+  </div>
+</section>
+
+<section class="slide try">
+  <h1>手を動かす</h1>
+
+  <pre class="shell"><code>cd steps/step17-expose-headers
+node server.js</code></pre>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th>ボタン</th><th>エンドポイント</th><th>Expose-Headers</th><th>読めるヘッダー</th></tr>
+    <tr><td>①</td><td>クロス <code>/api/hidden</code></td><td>無し</td>
+        <td><code>Cache-Control</code>, <code>Content-Type</code> のみ</td></tr>
+    <tr><td>②</td><td>クロス <code>/api/exposed</code></td><td><code>X-Total-Count, X-Request-Id</code></td>
+        <td>上記 + 指定した2つ</td></tr>
+    <tr><td>③</td><td>クロス <code>/api/exposed-all</code></td><td><code>*</code></td><td>全部</td></tr>
+    <tr><td>④</td><td>同一 <code>/api/same-origin</code></td><td>無し</td><td><strong>全部</strong></td></tr>
+  </table>
+  </div>
+
+  <p>② で <code>X-Rate-Limit-Remaining</code> だけ読めないことに注目してください。列挙していないからです。</p>
+
+  <div class="box key">
+    <div class="box-title">④ が重要</div>
+    <p style="margin-bottom:0"><strong>同一オリジンなら何も指定しなくても全部読めます。</strong>
+    この制限はクロスオリジンのときだけのものです。</p>
+  </div>
+</section>
+
+<section class="slide">
+  <h1>指定しなくても読める7つ</h1>
+
+  <p>「CORSセーフリスト済みレスポンスヘッダー」と呼ばれます。</p>
+
+  <ul style="columns:2">
+    <li><code>Cache-Control</code></li>
+    <li><code>Content-Language</code></li>
+    <li><code>Content-Length</code></li>
+    <li><code>Content-Type</code></li>
+    <li><code>Expires</code></li>
+    <li><code>Last-Modified</code></li>
+    <li><code>Pragma</code></li>
+  </ul>
+
+  <p>これ以外はすべて、サーバが明示的に公開しない限り読めません。</p>
+
+  <pre class="wire"><code><span class="res">Access-Control-Expose-Headers: X-Total-Count, Location, Content-Disposition</span></code></pre>
+</section>
+
+<section class="slide">
+  <h1>実務でつまずく場面</h1>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th>返しているもの</th><th>症状</th></tr>
+    <tr><td><code>X-Total-Count</code>（総件数）</td><td>ページネーションの総ページ数が計算できない</td></tr>
+    <tr><td><code>X-RateLimit-Remaining</code></td><td>残り回数が表示できない</td></tr>
+    <tr><td><code>Location</code>（作成したリソースのURL）</td><td><code>201 Created</code> の後どこに移動すればいいかわからない</td></tr>
+    <tr><td><code>Content-Disposition</code>（ファイル名）</td><td>ダウンロードファイル名が取れない</td></tr>
+  </table>
+  </div>
+
+  <p>いずれも「サーバは返しているのにフロントで <code>null</code>」という形で現れます。
+  サーバのログにもDevToolsにもヘッダーが見えているので、原因に気づきにくいのが厄介です。</p>
+
+  <div class="box warn">
+    <div class="box-title"><code>*</code> の注意点</div>
+    <p style="margin-bottom:0"><code>Access-Control-Expose-Headers: *</code> は
+    <strong><code>credentials: 'include'</code> のリクエストでは無効</strong>になり、
+    「<code>*</code> という名前のヘッダー」を探す扱いになります。<br>
+    同じ制限が <code>Access-Control-Allow-Headers: *</code> や
+    <code>Access-Control-Allow-Methods: *</code> にもあります。
+    credentials を使うなら必ず個別に列挙してください。</p>
+  </div>
+</section>
+
+<section class="slide">
+  <h1>curlでの確認</h1>
+
+  <pre class="shell"><code>curl -i http://localhost:8081/api/hidden</code></pre>
+  <pre class="wire"><code><span class="res">HTTP/1.1 200 OK</span>
+X-Total-Count: 1234
+X-Request-Id: req-1
+X-Rate-Limit-Remaining: 42</code></pre>
+
+  <p>普通に見えます。<strong>サーバは常に送っています。ブラウザがJSに渡さないだけです。</strong></p>
+
+  <div class="box key">
+    <div class="box-title">step12 と同じ構図</div>
+    <p style="margin-bottom:0">CORSはブラウザの中だけの仕組み——
+    ボディでも、ヘッダーでも、まったく同じです。</p>
+  </div>
+
+  <details class="quiz">
+    <summary>クイズ: <code>Content-Type</code> が指定なしで読めるのはなぜ？</summary>
+    <p style="margin-bottom:0">CORSセーフリストに入っているからです。
+    <code>&lt;img&gt;</code> や <code>&lt;script&gt;</code> の時代から
+    ブラウザが必要としてきた基本的な情報であり、
+    これを隠しても得られるプライバシー上の利益がほとんどないためです。</p>
+  </details>
+
+  <details class="quiz">
+    <summary>クイズ: 同一オリジンのリクエストで <code>Expose-Headers</code> は必要？</summary>
+    <p style="margin-bottom:0"><strong>不要です。</strong>
+    同一オリジンなら全ヘッダーが読めます。
+    「ローカルでは動いたのに本番で動かない」の典型的な原因になります
+    （開発中はプロキシ経由で同一オリジンだった、など）。</p>
+  </details>
+</section>
+
+</main>
+<script src="assets/deck.js"></script>
+</body>
+</html>

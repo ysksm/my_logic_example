@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>step12: 同一オリジンポリシー</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-step="12">
+<main>
+
+<section class="slide">
+  <h1>step12: 同一オリジンポリシー</h1>
+  <p class="lead">第4章のはじまり。ここが目的地です。まず「CORSとは誰の仕組みか」を確定させます。</p>
+
+  <div class="box key">
+    <div class="box-title">このステップの核心</div>
+    <p style="margin-bottom:0">fetch が失敗しても、<strong>サーバにはリクエストが届き、200 OK が返っています。</strong><br>
+    CORSはサーバの機能ではなく、<strong>ブラウザの機能</strong>です。</p>
+  </div>
+
+  <h2>2つのサーバを1プロセスで動かします</h2>
+  <div class="diagram">オリジンA  http://localhost:8080  … 実験ページを配る（ブラウザが表示する側）
+オリジンB  http://localhost:8081  … API（別オリジン）</div>
+  <p>step11からの差分は、HTTPコアに「どちらのサーバのログか」を示す
+  <code>label</code> を足しただけです。</p>
+</section>
+
+<section class="slide">
+  <h1>オリジンとは</h1>
+
+  <div class="diagram">http://localhost:8080
+└─┬─┘  └───┬───┘ └┬─┘
+スキーム  ホスト   ポート
+
+この3つがすべて一致するときだけ「同一オリジン」</div>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th>比較対象（基準: <code>http://localhost:8080</code>）</th><th>判定</th><th>理由</th></tr>
+    <tr><td><code>http://localhost:8080/other/path</code></td><td>同一</td><td>パスは関係ない</td></tr>
+    <tr><td><code>http://localhost:8081</code></td><td><strong>別</strong></td><td>ポートが違う</td></tr>
+    <tr><td><code>https://localhost:8080</code></td><td><strong>別</strong></td><td>スキームが違う</td></tr>
+    <tr><td><code>http://127.0.0.1:8080</code></td><td><strong>別</strong></td><td>ホスト名が違う（同じマシンでも）</td></tr>
+    <tr><td><code>http://sub.localhost:8080</code></td><td><strong>別</strong></td><td>ホスト名が違う</td></tr>
+  </table>
+  </div>
+
+  <div class="box warn">
+    <div class="box-title">step16 への伏線</div>
+    <p style="margin-bottom:0">「オリジン」と「サイト」は<strong>別の概念</strong>です。
+    サイトの判定にポートは関係しません。step16 でこの差が効いてきます。</p>
+  </div>
+</section>
+
+<section class="slide try">
+  <h1>手を動かす</h1>
+
+  <pre class="shell"><code>cd steps/step12-same-origin
+node server.js</code></pre>
+  <p>ブラウザで <code>http://localhost:8080/</code> を開いてください。<br>
+  <strong>必ずサーバのコンソールも見えるようにしておいてください。</strong></p>
+
+  <h2>実験1: 同一オリジン → 成功</h2>
+  <p>「① GET /api/same-origin」。8080 自身が返しているので何の制限もありません。</p>
+
+  <h2>実験2: 別オリジン → 失敗（このステップの核心）</h2>
+  <p>「② GET http://localhost:8081/api/hello」を押すと失敗します。<br>
+  <strong>そのあと必ずサーバのコンソールを見てください。</strong></p>
+  <pre><code>[API 8081] GET /api/hello  Origin: http://localhost:8080</code></pre>
+
+  <div class="box danger">
+    <div class="box-title">リクエストは届いている</div>
+    <ul style="margin-bottom:0">
+      <li>サーバは何も拒否していない</li>
+      <li>通信は完全に成功している（200 OK を返している）</li>
+      <li>それでも JavaScript は中身を読めない</li>
+    </ul>
+  </div>
+</section>
+
+<section class="slide">
+  <h1>ブラウザは何と言っているか</h1>
+
+  <p>DevTools の Console:</p>
+  <pre class="wire"><code><span class="bad">Access to fetch at 'http://localhost:8081/api/hello' from origin
+'http://localhost:8080' <span class="hl">has been blocked by CORS policy</span>:
+No 'Access-Control-Allow-Origin' header is present on the requested resource.</span></code></pre>
+
+  <p><strong>「has been blocked by CORS policy」— 誰にブロックされたのか。ブラウザにです。</strong></p>
+
+  <h2>実験3: curlなら成功する</h2>
+  <pre class="shell"><code>curl -s http://localhost:8081/api/hello</code></pre>
+  <p>普通に読めます。</p>
+
+  <div class="box key">
+    <div class="box-title">CORSはアクセス制御ではない</div>
+    <p style="margin-bottom:0">curl にも、サーバ間通信にも、
+    Pythonのスクリプトにも、<strong>CORSは一切効きません</strong>。
+    効くのは「ブラウザの中で動くJavaScript」に対してだけです。</p>
+  </div>
+</section>
+
+<section class="slide">
+  <h1>実験4: <code>&lt;img&gt;</code> なら読み込める</h1>
+
+  <p>「③ &lt;img src="http://localhost:8081/api/pixel"&gt;」を押すと<strong>成功</strong>します。</p>
+
+  <div class="box key">
+    <div class="box-title">止めているのは「送ること」ではなく「読むこと」</div>
+    <ul style="margin-bottom:0">
+      <li><code>&lt;img&gt;</code> で他オリジンの画像を表示する → <strong>できる</strong></li>
+      <li>その画像を <code>&lt;canvas&gt;</code> に描いて <code>getImageData()</code> する → <strong>止められる</strong></li>
+      <li><code>&lt;script src&gt;</code> で他オリジンのJSを実行する → <strong>できる</strong></li>
+      <li><code>&lt;form&gt;</code> で他オリジンにPOSTする → <strong>できる</strong>（← CSRFが成立する理由）</li>
+    </ul>
+  </div>
+
+  <p><code>&lt;img&gt;</code> や <code>&lt;script&gt;</code> はCORSが生まれるずっと前から
+  他オリジンを読み込めていました。今もそのままです。</p>
+</section>
+
+<section class="slide">
+  <h1>何のための仕組みなのか</h1>
+
+  <p>あなたが銀行にログインしているとします。攻撃者のページを開いたとき、
+  そのページのJSがこう書けたらどうなるでしょう。</p>
+
+  <pre><code>const r = await fetch('https://bank.example/api/balance', {
+  credentials: 'include'      // ブラウザがあなたのCookieを自動で付ける
+});
+const data = await r.json();  // 残高が読めてしまう
+sendToAttacker(data);</code></pre>
+
+  <div class="box danger">
+    <div class="box-title">CORSが守っているのはサーバではなく、利用者（あなた）です</div>
+    <p style="margin-bottom:0">だからブラウザは「別オリジンの応答をJSに渡さない」という規則を持っています。
+    そのうえで「このオリジンになら読ませてよい」と<strong>サーバが宣言する手段</strong>が、
+    次のステップの <code>Access-Control-Allow-Origin</code> です。</p>
+  </div>
+
+  <details class="quiz">
+    <summary>クイズ: fetch が失敗したとき、サーバにリクエストは届いていましたか？</summary>
+    <p style="margin-bottom:0"><strong>届いています。</strong>
+    （プリフライトが飛ぶ場合だけは、本番リクエストが送られないことがあります。step14で扱います）<br>
+    だから「CORSエラーだから何も起きていない」と考えるのは間違いです。
+    副作用のあるリクエストなら、副作用はもう発生しています。</p>
+  </details>
+
+  <details class="quiz">
+    <summary>クイズ: <code>&lt;form&gt;</code> での他オリジンPOSTはCORSで止められますか？</summary>
+    <p style="margin-bottom:0"><strong>止められません。</strong>
+    これがCSRFが成立する理由であり、CORSがCSRF対策にならない理由です（step18で詳述）。</p>
+  </details>
+</section>
+
+</main>
+<script src="assets/deck.js"></script>
+</body>
+</html>

@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>step14: プリフライト</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-step="14">
+<main>
+
+<section class="slide">
+  <h1>step14: プリフライト</h1>
+  <p class="lead">送る前に許可を尋ねる。step09 で作った <code>OPTIONS</code> を、今度はブラウザが自動で送ります。</p>
+
+  <div class="box key">
+    <div class="box-title">このステップでわかること</div>
+    <ul style="margin-bottom:0">
+      <li>プリフライトが通らなければ、<strong>本番リクエストは送られない</strong></li>
+      <li><code>Access-Control-Request-*</code> に <code>Access-Control-Allow-*</code> で答える</li>
+      <li><strong>プリフライト＝入場許可、本番のACAO＝閲覧許可。両方必要</strong></li>
+    </ul>
+  </div>
+</section>
+
+<section class="slide">
+  <h1>やりとりの全体像</h1>
+
+  <pre class="wire"><code>（ブラウザが「これは単純リクエストではない」と判断する）
+
+<span class="req">→ OPTIONS /api/ok HTTP/1.1</span>
+   Origin: http://localhost:8080
+   <span class="hl">Access-Control-Request-Method: PUT</span>            ← これから使いたいメソッド
+   <span class="hl">Access-Control-Request-Headers: content-type</span>  ← これから付けたいヘッダー
+
+<span class="res">← HTTP/1.1 204 No Content</span>
+   Access-Control-Allow-Origin: *
+   <span class="hl">Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS</span>
+   <span class="hl">Access-Control-Allow-Headers: Content-Type, X-Demo</span>
+
+（ここで初めて本番が送られる）
+
+<span class="req">→ PUT /api/ok HTTP/1.1</span>
+   Origin: http://localhost:8080
+   Content-Type: application/json
+
+<span class="res">← HTTP/1.1 200 OK</span>
+   <span class="hl">Access-Control-Allow-Origin: *</span>      ← 本番にも必要！</code></pre>
+
+  <p><strong>「送ってみてダメだった」ではなく「送る前に諦める」</strong>のがプリフライトです。</p>
+</section>
+
+<section class="slide">
+  <h1>実装</h1>
+
+  <pre><code>// プリフライトかどうかの見分け方
+if (req.method === "OPTIONS" &amp;&amp; req.headers["access-control-request-method"]) {
+
+  const wantMethod  = req.headers["access-control-request-method"];
+  const wantHeaders = req.headers["access-control-request-headers"];
+
+  return res.send(204, {
+    "Access-Control-Allow-Origin":  "*",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, X-Demo",
+  });
+}</code></pre>
+
+  <div class="box warn">
+    <div class="box-title">OPTIONS が来ただけではプリフライトとは限らない</div>
+    <p style="margin-bottom:0">step09 のような普通の <code>OPTIONS</code> もあります。
+    <code>Access-Control-Request-Method</code> の有無で判定してください。</p>
+  </div>
+
+  <div class="box">
+    <div class="box-title">プリフライトの応答は 2xx である必要がある</div>
+    <p style="margin-bottom:0"><code>204 No Content</code> が最も自然です（ボディは不要なので）。
+    <code>401</code> や <code>404</code> を返すとプリフライトは失敗します。<br>
+    <strong>認証ミドルウェアが <code>OPTIONS</code> にも認証を要求してしまい壊れる</strong>——
+    実務でよくある事故です。プリフライトには <code>Authorization</code> ヘッダーは付きません。</p>
+  </div>
+</section>
+
+<section class="slide try">
+  <h1>手を動かす</h1>
+
+  <pre class="shell"><code>cd steps/step14-preflight
+node server.js</code></pre>
+  <p>プリフライトが飛ぶとコンソールに <code>★</code> が出ます。</p>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th>パス</th><th>プリフライト応答</th><th>本番応答のACAO</th></tr>
+    <tr><td><code>/api/ok</code></td><td>正しく返す</td><td>あり</td></tr>
+    <tr><td><code>/api/strict</code></td><td>返さない（404）</td><td>あり</td></tr>
+    <tr><td><code>/api/preflight-only</code></td><td>正しく返す</td><td><strong>無し</strong></td></tr>
+  </table>
+  </div>
+
+  <h2>成功する例</h2>
+  <p>① POST+JSON　② PUT　③ DELETE　④ <strong>GET + 独自ヘッダー <code>X-Demo</code></strong></p>
+  <div class="box warn">
+    <div class="box-title">④ に注目 — GETでもプリフライトが飛ぶ</div>
+    <p style="margin-bottom:0">独自ヘッダーを1つ付けただけで「単純リクエスト」の条件を外れます。
+    <code>Authorization: Bearer ...</code> を付けるAPIがプリフライトを避けられないのはこれが理由です。</p>
+  </div>
+</section>
+
+<section class="slide try">
+  <h1>失敗する3パターン</h1>
+
+  <h2>⑤ プリフライトに応答しないAPI</h2>
+  <p>コンソールを見ると、<strong><code>OPTIONS</code> は届いているが <code>POST</code> は届いていません。</strong>
+  ブラウザは許可が取れなかったので、本番を送るのをやめました。</p>
+
+  <h2>⑥ 許可されていないヘッダー</h2>
+  <p><code>X-Secret</code> を付けると、プリフライトの段階で失敗します。
+  サーバは <code>Access-Control-Allow-Headers: Content-Type, X-Demo</code> としか答えないためです。</p>
+  <p>実務で <code>Authorization</code> や <code>X-Requested-With</code> を追加したときに
+  突然壊れるのは、たいていこれです。</p>
+
+  <h2>⑦ プリフライトは通るが本番にACAOが無い</h2>
+  <div class="box danger">
+    <div class="box-title">一番わかりにくいパターン</div>
+    <ul style="margin-bottom:0">
+      <li><code>★</code> プリフライトが通っている</li>
+      <li>本番の <code>PUT</code> も<strong>届いている</strong>（サーバは200を返している）</li>
+      <li>それでもJSは読めない</li>
+    </ul>
+  </div>
+  <p><strong>プリフライトは「入場許可」、本番のACAOは「閲覧許可」。両方必要です。</strong><br>
+  <code>OPTIONS</code> のときだけCORS設定を書いて、本番のレスポンスに付け忘れる——
+  実務で非常に多いミスです。</p>
+</section>
+
+<section class="slide">
+  <h1>curlでプリフライトを手動再現する</h1>
+
+  <pre class="shell"><code>curl -i -X OPTIONS \
+  -H 'Origin: http://localhost:8080' \
+  -H 'Access-Control-Request-Method: PUT' \
+  -H 'Access-Control-Request-Headers: content-type' \
+  http://localhost:8081/api/ok</code></pre>
+
+  <pre class="wire"><code><span class="res">HTTP/1.1 204 No Content</span>
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS
+Access-Control-Allow-Headers: Content-Type, X-Demo</code></pre>
+
+  <div class="box key">
+    <div class="box-title">ブラウザがやっていることは、これだけです</div>
+    <p style="margin-bottom:0">魔法ではありません。
+    CORSがうまくいかないときは、この curl を打って
+    サーバが何を返しているかを直接確かめるのが最短です。</p>
+  </div>
+</section>
+
+<section class="slide">
+  <h1>プリフライトが飛ぶ条件（まとめ）</h1>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th>やること</th><th>プリフライト</th></tr>
+    <tr><td><code>GET</code> / <code>HEAD</code></td><td>飛ばない</td></tr>
+    <tr><td><code>POST</code> + <code>text/plain</code> / <code>x-www-form-urlencoded</code> / <code>multipart/form-data</code></td><td>飛ばない</td></tr>
+    <tr><td><code>POST</code> + <code>application/json</code></td><td><strong>飛ぶ</strong></td></tr>
+    <tr><td><code>PUT</code> / <code>DELETE</code> / <code>PATCH</code></td><td><strong>飛ぶ</strong></td></tr>
+    <tr><td>独自ヘッダーを付ける（メソッド問わず）</td><td><strong>飛ぶ</strong></td></tr>
+  </table>
+  </div>
+
+  <details class="quiz">
+    <summary>クイズ: プリフライトが失敗したら、本番リクエストはサーバに届きますか？</summary>
+    <p style="margin-bottom:0"><strong>届きません。</strong>
+    step12 では「fetchが失敗してもリクエストは届いていた」と学びましたが、
+    プリフライトが失敗する場合だけは本番が送られません。この違いは重要です。</p>
+  </details>
+
+  <details class="quiz">
+    <summary>クイズ: プリフライトのレスポンスにだけCORSヘッダーを書くと、なぜ動かない？</summary>
+    <p style="margin-bottom:0">プリフライトは「送ってよいか」の確認にすぎません。
+    本番の応答を<strong>読んでよいか</strong>は、本番の応答に付いた
+    <code>Access-Control-Allow-Origin</code> で改めて判定されます。</p>
+  </details>
+</section>
+
+</main>
+<script src="assets/deck.js"></script>
+</body>
+</html>

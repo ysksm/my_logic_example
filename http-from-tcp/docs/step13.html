@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>step13: 単純リクエストと Access-Control-Allow-Origin</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-step="13">
+<main>
+
+<section class="slide">
+  <h1>step13: 単純リクエストと ACAO</h1>
+  <p class="lead">たった1行のヘッダーで通る場合と、通らない場合がある。その境界線を正確に知ります。</p>
+
+  <div class="box key">
+    <div class="box-title">このステップでわかること</div>
+    <ul style="margin-bottom:0">
+      <li><code>Access-Control-Allow-Origin</code>（ACAO）は「有無」ではなく「<strong>一致</strong>」で判定される</li>
+      <li>「単純リクエスト」の正確な条件</li>
+      <li>条件を外れると、ブラウザが勝手に <code>OPTIONS</code> を送る（→ step14）</li>
+    </ul>
+  </div>
+</section>
+
+<section class="slide">
+  <h1>やりとり</h1>
+
+  <pre class="wire"><code><span class="req">→ GET /api/wildcard HTTP/1.1</span>
+   Host: localhost:8081
+   <span class="hl">Origin: http://localhost:8080</span>      ← ブラウザが自動で付ける
+
+<span class="res">← HTTP/1.1 200 OK</span>
+   <span class="hl">Access-Control-Allow-Origin: *</span>     ← サーバの「読ませてよい」宣言
+   Content-Type: application/json
+
+   {"message":"..."}</code></pre>
+
+  <div class="box key">
+    <div class="box-title">2つのヘッダーの役割</div>
+    <ul style="margin-bottom:0">
+      <li><code>Origin</code> … <strong>ブラウザが付ける</strong>。「このリクエストはどのページから出たか」</li>
+      <li><code>Access-Control-Allow-Origin</code> … <strong>サーバが付ける</strong>。「このオリジンには読ませてよい」</li>
+    </ul>
+  </div>
+
+  <p>ブラウザは応答を受け取ってから ACAO を見て、
+  JSに渡すかどうかを決めます。<strong>判定はすべてブラウザ側で行われます。</strong></p>
+</section>
+
+<section class="slide try">
+  <h1>実験A: GET（単純リクエスト）</h1>
+
+  <pre class="shell"><code>cd steps/step13-simple-request
+node server.js</code></pre>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th>ボタン</th><th>ACAO</th><th>結果</th></tr>
+    <tr><td>① <code>/api/no-cors</code></td><td>無し</td><td>失敗</td></tr>
+    <tr><td>② <code>/api/wildcard</code></td><td><code>*</code></td><td><strong>成功</strong></td></tr>
+    <tr><td>③ <code>/api/wrong-origin</code></td><td><code>https://example.com</code></td><td>失敗</td></tr>
+  </table>
+  </div>
+
+  <div class="box warn">
+    <div class="box-title">③ が重要です</div>
+    <p style="margin-bottom:0"><strong>ヘッダーはあるのに失敗します。</strong><br>
+    CORSの判定は「ヘッダーが有るか無いか」ではなく
+    「<strong>値がこのページのオリジンと一致するか</strong>」です。
+    <code>*</code> は「すべてに一致する特別な値」というだけ。</p>
+  </div>
+</section>
+
+<section class="slide try">
+  <h1>実験B: POSTはContent-Typeで結果が変わる</h1>
+
+  <p>同じ <code>/api/wildcard</code>（ACAO: <code>*</code>）に、同じPOSTを送ります。</p>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th>ボタン</th><th>Content-Type</th><th>結果</th><th>サーバに届いたもの</th></tr>
+    <tr><td>④</td><td><code>text/plain</code></td><td><strong>成功</strong></td><td><code>POST /api/wildcard</code></td></tr>
+    <tr><td>⑤</td><td><code>application/json</code></td><td>失敗</td><td><strong><code>OPTIONS /api/wildcard</code></strong></td></tr>
+  </table>
+  </div>
+
+  <p>サーバのコンソールを比べてください。
+  ⑤ では <code>POST</code> が届かず、代わりに <code>OPTIONS</code> が届いています。</p>
+
+  <div class="box key">
+    <div class="box-title">これがプリフライトです</div>
+    <p style="margin-bottom:0"><code>application/json</code> は「単純リクエスト」の条件から外れるため、
+    ブラウザが本番の前に許可を確認しに行きました。
+    このステップのサーバはまだ <code>OPTIONS</code> に応答しないので失敗します（step14で対応）。</p>
+  </div>
+</section>
+
+<section class="slide">
+  <h1>「単純リクエスト」の条件</h1>
+
+  <p>次を<strong>すべて</strong>満たすときだけ、プリフライトなしで送られます。</p>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th>項目</th><th>条件</th></tr>
+    <tr><td>メソッド</td><td><code>GET</code> / <code>HEAD</code> / <code>POST</code> のいずれか</td></tr>
+    <tr><td>ヘッダー</td><td>手で付けたヘッダーが安全なもの（<code>Accept</code>,
+      <code>Accept-Language</code>, <code>Content-Language</code>,
+      <code>Content-Type</code>, <code>Range</code> など）だけ。<br>
+      <code>Authorization</code> や <code>X-独自ヘッダー</code> を1つでも付けると外れる</td></tr>
+    <tr><td>Content-Type</td><td><code>application/x-www-form-urlencoded</code> /
+      <code>multipart/form-data</code> / <code>text/plain</code> のいずれか<br>
+      <strong><code>application/json</code> は含まれない</strong></td></tr>
+    <tr><td>その他</td><td>アップロード進捗イベントを使っていない、
+      <code>ReadableStream</code> をボディにしていない</td></tr>
+  </table>
+  </div>
+
+  <div class="box key">
+    <div class="box-title">なぜこの条件なのか</div>
+    <p style="margin-bottom:0">この条件は「<strong>HTMLのフォームで昔から送れたもの</strong>」とほぼ一致します
+    （step07 のクイズを思い出してください）。<br>
+    フォームで送れる範囲はCORSが生まれる前から送れていたので、
+    いまさら事前確認を要求しても意味がありません。
+    それを超えるもの（<code>PUT</code>、<code>DELETE</code>、JSON、独自ヘッダー）だけ
+    確認を求める、という設計です。</p>
+  </div>
+
+  <p><strong>ただし「送れる」だけで「読める」わけではありません。</strong>
+  応答を読むには、いずれの場合も ACAO が必要です。</p>
+</section>
+
+<section class="slide">
+  <h1><code>*</code> と個別指定</h1>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th>値</th><th>使う場面</th></tr>
+    <tr><td><code>Access-Control-Allow-Origin: *</code></td>
+        <td>誰でも使ってよい公開API。Cookieや認証情報を伴わないもの</td></tr>
+    <tr><td><code>Access-Control-Allow-Origin: https://app.example.com</code></td>
+        <td>特定のフロントからだけ使わせたいAPI</td></tr>
+  </table>
+  </div>
+
+  <div class="box warn">
+    <div class="box-title">step16 の予告</div>
+    <p style="margin-bottom:0"><code>*</code> は <code>credentials</code>（Cookie）と
+    <strong>併用できません</strong>。ブラウザが明確に拒否します。理由は step16 で。</p>
+  </div>
+
+  <h2>curlで確かめる</h2>
+  <pre class="shell"><code>curl -i -H 'Origin: http://localhost:8080' http://localhost:8081/api/wildcard</code></pre>
+  <p>ACAO が返っています。curl はこのヘッダーを見ても何もしません。
+  <strong>判断するのはブラウザだけ</strong>です。</p>
+
+  <details class="quiz">
+    <summary>クイズ: ACAO が <code>https://example.com</code> のとき、
+      <code>http://localhost:8080</code> のページは読める？</summary>
+    <p style="margin-bottom:0"><strong>読めません。</strong>
+    ヘッダーの有無ではなく一致で判定されます。
+    「CORSヘッダーは付けたのに直らない」というとき、まず値を確認してください。</p>
+  </details>
+</section>
+
+</main>
+<script src="assets/deck.js"></script>
+</body>
+</html>
