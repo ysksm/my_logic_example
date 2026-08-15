@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>step16: credentials とクロスオリジンの Cookie</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-step="16">
+<main>
+
+<section class="slide">
+  <h1>step16: credentials とクロスオリジンの Cookie</h1>
+  <p class="lead">第4章の山場。Cookie・プリフライト・ACAO がここで全部つながります。</p>
+
+  <div class="box key">
+    <div class="box-title">このステップでわかること</div>
+    <ul style="margin-bottom:0">
+      <li><code>fetch</code> は<strong>既定でクロスオリジンにCookieを送らない</strong></li>
+      <li>credentials 付きのとき <code>Access-Control-Allow-Origin: *</code> は<strong>使えない</strong></li>
+      <li><code>Vary: Origin</code> が必要な理由</li>
+      <li>「オリジン」と「サイト」は別物（発展）</li>
+    </ul>
+  </div>
+</section>
+
+<section class="slide">
+  <h1>fetch は既定でCookieを送らない</h1>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th><code>credentials</code></th><th>意味</th></tr>
+    <tr><td><code>'omit'</code></td><td>絶対に送らない</td></tr>
+    <tr><td><code>'same-origin'</code>（<strong>既定</strong>）</td><td>同一オリジンのときだけ送る</td></tr>
+    <tr><td><code>'include'</code></td><td>クロスオリジンでも送る。<strong>サーバ側の許可が必要</strong></td></tr>
+  </table>
+  </div>
+
+  <p><code>XMLHttpRequest</code> の <code>withCredentials = true</code> が同じ役割です。</p>
+
+  <div class="box warn">
+    <div class="box-title">Set-Cookie を受け入れるのにも 'include' が必要</div>
+    <p style="margin-bottom:0">省くと、サーバが <code>Set-Cookie</code> を返しても
+    ブラウザは保存しません。「ログインAPIは200を返すのにログインできない」の原因になります。</p>
+  </div>
+</section>
+
+<section class="slide try">
+  <h1>実験1・2 — Cookieが送られるかを比べる</h1>
+
+  <pre class="shell"><code>cd steps/step16-credentials
+node server.js</code></pre>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th>ボタン</th><th>credentials</th><th>結果</th><th>サーバのログ</th></tr>
+    <tr><td>①</td><td>指定なし</td><td><code>ログイン中: false</code></td><td><code>Cookie ヘッダー : 届いていません</code></td></tr>
+    <tr><td>②</td><td><code>'include'</code></td><td><code>ログイン中: true</code></td><td><code>Cookie ヘッダー : sid=...</code></td></tr>
+  </table>
+  </div>
+
+  <div class="box key">
+    <div class="box-title">① は通信自体は成功しています</div>
+    <p style="margin-bottom:0">ステータスは 200。ただCookieが送られていないので、
+    サーバから見れば<strong>未ログインの他人</strong>です。<br>
+    「APIは動いているのにログイン状態にならない」という症状の正体がこれです。</p>
+  </div>
+</section>
+
+<section class="slide">
+  <h1>実験3 — サーバ側の設定ミス2種</h1>
+
+  <h2>③ <code>Access-Control-Allow-Origin: *</code> ＋ <code>credentials: 'include'</code></h2>
+  <pre class="wire"><code><span class="bad">The value of the 'Access-Control-Allow-Origin' header in the response must not
+be the wildcard '*' when the request's credentials mode is 'include'.</span></code></pre>
+
+  <div class="box danger">
+    <div class="box-title">なぜ禁止されているのか</div>
+    <p style="margin-bottom:0"><code>*</code> は「誰でもどうぞ」という意味です。
+    そこにユーザーのCookie（＝本人の権限）が乗ると、
+    <strong>どんなサイトからでも、そのユーザーとしてAPIを叩いて結果を読める</strong>ことになります。<br>
+    「誰でも」と「本人の権限」は同時に成立させてはいけない。だからブラウザが拒否します。</p>
+  </div>
+
+  <h2>④ <code>Allow-Credentials</code> の付け忘れ</h2>
+  <pre class="wire"><code><span class="bad">The value of the 'Access-Control-Allow-Credentials' header in the response is ''
+which must be 'true' when the request's credentials mode is 'include'.</span></code></pre>
+  <p><strong>Origin の一致だけでは足りません。</strong>
+  「Cookieを伴ってよい」という明示的な許可が別途必要です。</p>
+</section>
+
+<section class="slide">
+  <h1>正しい実装</h1>
+
+  <pre><code>function corsWithCredentials(origin) {
+  if (!ALLOWED_ORIGINS.has(origin)) return { "Vary": "Origin" };
+  return {
+    "Access-Control-Allow-Origin": origin,        // ← "*" ではなく実際の値
+    "Access-Control-Allow-Credentials": "true",   // ← これが無いと通らない
+    "Vary": "Origin",                             // ← キャッシュ事故を防ぐ
+  };
+}</code></pre>
+
+  <ol>
+    <li><code>Access-Control-Allow-Origin</code> に <strong><code>*</code> は使えない</strong>。Origin をそのまま返す</li>
+    <li><code>Access-Control-Allow-Credentials: true</code> を返す</li>
+    <li><strong>プリフライトが飛ぶ場合は、プリフライトの応答にもこの2つが必要</strong></li>
+    <li><code>Vary: Origin</code> を付ける</li>
+  </ol>
+
+  <div class="box warn">
+    <div class="box-title"><code>Vary: Origin</code> はなぜ必要か</div>
+    <div class="diagram" style="margin-bottom:0">CDN / プロキシ
+   ↓ A社向けの応答（ACAO: https://a.example）をキャッシュ
+   ↓ それをB社に配ってしまう
+   → B社からは読めない（あるいはその逆の事故）</div>
+  </div>
+  <p><strong>許可した場合も、許可しなかった場合も、必ず付けてください。</strong></p>
+</section>
+
+<section class="slide">
+  <h1>発展（任意）: オリジンとサイトは別物</h1>
+
+  <p>ここまでの実験では <code>SameSite=Lax</code> のままCookieが送られていました。不思議ではありませんか？</p>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th>概念</th><th>判定に使うもの</th></tr>
+    <tr><td><strong>オリジン</strong></td><td>スキーム + ホスト + <strong>ポート</strong></td></tr>
+    <tr><td><strong>サイト</strong></td><td>スキーム + 登録可能ドメイン（eTLD+1）。<strong>ポートは無関係</strong></td></tr>
+  </table>
+  </div>
+
+  <div class="diagram">http://localhost:8080  と  http://localhost:8081
+  → 別オリジン（ポートが違う）だが、同じサイト（ホストが同じ）
+
+http://localhost:8080  と  http://127.0.0.1:8081
+  → 別オリジン かつ 別サイト（ホスト名が違う）</div>
+
+  <p><code>SameSite</code> 属性が見ているのは「オリジン」ではなく「<strong>サイト</strong>」です。
+  だからポートが違うだけの今回のケースは same-site であり、<code>Lax</code> でもCookieが送られます。</p>
+</section>
+
+<section class="slide try">
+  <h1>発展の実験（⑤⑥⑦）</h1>
+
+  <p><code>http://127.0.0.1:8081</code> にすると別サイトになります。
+  <strong>同じAPIサーバに別の名前でアクセスするだけ</strong>です。</p>
+
+  <ol>
+    <li><strong>⑤</strong> 127.0.0.1 側に <code>SameSite=Lax</code> でログイン
+        → 応答は成功するが、<strong>Cookieは保存されない</strong></li>
+    <li><strong>⑥</strong> 127.0.0.1 側の <code>/api/me</code> → Cookieが届かない</li>
+    <li><strong>⑦</strong> <code>SameSite=None; Secure</code> でログインし直す → 保存される</li>
+    <li><strong>⑥</strong> をもう一度 → Cookieが届く</li>
+  </ol>
+
+  <p>DevTools → Application → Cookies → <code>http://127.0.0.1:8081</code> で確認してください。</p>
+
+  <div class="box">
+    <div class="box-title">Secure なのに http で動く理由</div>
+    <p style="margin-bottom:0">step11 で見たとおり、ブラウザは <code>localhost</code> /
+    <code>127.0.0.1</code> を例外的に「安全なオリジン」として扱います。本番では本物のHTTPSが必要です。</p>
+  </div>
+
+  <div class="box warn">
+    <div class="box-title">うまくいかない場合</div>
+    <p style="margin-bottom:0">ブラウザのサードパーティCookieブロックを確認してください。
+    Chrome: 設定 → プライバシーとセキュリティ → サードパーティCookie。
+    <strong>Safari は既定でブロックするため、この発展実験は動きません。</strong></p>
+  </div>
+</section>
+
+<section class="slide">
+  <h1>クロスサイトでCookieを使うための条件</h1>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th>層</th><th>必要なもの</th></tr>
+    <tr><td>Cookie</td><td><code>SameSite=None; Secure</code></td></tr>
+    <tr><td>fetch</td><td><code>credentials: 'include'</code></td></tr>
+    <tr><td>CORS（本番）</td><td><code>Access-Control-Allow-Origin: &lt;実際のOrigin&gt;</code> ＋ <code>Allow-Credentials: true</code></td></tr>
+    <tr><td>CORS（プリフライト）</td><td>同上</td></tr>
+    <tr><td>キャッシュ</td><td><code>Vary: Origin</code></td></tr>
+  </table>
+  </div>
+
+  <div class="box danger">
+    <div class="box-title">5層すべてが揃わないと動きません</div>
+    <p style="margin-bottom:0">1つでも欠けると失敗します。
+    「クロスオリジンのCookieがつらい」と言われるのはこのためです。<br>
+    <strong>step19 では、この全部を不要にする方法を扱います。</strong></p>
+  </div>
+
+  <details class="quiz">
+    <summary>クイズ: <code>http://a.example:8080</code> と <code>http://a.example:9000</code> は？</summary>
+    <p style="margin-bottom:0"><strong>別オリジン、同じサイト</strong>です。<br>
+    → CORSの対象にはなる（ACAOが必要）が、<code>SameSite</code> の制限は受けません。</p>
+  </details>
+</section>
+
+</main>
+<script src="assets/deck.js"></script>
+</body>
+</html>

@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>step05: レスポンスを組み立てる ＋ keep-alive</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-step="5">
+<main>
+
+<section class="slide">
+  <h1>step05: レスポンスを組み立てる ＋ keep-alive</h1>
+  <p class="lead">ここで作る「HTTPコア」を step06 以降ずっと使い回します。第1章の総仕上げです。</p>
+
+  <div class="box key">
+    <div class="box-title">このステップでわかること</div>
+    <ul>
+      <li>1本のTCP接続で複数リクエストを処理する（keep-alive）</li>
+      <li>そのために <code>while</code> ループが必要な理由</li>
+      <li><code>204</code> / <code>304</code> はボディを持てない</li>
+    </ul>
+  </div>
+
+  <div class="box">
+    <div class="box-title">step04からの差分</div>
+    <ul style="margin-bottom:0">
+      <li>読み切った分をバッファから取り除き、ループでもう一度読む</li>
+      <li>レスポンス組み立ての部品 <code>res.text() / .html() / .json() / .send()</code></li>
+    </ul>
+  </div>
+</section>
+
+<section class="slide">
+  <h1>keep-alive</h1>
+
+  <h2>HTTP/1.0 — 1リクエスト＝1接続</h2>
+  <div class="diagram">接続 → GET /index.html → 応答 → 切断
+接続 → GET /style.css  → 応答 → 切断
+接続 → GET /logo.png   → 応答 → 切断     ← 画像20個なら20回の接続確立</div>
+
+  <h2>HTTP/1.1 — 既定で使い回す</h2>
+  <div class="diagram">接続 → GET /index.html → 応答
+     → GET /style.css  → 応答
+     → GET /logo.png   → 応答 → （閉じたい側が Connection: close と宣言）</div>
+
+  <div class="box warn">
+    <div class="box-title">サーバ実装への影響</div>
+    <p style="margin-bottom:0">バッファに残ったバイトが
+    「次のリクエスト」かもしれません。だから<strong>読み切ったら捨てて、もう一度読む</strong>
+    ループが要ります。</p>
+  </div>
+</section>
+
+<section class="slide">
+  <h1>ループの中身</h1>
+
+  <pre><code>socket.on("data", (chunk) =&gt; {
+  buffer = Buffer.concat([buffer, chunk]);
+
+  while (!closed) {
+    const headerEnd = buffer.indexOf("\r\n\r\n");
+    if (headerEnd === -1) break;                   // ヘッダーがまだ
+
+    // …ヘッダー解析…
+
+    const bodyStart = headerEnd + 4;
+    const contentLength = Number(headers["content-length"] ?? 0);
+    if (buffer.length &lt; bodyStart + contentLength) break;   // ボディがまだ
+
+    const body = buffer.subarray(bodyStart, bodyStart + contentLength);
+
+    // ★ 読み切った分を捨てる。残りは次のリクエスト
+    buffer = buffer.subarray(bodyStart + contentLength);
+
+    handler(req, res);
+  }
+});</code></pre>
+
+  <p><code>return</code> ではなく <code>break</code> にすること、
+  そして<strong>バッファを削ること</strong>がポイントです。</p>
+</section>
+
+<section class="slide">
+  <h1>レスポンス組み立て</h1>
+
+  <pre><code>send(status, headers = {}, body = "") {
+  const bodyBuf = Buffer.isBuffer(body) ? body : Buffer.from(String(body));
+  const noBody = status === 204 || status === 304;
+
+  const out = { ...headers };
+  if (!noBody) out["Content-Length"] = String(bodyBuf.length);
+  out["Connection"] = keepAlive ? "keep-alive" : "close";
+
+  const lines = [`HTTP/1.1 ${status} ${REASON[status]}`];
+  for (const [name, value] of Object.entries(out)) {
+    // 配列を渡すと同じ名前の行を複数出す（Set-Cookie 用。step10で使う）
+    for (const v of Array.isArray(value) ? value : [value])
+      lines.push(`${name}: ${v}`);
+  }
+
+  socket.write(Buffer.concat([
+    Buffer.from(lines.join("\r\n") + "\r\n\r\n"), bodyBuf
+  ]));
+}</code></pre>
+
+  <div class="box key">
+    <div class="box-title">以降ずっと使うAPI</div>
+    <pre style="margin-bottom:0"><code>req.method  req.target  req.path  req.query
+req.headers   // 小文字キーの辞書
+req.body      // Buffer
+
+res.text(200, "こんにちは\n")
+res.html(200, "&lt;h1&gt;hi&lt;/h1&gt;")
+res.json(200, { ok: true })
+res.send(204)
+res.send(200, { "Set-Cookie": ["a=1", "b=2"] }, "body")</code></pre>
+  </div>
+</section>
+
+<section class="slide try">
+  <h1>手を動かす</h1>
+
+  <pre class="shell"><code>cd steps/step05-response
+node server.js</code></pre>
+
+  <h2>実験1: 1本の接続で2リクエスト</h2>
+  <pre class="shell"><code>curl -v http://localhost:8080/plain http://localhost:8080/json</code></pre>
+  <p>curl 側に <code>* Re-using existing connection</code>、
+  サーバ側に <code>[この接続の 1 本目]</code> <code>[この接続の 2 本目]</code> が出ます。</p>
+
+  <h2>実験2（重要）: パイプライン</h2>
+  <pre class="shell"><code>printf 'GET /plain HTTP/1.1\r\nHost: x\r\n\r\nGET /json HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n' \
+  | nc localhost 8080</code></pre>
+  <p><strong>1回の <code>data</code> イベントで2リクエストが同時に届きます。</strong>
+  それでもループのおかげで両方に応答が返ります。
+  これが「TCPにはメッセージの境界がない」ことの実感です。</p>
+
+  <h2>実験3: 204 No Content</h2>
+  <pre class="shell"><code>curl -v http://localhost:8080/empty</code></pre>
+  <pre class="wire"><code><span class="res">HTTP/1.1 204 No Content</span>
+Connection: keep-alive</code></pre>
+  <p><code>Content-Length</code> が<strong>ありません</strong>。</p>
+</section>
+
+<section class="slide">
+  <h1>第1章のまとめ</h1>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th>step</th><th>学んだこと</th></tr>
+    <tr><td>01</td><td>TCPはバイト列を運ぶだけ。HTTPを知らない</td></tr>
+    <tr><td>02</td><td>「1行目＋ヘッダー＋空行＋ボディ」。行区切りは <code>\r\n</code></td></tr>
+    <tr><td>03</td><td>データは分割して届く。ヘッダー名は大文字小文字を区別しない</td></tr>
+    <tr><td>04</td><td>ボディの終わりに印はない → <code>Content-Length</code></td></tr>
+    <tr><td>05</td><td>1接続で複数リクエスト → 読み切って捨ててループ</td></tr>
+  </table>
+  </div>
+
+  <div class="box key">
+    <div class="box-title">これで「HTTPサーバ」が完成しました</div>
+    <p style="margin-bottom:0">150行ほどのコードです。
+    step06 以降、この「HTTPコア」は<strong>一切変わりません</strong>。
+    変わるのはその上に載るアプリケーション部分だけです。</p>
+  </div>
+
+  <details class="quiz">
+    <summary>クイズ: <code>204</code> に <code>Content-Length: 0</code> を付けてはいけないのはなぜ？</summary>
+    <p style="margin-bottom:0">仕様上 <code>204</code> はボディを持ちません。
+    <code>Content-Length</code> は「ボディの長さ」を表すヘッダーなので、
+    ボディが存在しない応答に付けるのは矛盾です。
+    一部のクライアントやプロキシが混乱します（<code>304</code> も同様）。</p>
+  </details>
+
+  <div class="box do">
+    <div class="box-title">次のステップ（第2章）</div>
+    <p style="margin-bottom:0">GET / POST / PUT / DELETE を1つずつ実装します。</p>
+  </div>
+</section>
+
+</main>
+<script src="assets/deck.js"></script>
+</body>
+</html>

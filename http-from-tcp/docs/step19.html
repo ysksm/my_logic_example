@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>step19: 同一オリジン化リバースプロキシ</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-step="19">
+<main>
+
+<section class="slide">
+  <h1>step19（特別演習）<br>同一オリジン化リバースプロキシ</h1>
+  <p class="lead">CORSを「設定する」のではなく「<strong>発生させない</strong>」もうひとつの解。</p>
+
+  <div class="diagram">ブラウザ ──→ http://localhost:8080   ページ＋プロキシ（＝唯一のオリジン）
+                    │  /api/* だけを転送
+                    ↓
+              http://127.0.0.1:9001   バックエンドAPI（CORS設定は一切なし）</div>
+
+  <div class="box key">
+    <div class="box-title">ブラウザから見えるオリジンは1つだけ</div>
+    <p style="margin-bottom:0">だから同一オリジンポリシーの対象にならず、
+    <strong>CORSは最初から発生しません。</strong></p>
+  </div>
+</section>
+
+<section class="slide">
+  <h1>サーバが初めてTCPクライアントになる</h1>
+
+  <pre><code>const upstream = net.createConnection({ host, port }, () =&gt; {
+  upstream.write(upstreamRequest);   // step02 で手書きしたのと同じ形のテキスト
+});
+
+let received = Buffer.alloc(0);
+upstream.on("data", (chunk) =&gt; { received = Buffer.concat([received, chunk]); });
+upstream.on("end",  () =&gt; { /* 応答を分解してブラウザへ返す */ });</code></pre>
+
+  <div class="box key">
+    <div class="box-title"><code>net.createServer</code> の逆が <code>net.createConnection</code></div>
+    <p style="margin-bottom:0">書き込むのは
+    <code>メソッド パス HTTP/1.1\r\n...</code> というテキスト。
+    <strong>第1章でやったことがそのまま使えます。</strong></p>
+  </div>
+
+  <h2>1リクエストにつき4つのダンプ</h2>
+  <div class="diagram">▼ ブラウザ    → プロキシ
+▶ プロキシ    → バックエンド    ← Host が書き換わっている
+◀ バックエンド → プロキシ
+▲ プロキシ    → ブラウザ</div>
+</section>
+
+<section class="slide try">
+  <h1>手を動かす</h1>
+
+  <pre class="shell"><code>cd steps/step19-reverse-proxy
+node server.js</code></pre>
+
+  <h2>実験1: 直接 vs プロキシ経由</h2>
+  <div class="tablewrap">
+  <table>
+    <tr><th>ボタン</th><th>呼び先</th><th>結果</th></tr>
+    <tr><td>①</td><td><code>http://localhost:9001/api/hello</code>（直接）</td><td><strong>失敗</strong></td></tr>
+    <tr><td>②</td><td><code>/api/hello</code>（プロキシ経由）</td><td><strong>成功</strong></td></tr>
+  </table>
+  </div>
+  <p><strong>バックエンドは同じです。CORSヘッダーを1つも返していません。</strong>
+  違うのは「ブラウザから見て何オリジンか」だけ。</p>
+
+  <h2>実験2: プリフライトが飛ばない</h2>
+  <p>③ <code>PUT /api/items/1</code> + JSON　④ <code>DELETE /api/items/1</code></p>
+  <p>step14 なら<strong>確実にプリフライトが飛んだ</strong>組み合わせです。
+  サーバのコンソールに <code>OPTIONS</code> が<strong>1つも出ない</strong>ことを確認してください。
+  往復が1回減ります。</p>
+
+  <h2>実験3: Cookieが素直に動く</h2>
+  <p>⑤ <code>POST /api/login</code>　⑥ <code>GET /api/me</code> → <code>ログイン中: true</code></p>
+  <p><strong><code>credentials: 'include'</code> を一度も書いていません。</strong>
+  Cookieの属性も <code>Path=/; HttpOnly; SameSite=Lax</code> とごく普通です。</p>
+</section>
+
+<section class="slide">
+  <h1>Cookieはどこのものになるか</h1>
+
+  <div class="diagram">バックエンドが発行:
+    Set-Cookie: sid=...; Path=/; HttpOnly; SameSite=Lax
+              ↓ プロキシがそのまま転送
+ブラウザから見ると:
+    「http://localhost:8080 が返した Set-Cookie」
+              ↓
+    localhost:8080 のファーストパーティCookieとして保存される</div>
+
+  <p>DevTools → Application → Cookies を見ると、Cookieは
+  <strong><code>http://localhost:8080</code> のもの</strong>として保存されています。
+  バックエンドが発行したのに、です。</p>
+
+  <div class="box key">
+    <div class="box-title">step16 で必要だった5層がすべて不要になる</div>
+    <p style="margin-bottom:0"><code>SameSite=None</code> も <code>Secure</code> も
+    <code>credentials:'include'</code> も <code>Allow-Credentials</code> も
+    <code>Vary: Origin</code> も——1つも要りません。</p>
+  </div>
+</section>
+
+<section class="slide">
+  <h1>2つの解の比較</h1>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th></th><th>CORSを設定する（step13〜18）</th><th>プロキシで同一オリジンにする（step19）</th></tr>
+    <tr><td>ブラウザから見たオリジン</td><td>2つ</td><td>1つ</td></tr>
+    <tr><td>プリフライト</td><td>条件次第で飛ぶ（往復1回分の遅延）</td><td>飛ばない</td></tr>
+    <tr><td>Cookie</td><td><code>SameSite=None; Secure</code> ＋
+        <code>credentials:'include'</code> ＋ <code>Allow-Credentials</code></td>
+        <td>ファーストパーティCookieとして普通に動く</td></tr>
+    <tr><td>APIの改修</td><td>必要</td><td>不要</td></tr>
+    <tr><td>運用</td><td>サーバは1つでよい</td><td>プロキシ層が増える。障害点も増える</td></tr>
+    <tr><td>通信量</td><td>ブラウザ→API 直通</td><td>すべてプロキシを経由する</td></tr>
+    <tr><td>向いている場面</td><td>不特定多数に公開するAPI、<br>別会社のフロントから叩かれるAPI</td>
+        <td>自社フロント＋自社API、<br>APIを改修できない場合</td></tr>
+  </table>
+  </div>
+
+  <div class="box key">
+    <div class="box-title">実務で見かけるものは、ほぼこの2つのどちらか</div>
+    <ul style="margin-bottom:0">
+      <li>Vite の <code>server.proxy</code> / Next.js の <code>rewrites</code> → step19 の方式</li>
+      <li>Nginx の <code>location /api/ { proxy_pass ...; }</code> → step19 の方式</li>
+      <li>Kubernetes Ingress のパスベースルーティング → step19 の方式</li>
+      <li>公開REST API の <code>Access-Control-Allow-Origin: *</code> → step13 の方式</li>
+    </ul>
+  </div>
+</section>
+
+<section class="slide">
+  <h1>プロキシ実装の要点</h1>
+
+  <h2>1. ホップバイホップヘッダーを転送しない</h2>
+  <pre><code>const HOP_BY_HOP = new Set([
+  "connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
+  "te", "trailer", "transfer-encoding", "upgrade",
+]);</code></pre>
+  <p>これらは「<strong>この1本の接続についての取り決め</strong>」です。
+  次の接続にそのまま持ち越すと壊れます。</p>
+
+  <h2>2. Host を書き換え、元の情報は X-Forwarded-* で渡す</h2>
+  <pre><code>outHeaders.push(`Host: ${BACKEND_HOST}:${BACKEND_PORT}`);
+outHeaders.push(`X-Forwarded-Host: ${req.headers["host"]}`);
+outHeaders.push(`X-Forwarded-Proto: http`);
+outHeaders.push(`X-Forwarded-For: 127.0.0.1`);</code></pre>
+
+  <h2>3. 同名ヘッダーを潰さない</h2>
+  <pre><code>if (headers.has(key)) headers.get(key).values.push(value);</code></pre>
+  <p><code>Set-Cookie</code> が2行あるとき片方を捨てるとログインが壊れます。
+  step10 の「<code>Set-Cookie</code> は連結してはいけない」がここで効きます。</p>
+
+  <h2>4. Content-Length は自分で計算し直す</h2>
+</section>
+
+<section class="slide">
+  <h1>注意点</h1>
+
+  <div class="box danger">
+    <div class="box-title">転送先を固定する</div>
+    <p style="margin-bottom:0">URLの一部を転送先ホストにするような作りにすると、
+    社内ネットワークへの踏み台（<strong>SSRF</strong>）になります。
+    <code>/proxy?url=http://169.254.169.254/</code> のような設計は絶対に避けてください。</p>
+  </div>
+
+  <ul>
+    <li>クライアントが送ってきた <code>X-Forwarded-For</code> を<strong>信用しない</strong>（偽装できます）</li>
+    <li>この実装は <code>Transfer-Encoding: chunked</code>、WebSocket（<code>Upgrade</code>）、
+        ストリーミングに対応していません</li>
+    <li>バックエンドへ <code>Connection: close</code> を送っているので毎回TCP接続を張り直しています。
+        実務のプロキシは接続プールを持ちます</li>
+  </ul>
+
+  <details class="quiz">
+    <summary>クイズ: なぜプロキシ経由だとプリフライトが飛ばないのですか？</summary>
+    <p style="margin-bottom:0">ブラウザから見て<strong>同一オリジン</strong>だからです。
+    プリフライトはクロスオリジンリクエストのための仕組みなので、
+    そもそも判定対象になりません。</p>
+  </details>
+
+  <details class="quiz">
+    <summary>クイズ: <code>Connection</code> ヘッダーを転送してはいけないのはなぜ？</summary>
+    <p style="margin-bottom:0">「この1本のTCP接続をどう扱うか」の取り決めだからです。
+    ブラウザ↔プロキシ間の取り決めを、プロキシ↔バックエンド間にそのまま持ち込むと
+    接続管理が壊れます。</p>
+  </details>
+</section>
+
+<section class="slide">
+  <h1>おつかれさまでした</h1>
+
+  <div class="box key">
+    <div class="box-title">ここまでやったこと</div>
+    <ol style="margin-bottom:0">
+      <li><strong>第1章</strong> — TCPはただの土管。そこにHTTPを組み立てた</li>
+      <li><strong>第2章</strong> — 4つのメソッドと、それぞれに適したステータスコード</li>
+      <li><strong>第3章</strong> — Cookieでステートレスなプロトコルに状態を持たせた</li>
+      <li><strong>第4章</strong> — CORSの各ヘッダーを1つずつ動かして確かめた</li>
+      <li><strong>第5章</strong> — 安全な許可リストと、CORSで防げないもの</li>
+      <li><strong>特別演習</strong> — プロキシでオリジンそのものを畳んだ</li>
+    </ol>
+  </div>
+
+  <div class="box do">
+    <div class="box-title">これから CORS エラーを見たとき</div>
+    <p style="margin-bottom:0">「なんとなくCORSで落ちた」ではなく、
+    <strong>ブラウザが、どの段階で、どの条件を満たさなかったのか</strong>
+    を具体的に切り分けられるはずです。</p>
+    <ul style="margin-bottom:0">
+      <li>そもそもプリフライトは飛んだか？ 通ったか？</li>
+      <li>本番の応答に ACAO はあるか？ 値は<strong>一致</strong>しているか？</li>
+      <li>credentials を使っているのに <code>*</code> を返していないか？</li>
+      <li>読みたいのはボディか、ヘッダーか（<code>Expose-Headers</code>）？</li>
+      <li>そもそもCORSで解くべきか、プロキシで畳むべきか？</li>
+    </ul>
+  </div>
+
+  <h2>さらに学ぶなら</h2>
+  <ul>
+    <li>HTTPS / TLS — なぜ <code>Secure</code> が意味を持つのか</li>
+    <li>HTTP/2・HTTP/3 — テキストからバイナリフレームへ</li>
+    <li><code>Transfer-Encoding: chunked</code> とストリーミング</li>
+    <li>キャッシュ制御（<code>Cache-Control</code>、<code>ETag</code>、条件付きリクエスト）</li>
+    <li>認証（<code>Authorization</code>、Bearerトークン、OAuth）</li>
+  </ul>
+</section>
+
+</main>
+<script src="assets/deck.js"></script>
+</body>
+</html>

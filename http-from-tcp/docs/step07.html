@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>step07: POST</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-step="7">
+<main>
+
+<section class="slide">
+  <h1>step07: POST</h1>
+  <p class="lead">ボディはただのバイト列。それが何なのかを教えるのが <code>Content-Type</code> です。</p>
+
+  <div class="box key">
+    <div class="box-title">このステップでわかること</div>
+    <ul style="margin-bottom:0">
+      <li><code>Content-Type</code> でボディの読み方を切り替える</li>
+      <li>フォーム形式とクエリ文字列は<strong>書式が同じ</strong></li>
+      <li><code>415 Unsupported Media Type</code> の使いどころ</li>
+    </ul>
+  </div>
+</section>
+
+<section class="slide">
+  <h1>GET と POST の違い</h1>
+
+  <h2>GET</h2>
+  <pre class="wire"><code><span class="req">GET /search?name=%E5%B1%B1%E7%94%B0&amp;age=20 HTTP/1.1</span>
+Host: localhost:8080</code></pre>
+
+  <h2>POST</h2>
+  <pre class="wire"><code><span class="req">POST /submit HTTP/1.1</span>
+Host: localhost:8080
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 41
+
+<span class="hl">name=%E5%B1%B1%E7%94%B0&amp;age=20</span></code></pre>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th></th><th>GET</th><th>POST</th></tr>
+    <tr><td>データの場所</td><td>URL（リクエストライン）</td><td>ボディ</td></tr>
+    <tr><td>アドレスバー</td><td><code>?name=…</code> が付く</td><td><code>/submit</code> のまま</td></tr>
+    <tr><td>履歴・ログ</td><td>残る</td><td>残らない</td></tr>
+    <tr><td><strong>書式</strong></td><td colspan="2"><strong>同じ（<code>name=value&amp;…</code>）</strong></td></tr>
+  </table>
+  </div>
+  <p>書式が同じなので、<code>parseUrlEncoded()</code> はクエリにもボディにも使い回せます。</p>
+</section>
+
+<section class="slide">
+  <h1>Content-Type がすべてを決める</h1>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th>Content-Type</th><th>ボディの形</th><th>誰が使う</th></tr>
+    <tr><td><code>application/x-www-form-urlencoded</code></td><td><code>name=taro&amp;age=20</code></td><td>HTMLフォーム（既定）</td></tr>
+    <tr><td><code>application/json</code></td><td><code>{"name":"taro"}</code></td><td>fetch / APIクライアント</td></tr>
+    <tr><td><code>text/plain</code></td><td>ただの文字列</td><td>単純な用途</td></tr>
+    <tr><td><code>multipart/form-data</code></td><td>境界文字列で区切る</td><td>ファイルアップロード</td></tr>
+  </table>
+  </div>
+
+  <pre><code>// "application/json; charset=utf-8" のようにパラメータが付くので
+// ";" より前だけを見る
+const contentType = (req.headers["content-type"] ?? "")
+  .split(";")[0].trim().toLowerCase();
+
+if (contentType === "application/x-www-form-urlencoded")
+  return parseUrlEncoded(raw);
+
+if (contentType === "application/json")
+  return JSON.parse(raw);
+
+return { unsupported: true };   // → 415</code></pre>
+
+  <div class="box key">
+    <div class="box-title">この3つを覚えておいてください</div>
+    <p style="margin-bottom:0"><code>x-www-form-urlencoded</code> /
+    <code>multipart/form-data</code> / <code>text/plain</code> ——
+    <strong>step13 の「単純リクエスト」の条件でそのまま再登場します。</strong>
+    <code>application/json</code> が入っていないことが、CORSの挙動を分けます。</p>
+  </div>
+</section>
+
+<section class="slide try">
+  <h1>手を動かす</h1>
+
+  <pre class="shell"><code>cd steps/step07-post
+node server.js</code></pre>
+  <p>ブラウザで <code>http://localhost:8080/</code> を開いてください。</p>
+
+  <h2>実験1: HTMLフォームのPOST</h2>
+  <p>1つ目のフォームを送信し、サーバのコンソールで生の通信を見てください。
+  アドレスバーは <code>/submit</code> のままです。</p>
+
+  <h2>実験2: JSONのPOST</h2>
+  <pre class="shell"><code>curl -v -H 'Content-Type: application/json' \
+     -d '{"name":"太郎","tags":["a","b"]}' http://localhost:8080/submit</code></pre>
+
+  <h2>実験3: 415 Unsupported Media Type</h2>
+  <pre class="shell"><code>curl -v -H 'Content-Type: application/xml' -d '&lt;a/&gt;' http://localhost:8080/submit</code></pre>
+  <p><code>415</code> は「文法は正しいが、この形式は受け付けない」。
+  <code>400</code>（そもそも壊れている）とは別物です。</p>
+
+  <h2>実験4: Content-Typeを詐称する</h2>
+  <pre class="shell"><code>curl -H 'Content-Type: application/json' -d 'name=taro' http://localhost:8080/submit</code></pre>
+  <p><code>400</code> が返ります。<strong><code>Content-Type</code> は宣言にすぎず、
+  中身とは無関係です。</strong>サーバは必ず「宣言どおりでなかった場合」を処理する必要があります。</p>
+</section>
+
+<section class="slide">
+  <h1>まとめ</h1>
+
+  <div class="box key">
+    <div class="box-title">今日の要点</div>
+    <ul style="margin-bottom:0">
+      <li>ボディはバイト列。意味を与えるのは <code>Content-Type</code></li>
+      <li><code>Content-Type</code> はパラメータ付きで来る → <code>;</code> より前を見る</li>
+      <li>宣言は信用できない → パース失敗を必ず処理する</li>
+      <li><code>400</code>（壊れている） と <code>415</code>（形式が非対応）を使い分ける</li>
+    </ul>
+  </div>
+
+  <details class="quiz">
+    <summary>クイズ: HTMLの <code>&lt;form&gt;</code> は <code>application/json</code> で送れますか？</summary>
+    <p style="margin-bottom:0"><strong>送れません。</strong>
+    <code>&lt;form enctype&gt;</code> に指定できるのは
+    <code>application/x-www-form-urlencoded</code>、<code>multipart/form-data</code>、
+    <code>text/plain</code> の3つだけです。<br>
+    …この3つ、どこかで見ませんでしたか？ <strong>step13 の「単純リクエスト」の条件と同じです。</strong>
+    偶然ではありません。</p>
+  </details>
+
+  <details class="quiz">
+    <summary>クイズ: <code>Content-Type</code> が無いPOSTが来たら？</summary>
+    <p style="margin-bottom:0">仕様上は <code>application/octet-stream</code>
+    （ただのバイト列）とみなしてよいことになっています。
+    実務では <code>400</code> か <code>415</code> を返して明示的に拒否するのが安全です。</p>
+  </details>
+
+  <div class="box do">
+    <div class="box-title">次のステップ</div>
+    <p style="margin-bottom:0">POST と PUT の違い ——「場所を決めるのは誰か」を扱います。</p>
+  </div>
+</section>
+
+</main>
+<script src="assets/deck.js"></script>
+</body>
+</html>

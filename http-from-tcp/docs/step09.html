@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>step09: DELETE と適切な応答</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-step="9">
+<main>
+
+<section class="slide">
+  <h1>step09: DELETE と適切な応答</h1>
+  <p class="lead">第2章の締めくくり。そして<strong>ここで <code>OPTIONS</code> が初登場します。</strong></p>
+
+  <div class="box key">
+    <div class="box-title">このステップでわかること</div>
+    <ul style="margin-bottom:0">
+      <li>DELETEが2回目も成功を返す理由</li>
+      <li><code>405</code> には <code>Allow</code> ヘッダーが必須</li>
+      <li><code>OPTIONS</code> = 「このURLで何ができるのか」を尋ねるメソッド</li>
+    </ul>
+  </div>
+
+  <div class="box warn">
+    <div class="box-title">step14 への伏線</div>
+    <p style="margin-bottom:0">ここで手で実装する <code>OPTIONS</code> を、
+    第4章では<strong>ブラウザが勝手に送ってきます</strong>。それがプリフライトです。</p>
+  </div>
+</section>
+
+<section class="slide">
+  <h1>DELETEは2回目も 204</h1>
+
+  <pre class="shell"><code>curl -i -X DELETE http://localhost:8080/items/1   # → 204 No Content
+curl -i -X DELETE http://localhost:8080/items/1   # → 204 No Content</code></pre>
+
+  <p>「もう無いのだから404では？」と思うかもしれません。</p>
+
+  <div class="box key">
+    <div class="box-title">DELETEの目的は「そのURLに何も無い状態にすること」</div>
+    <p style="margin-bottom:0">2回目もその状態は達成されているので、成功を返すのが自然です。
+    これによりDELETEは<strong>冪等</strong>になり、クライアントは安心して再送できます。</p>
+  </div>
+
+  <p>404を返す設計もありえますが、その場合クライアントは
+  「本当に無かったのか、自分の再送が成功した後なのか」を区別できません。</p>
+
+  <h2>204 にはボディも Content-Length も無い</h2>
+  <pre class="wire"><code><span class="res">HTTP/1.1 204 No Content</span>
+Connection: keep-alive
+</code></pre>
+</section>
+
+<section class="slide">
+  <h1>405 には Allow を付ける</h1>
+
+  <pre class="shell"><code>curl -i -X PATCH http://localhost:8080/items/1</code></pre>
+  <pre class="wire"><code><span class="res">HTTP/1.1 405 Method Not Allowed</span>
+<span class="hl">Allow: GET, PUT, DELETE, OPTIONS</span></code></pre>
+
+  <p><strong><code>Allow</code> は405のとき必須です（RFC 9110）。</strong>
+  「ダメです」だけでなく「これならできます」を返すのがHTTPの作法です。</p>
+
+  <div class="box warn">
+    <div class="box-title">404 と 405 の違い</div>
+    <ul style="margin-bottom:0">
+      <li><code>404</code> … <strong>URLが存在しない</strong></li>
+      <li><code>405</code> … <strong>URLはあるが、そのメソッドは使えない</strong></li>
+    </ul>
+  </div>
+
+  <pre><code>const ALLOWED = {
+  collection: ["GET", "POST", "OPTIONS"],
+  item:       ["GET", "PUT", "DELETE", "OPTIONS"],
+};
+
+return res.json(405, { error: "Method Not Allowed" },
+                { "Allow": ALLOWED.item.join(", ") });</code></pre>
+</section>
+
+<section class="slide">
+  <h1>OPTIONS — 何ができるかを尋ねる</h1>
+
+  <pre class="shell"><code>curl -i -X OPTIONS http://localhost:8080/items/1</code></pre>
+  <pre class="wire"><code><span class="res">HTTP/1.1 204 No Content</span>
+Allow: GET, PUT, DELETE, OPTIONS</code></pre>
+
+  <pre class="shell"><code>curl -i -X OPTIONS http://localhost:8080/items</code></pre>
+  <pre class="wire"><code><span class="res">HTTP/1.1 204 No Content</span>
+Allow: GET, POST, OPTIONS</code></pre>
+
+  <div class="box key">
+    <div class="box-title">OPTIONS は「実際に何かをする」メソッドではない</div>
+    <p style="margin-bottom:0">そのURLに対して<strong>何ができるのかを尋ねるだけ</strong>。
+    安全（状態を変えない）で冪等です。</p>
+  </div>
+
+  <div class="box do">
+    <div class="box-title">これがCORSのプリフライトの正体です</div>
+    <p style="margin-bottom:0">step14 でブラウザが<strong>勝手に</strong>
+    <code>OPTIONS</code> を送る場面に出会います。
+    そのとき「あの『何ができるか尋ねるメソッド』か」と思い出してください。<br>
+    ただしCORSのプリフライトは <code>Allow</code> ではなく
+    <code>Access-Control-Allow-Methods</code> という別のヘッダーで答えます。</p>
+  </div>
+</section>
+
+<section class="slide">
+  <h1>ステータスコードの選び方</h1>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th>コード</th><th>意味</th><th>使う場面</th></tr>
+    <tr><td><code>200 OK</code></td><td>成功。ボディあり</td><td>GET、更新したPUT</td></tr>
+    <tr><td><code>201 Created</code></td><td>作った。<code>Location</code> を付ける</td><td>POST、新規のPUT</td></tr>
+    <tr><td><code>204 No Content</code></td><td>成功。返す中身なし</td><td>DELETE、OPTIONS</td></tr>
+    <tr><td><code>400 Bad Request</code></td><td>リクエストが壊れている</td><td>JSONが不正</td></tr>
+    <tr><td><code>404 Not Found</code></td><td>そのURLに何もない</td><td>存在しないid</td></tr>
+    <tr><td><code>405 Method Not Allowed</code></td><td>メソッドが違う。<code>Allow</code> 必須</td><td><code>PATCH /items/1</code></td></tr>
+    <tr><td><code>415 Unsupported Media Type</code></td><td>Content-Typeが非対応</td><td>XMLを送ってきた</td></tr>
+  </table>
+  </div>
+</section>
+
+<section class="slide">
+  <h1>第2章のまとめ</h1>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th>メソッド</th><th>安全</th><th>冪等</th><th>ボディ</th><th>典型的な成功応答</th></tr>
+    <tr><td>GET</td><td>○</td><td>○</td><td>なし</td><td>200</td></tr>
+    <tr><td>POST</td><td>×</td><td>×</td><td>あり</td><td>201 + Location</td></tr>
+    <tr><td>PUT</td><td>×</td><td>○</td><td>あり</td><td>201 + Location / 200</td></tr>
+    <tr><td>DELETE</td><td>×</td><td>○</td><td>なし</td><td>204</td></tr>
+    <tr><td>OPTIONS</td><td>○</td><td>○</td><td>なし</td><td>204 + Allow</td></tr>
+  </table>
+  </div>
+
+  <details class="quiz">
+    <summary>クイズ: <code>OPTIONS</code> は何をするメソッドですか？</summary>
+    <p style="margin-bottom:0">そのURLで<strong>何ができるかを尋ねる</strong>メソッドです。
+    step14 で必ず思い出してください。</p>
+  </details>
+
+  <details class="quiz">
+    <summary>クイズ: 存在しないパスに <code>PATCH</code> したら 404 と 405 のどちら？</summary>
+    <p style="margin-bottom:0"><strong>404</strong>です。URLがそもそも存在しないので、
+    メソッドの可否を論じる以前の問題です。</p>
+  </details>
+
+  <div class="box do">
+    <div class="box-title">次のステップ（第3章）</div>
+    <p style="margin-bottom:0">ステートレスなHTTPに状態を持たせる Cookie を扱います。
+    第4章のCORSの重要な前提になります。</p>
+  </div>
+</section>
+
+</main>
+<script src="assets/deck.js"></script>
+</body>
+</html>

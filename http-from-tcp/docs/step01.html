@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>step01: TCPエコーサーバ</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-step="1">
+<main>
+
+<section class="slide">
+  <h1>step01: TCPエコーサーバ</h1>
+  <p class="lead">まだHTTPは1行も書きません。まず土台を見ます。</p>
+
+  <div class="box key">
+    <div class="box-title">このステップでわかること</div>
+    <ul>
+      <li>TCPは「バイト列を運ぶ土管」でしかない</li>
+      <li>HTTPリクエストとは、決まった形のテキストをTCPに書き込むこと</li>
+      <li>ブラウザが期待しているのは「HTTPの応答」であって、TCPの返事ではない</li>
+    </ul>
+  </div>
+
+  <h2>使うもの</h2>
+  <pre><code>import net from "node:net";   // これだけ。HTTPライブラリは使いません</code></pre>
+</section>
+
+<section class="slide">
+  <h1>TCPとHTTPの関係</h1>
+
+  <div class="diagram">   ブラウザ / curl                        あなたのサーバ
+        │                                      │
+        │  ①TCP接続を確立（3ウェイハンドシェイク） │
+        │ ────────────────────────────────────→ │
+        │                                      │
+        │  ②バイト列を書き込む                   │
+        │ ────────────────────────────────────→ │   net の world はここまで。
+        │      "GET / HTTP/1.1\r\n..."          │   中身が何かは一切知らない
+        │                                      │
+        │  ③バイト列が返ってくる                 │
+        │ ←──────────────────────────────────── │
+        │                                      │
+        │  ④接続を閉じる                        │
+        │ ←───────────────────────────────────→ │</div>
+
+  <div class="box">
+    <div class="box-title">HTTPは「TCPの上を流れるテキストの取り決め」</div>
+    <p style="margin-bottom:0">TCPは「順番どおりに、欠けずにバイト列を届ける」ことだけを保証します。
+    どこからどこまでが1つのメッセージなのか、それが何を意味するのかは
+    <strong>まったく知りません</strong>。それを決めているのがHTTPです。</p>
+  </div>
+</section>
+
+<section class="slide">
+  <h1>コードの中身</h1>
+
+  <pre><code>const server = net.createServer((socket) =&gt; {
+  // TCP接続が来たら呼ばれる。HTTPのことは何も知らない。
+
+  socket.on("data", (chunk) =&gt; {
+    // 相手が送ってきたバイト列が、届いた分だけ何度でもここに来る
+    console.log(visualize(chunk));
+
+    socket.write(chunk);   // そのまま送り返す（エコー）
+  });
+});
+
+server.listen(8080);</code></pre>
+
+  <h2>見やすくするための道具</h2>
+  <pre><code>function visualize(buf) {
+  return buf.toString("utf8")
+    .replace(/\r/g, "\\r")     // 画面では見えない制御文字を
+    .replace(/\n/g, "\\n\n");  // 文字として書き出す
+}</code></pre>
+  <p>これをやると「HTTPは <code>\r\n</code> で行を区切るテキスト」が一目でわかります。</p>
+</section>
+
+<section class="slide try">
+  <h1>手を動かす</h1>
+
+  <h2>起動</h2>
+  <pre class="shell"><code>cd steps/step01-tcp-echo
+node server.js</code></pre>
+
+  <h2>実験1: TCPはただの土管</h2>
+  <pre class="shell"><code>nc localhost 8080</code></pre>
+  <p><code>hello</code> と打ってEnter。そのまま返ってきます。
+  「メソッド」も「ヘッダー」も「ステータスコード」も存在しません。</p>
+
+  <h2>実験2: curlが送っているものを覗く</h2>
+  <pre class="shell"><code>curl -v http://localhost:8080/hello</code></pre>
+  <p>サーバのコンソールにこう出ます。</p>
+  <pre class="wire"><code><span class="req">GET /hello HTTP/1.1</span><span class="crlf">\r\n</span>
+Host: localhost:8080<span class="crlf">\r\n</span>
+User-Agent: curl/8.7.1<span class="crlf">\r\n</span>
+Accept: */*<span class="crlf">\r\n</span>
+<span class="crlf">\r\n</span></code></pre>
+  <p><strong>これがHTTPリクエストの正体です。</strong></p>
+
+  <h2>実験3: ブラウザで開く</h2>
+  <p><code>http://localhost:8080</code> を開くと
+  <code>ERR_EMPTY_RESPONSE</code> などになります。<strong>それで正解です。</strong>
+  HTTPの応答を返していないからです。</p>
+</section>
+
+<section class="slide">
+  <h1>読み取れること</h1>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th>見えたもの</th><th>意味</th></tr>
+    <tr><td><code>GET /hello HTTP/1.1</code></td><td>1行目だけが特別。「リクエストライン」</td></tr>
+    <tr><td><code>\r\n</code></td><td>行の区切り。<code>\n</code> ではない</td></tr>
+    <tr><td>最後の <code>\r\n\r\n</code></td><td>空行。ヘッダーの終わりの合図</td></tr>
+    <tr><td><code>Host:</code> など</td><td>「名前: 値」の並び＝ヘッダー</td></tr>
+  </table>
+  </div>
+
+  <div class="box warn">
+    <div class="box-title">1回の data イベント ＝ 1メッセージ ではない</div>
+    <p style="margin-bottom:0">TCPは「1回のwriteが1回のdataで届く」ことを保証しません。
+    大きなリクエストは分割して届きます。step03 でこの問題に対処します。</p>
+  </div>
+
+  <details class="quiz">
+    <summary>クイズ: なぜ改行が <code>\n</code> ではなく <code>\r\n</code> なのか？</summary>
+    <p>HTTPはテレタイプ端末の時代の慣習を引き継いだテキストプロトコルだからです。
+    <code>\r</code>（キャリッジリターン＝印字位置を左端へ）と
+    <code>\n</code>（ラインフィード＝紙を1行送る）の2動作をセットで送っていた名残です。
+    同じ理由でSMTPやFTPも <code>\r\n</code> を使います。</p>
+    <p style="margin-bottom:0">実装上の注意: <code>\n</code> だけで区切るサーバも多いですが、
+    厳密には <code>\r\n</code> です。この教材では常に <code>\r\n</code> を使います。</p>
+  </details>
+
+  <details class="quiz">
+    <summary>クイズ: ヘッダーの終わりはどうやって表現されていましたか？</summary>
+    <p style="margin-bottom:0"><strong>空行（<code>\r\n\r\n</code>）</strong>です。
+    これがHTTPで最も重要なルールのひとつで、step02〜05 で繰り返し出てきます。</p>
+  </details>
+
+  <div class="box do">
+    <div class="box-title">次のステップ</div>
+    <p style="margin-bottom:0">この1行目を分解し、HTTPの応答を手で書いて、初めて「HTTPサーバ」になります。</p>
+  </div>
+</section>
+
+</main>
+<script src="assets/deck.js"></script>
+</body>
+</html>

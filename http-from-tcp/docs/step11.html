@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>step11: Cookie 属性とセッション</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-step="11">
+<main>
+
+<section class="slide">
+  <h1>step11: Cookie 属性とセッション</h1>
+  <p class="lead">属性でCookieの振る舞いを制御する。<code>SameSite</code> は第4章の重要な前提です。</p>
+
+  <div class="box key">
+    <div class="box-title">このステップでわかること</div>
+    <ul style="margin-bottom:0">
+      <li>Path / Max-Age / HttpOnly / Secure / SameSite の役割</li>
+      <li><code>localhost</code> は例外的に「安全なオリジン」として扱われる</li>
+      <li>セッションID方式 —— Cookieには「鍵」だけを入れる</li>
+    </ul>
+  </div>
+</section>
+
+<section class="slide">
+  <h1>属性の一覧</h1>
+
+  <pre class="wire"><code><span class="res">Set-Cookie: sid=abc123; Path=/; Max-Age=3600; HttpOnly; Secure; SameSite=Lax</span>
+            └───┬───┘  └────────────────────┬───────────────────────────┘
+             名前=値                       属性（; 区切り）</code></pre>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th>属性</th><th>意味</th><th>付けないと</th></tr>
+    <tr><td><code>Path=/foo</code></td><td>そのパス以下にだけ送る</td><td>サイト全体に送られる</td></tr>
+    <tr><td><code>Domain=example.com</code></td><td>サブドメインにも送る</td><td>そのホストにだけ送る（<strong>より安全</strong>）</td></tr>
+    <tr><td><code>Max-Age=3600</code></td><td>3600秒で消える</td><td>ブラウザを閉じると消える</td></tr>
+    <tr><td><code>HttpOnly</code></td><td>JavaScriptから読めない</td><td><code>document.cookie</code> で読める＝XSSで盗まれる</td></tr>
+    <tr><td><code>Secure</code></td><td>HTTPSのときだけ送る</td><td>httpでも送られる＝盗聴される</td></tr>
+    <tr><td><code>SameSite</code></td><td>他サイト起点のリクエストに付けるか</td><td>既定は <code>Lax</code></td></tr>
+  </table>
+  </div>
+</section>
+
+<section class="slide try">
+  <h1>手を動かす（ブラウザ必須）</h1>
+
+  <pre class="shell"><code>cd steps/step11-cookie-attributes
+node server.js</code></pre>
+  <p><code>http://localhost:8080/</code> を開き、
+  「属性つきCookieを5個受け取る」を押してください。</p>
+
+  <h2>① HttpOnly</h2>
+  <p>ページに2つの表示が並びます。</p>
+  <ul>
+    <li><strong>サーバが受け取ったCookie</strong>: <code>plain</code> <code>secret</code> <code>temp</code> …</li>
+    <li><strong>document.cookie</strong>: <code>secret</code> が<strong>無い</strong></li>
+  </ul>
+  <p>ログインすると <code>sid</code> も同様です。
+  <code>HttpOnly</code> は「JavaScriptから隠す」だけの属性で、通信には普通に載ります。</p>
+
+  <h2>② Path</h2>
+  <p><code>/</code> と <code>/admin</code> を行き来してください。
+  <code>area</code> は <code>/admin</code> でだけ表に現れます。</p>
+
+  <h2>③ Max-Age</h2>
+  <p><code>temp</code> は10秒後にリロードすると消えます。</p>
+</section>
+
+<section class="slide">
+  <h1>④ Secure と localhost の例外（重要）</h1>
+
+  <p><code>onlyhttps=secure-attr; Path=/; Secure</code> は
+  <strong>http なのに保存されています。</strong></p>
+
+  <div class="box key">
+    <div class="box-title">これは仕様どおり</div>
+    <p style="margin-bottom:0">ブラウザは <code>localhost</code> と <code>127.0.0.1</code> を
+    <strong>「潜在的に信頼できるオリジン（potentially trustworthy origin）」</strong>
+    として扱い、httpでも安全なオリジンとみなします。</p>
+  </div>
+
+  <p>本物のドメインを http で使った場合、<code>Secure</code> 付きCookieは保存されません。</p>
+
+  <div class="box do">
+    <div class="box-title">step16 で効いてきます</div>
+    <p style="margin-bottom:0">クロスサイトでCookieを送るには
+    <code>SameSite=None; Secure</code> が必要ですが、
+    localhost ならHTTPSを用意しなくても実験できます。</p>
+  </div>
+</section>
+
+<section class="slide">
+  <h1>⑤ SameSite（step16の予告）</h1>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th>値</th><th>他サイトからのリクエストにCookieを付けるか</th></tr>
+    <tr><td><code>Strict</code></td><td>一切付けない（他サイトのリンクから来ると未ログイン扱い）</td></tr>
+    <tr><td><code>Lax</code>（既定）</td><td>トップレベルのGET遷移（リンククリック）だけ付ける</td></tr>
+    <tr><td><code>None</code></td><td>常に付ける。ただし <code>Secure</code> が必須</td></tr>
+  </table>
+  </div>
+
+  <div class="box warn">
+    <div class="box-title">Lax が既定になった理由 — CSRF対策</div>
+    <div class="diagram" style="margin-bottom:0">攻撃者のページ
+  &lt;form method="POST" action="https://bank.example/transfer"&gt;
+    （自動送信）
+        ↓
+  リクエストは届く（step12でやるとおり、フォーム送信は止められない）
+        ↓
+  しかし SameSite=Lax なら Cookie が付かない → 認証が通らない</div>
+  </div>
+
+  <p><strong>CORSとCSRFは別物です。</strong> step18 で改めて整理します。</p>
+</section>
+
+<section class="slide">
+  <h1>セッションID方式</h1>
+
+  <pre><code>const sid = randomUUID();                       // 推測できないID
+sessions.set(sid, { user, loginAt });           // 中身はサーバが持つ
+
+"Set-Cookie": `sid=${sid}; Path=/; HttpOnly; SameSite=Lax`</code></pre>
+
+  <div class="diagram">    ブラウザ                        サーバ
+  ┌──────────┐              ┌──────────────────────┐
+  │ sid=abc… │  ←──鍵だけ──  │ abc… → { user: 山田 } │
+  └──────────┘              │ def… → { user: 佐藤 } │
+                             └──────────────────────┘
+   書き換えても                  対応表はサーバが持つので
+   存在しないIDになるだけ          なりすませない</div>
+
+  <div class="box key">
+    <div class="box-title">なぜ中身を入れないのか</div>
+    <p style="margin-bottom:0">step10 の実験4で見たとおり、Cookieの値は書き換えられます。
+    <code>Cookie: user=admin</code> のように中身そのものを入れると、書き換えられて終わりです。</p>
+  </div>
+
+  <div class="box warn">
+    <div class="box-title">ログアウト時の注意</div>
+    <p style="margin-bottom:0"><strong>サーバ側の <code>sessions</code> からも消してください。</strong>
+    Cookieを消しただけでは、盗まれたIDがまだ有効なままです。</p>
+  </div>
+
+  <details class="quiz">
+    <summary>クイズ: <code>HttpOnly</code> を付けると通信は暗号化されますか？</summary>
+    <p style="margin-bottom:0">されません。<code>HttpOnly</code> はJavaScriptから隠すだけです。
+    通信を暗号化するのはHTTPS（TLS）の役割で、Cookie側では <code>Secure</code> 属性が
+    「暗号化された経路でだけ送る」ことを保証します。役割が別なので両方付けます。</p>
+  </details>
+
+  <div class="box do">
+    <div class="box-title">次のステップ（第4章）</div>
+    <p style="margin-bottom:0">いよいよ本題のCORSです。サーバを2つ立てます。</p>
+  </div>
+</section>
+
+</main>
+<script src="assets/deck.js"></script>
+</body>
+</html>

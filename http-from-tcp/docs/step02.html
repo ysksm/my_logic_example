@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>step02: リクエストラインを読む</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-step="2">
+<main>
+
+<section class="slide">
+  <h1>step02: リクエストラインを読む</h1>
+  <p class="lead">1行目を分解し、応答を手書きする。ここで初めてHTTPサーバになります。</p>
+
+  <div class="box key">
+    <div class="box-title">このステップでわかること</div>
+    <ul>
+      <li>リクエストラインは「メソッド・ターゲット・バージョン」の3要素</li>
+      <li>応答も同じ形。1行目は「ステータスライン」</li>
+      <li><strong><code>\r\n\r\n</code>（空行）がヘッダーの終わりの唯一の目印</strong></li>
+    </ul>
+  </div>
+
+  <div class="box">
+    <div class="box-title">step01からの差分</div>
+    <ul style="margin-bottom:0">
+      <li>受信テキストの1行目だけを空白で3分割する</li>
+      <li>HTTPの応答テキストを手書きして返す</li>
+    </ul>
+  </div>
+</section>
+
+<section class="slide">
+  <h1>2つの「1行目」</h1>
+
+  <h2>リクエストライン（クライアント → サーバ）</h2>
+  <pre class="wire"><code><span class="req">GET /hello?a=1 HTTP/1.1</span>
+└┬┘ └────┬───┘ └──┬───┘
+ │        │        └── HTTPバージョン
+ │        └────────── リクエストターゲット（パス＋クエリ）
+ └─────────────────  メソッド</code></pre>
+
+  <h2>ステータスライン（サーバ → クライアント）</h2>
+  <pre class="wire"><code><span class="res">HTTP/1.1 200 OK</span>
+└──┬───┘ └┬┘ └┬┘
+   │      │   └── 理由句（人間向け。ブラウザは見ない）
+   │      └────── ステータスコード（機械が見るのはこれ）
+   └───────────── HTTPバージョン</code></pre>
+
+  <div class="box">
+    <div class="box-title">どちらも「半角スペース区切りの3要素」</div>
+    <p style="margin-bottom:0">だから <code>line.split(" ")</code> で分解できます。
+    HTTPがテキストプロトコルであることの分かりやすい例です。</p>
+  </div>
+</section>
+
+<section class="slide">
+  <h1>メッセージ全体の形</h1>
+
+  <div class="diagram">┌─────────────────────────────┐
+│ GET /hello HTTP/1.1     \r\n │ ← 1行目（リクエストライン）
+├─────────────────────────────┤
+│ Host: localhost:8080    \r\n │
+│ User-Agent: curl/8.7.1  \r\n │ ← ヘッダー（0行以上）
+│ Accept: */*             \r\n │
+├─────────────────────────────┤
+│                         \r\n │ ← 空行！ここでヘッダーが終わる
+├─────────────────────────────┤
+│ （ボディ。GETでは普通は無い）    │
+└─────────────────────────────┘</div>
+
+  <div class="box warn">
+    <div class="box-title">応答も完全に同じ構造</div>
+    <pre class="wire" style="margin-bottom:0"><code><span class="res">HTTP/1.1 200 OK</span><span class="crlf">\r\n</span>
+Content-Type: text/plain; charset=utf-8<span class="crlf">\r\n</span>
+Content-Length: 42<span class="crlf">\r\n</span>
+Connection: close<span class="crlf">\r\n</span>
+<span class="hl">\r\n</span>            ← この空行がヘッダーの終わり
+（ここからボディ）</code></pre>
+  </div>
+</section>
+
+<section class="slide">
+  <h1>コードの中身</h1>
+
+  <pre><code>// --- リクエストラインを取り出す ---
+const text = chunk.toString("utf8");
+const requestLine = text.split("\r\n")[0];
+const [method, target, version] = requestLine.split(" ");
+
+// --- レスポンスを手で書く ---
+const bodyBuf = Buffer.from(body, "utf8");
+
+const responseHead =
+  "HTTP/1.1 200 OK\r\n" +
+  "Content-Type: text/plain; charset=utf-8\r\n" +
+  `Content-Length: ${bodyBuf.length}\r\n` +   // ← バイト数
+  "Connection: close\r\n" +
+  "\r\n";                                     // ← ヘッダーの終わり
+
+socket.write(Buffer.concat([Buffer.from(responseHead), bodyBuf]));
+socket.end();</code></pre>
+
+  <div class="box key">
+    <div class="box-title">たったこれだけ</div>
+    <p style="margin-bottom:0">step01 との差は文字列を数行組み立てただけ。
+    それでブラウザがページを表示するようになります。</p>
+  </div>
+</section>
+
+<section class="slide try">
+  <h1>手を動かす</h1>
+
+  <pre class="shell"><code>cd steps/step02-request-line
+node server.js</code></pre>
+
+  <h2>実験1: 初めてのHTTP応答</h2>
+  <pre class="shell"><code>curl -v http://localhost:8080/hello</code></pre>
+  <p>ブラウザ <code>http://localhost:8080/</code> でも文字が表示されます。</p>
+
+  <h2>実験2: メソッドは自由に名乗れる</h2>
+  <pre class="shell"><code>curl -v -X POST   http://localhost:8080/anything
+curl -v -X DELETE http://localhost:8080/users/1
+curl -v -X BANANA http://localhost:8080/</code></pre>
+  <p><code>BANANA</code> すら通ります。<strong>メソッドはただの文字列</strong>で、
+  意味を与えるのはサーバ側の実装です。</p>
+
+  <h2>実験3（重要）: 空行を消すとどうなるか</h2>
+  <p><code>responseHead</code> の最後の <code>"\r\n"</code> を消して再起動し、
+  <code>curl -v</code> してみてください。</p>
+  <pre class="shell"><code>* Empty reply from server</code></pre>
+  <p>あるいは curl がずっと待ち続けます。
+  <strong>クライアントは「ヘッダーがまだ続く」と思って待っている</strong>のです。
+  確認したら元に戻してください。</p>
+
+  <h2>実験4: 手で1リクエスト打つ</h2>
+  <pre class="shell"><code>printf 'GET /manual HTTP/1.1\r\nHost: localhost\r\n\r\n' | nc localhost 8080</code></pre>
+  <p>これが「HTTPを喋る」ということです。</p>
+</section>
+
+<section class="slide">
+  <h1>まとめ</h1>
+
+  <div class="box key">
+    <div class="box-title">今日の要点</div>
+    <ul style="margin-bottom:0">
+      <li>リクエストもレスポンスも「1行目＋ヘッダー＋空行＋ボディ」</li>
+      <li>行区切りは <code>\r\n</code>、ヘッダーの終わりは <code>\r\n\r\n</code></li>
+      <li>メソッドはただの文字列。サーバが意味を決める</li>
+      <li><code>Content-Length</code> はバイト数（文字数ではない）</li>
+    </ul>
+  </div>
+
+  <details class="quiz">
+    <summary>クイズ: <code>Content-Length</code> を実際のボディ長より大きくしたら？</summary>
+    <p style="margin-bottom:0">クライアントは「まだ続きがある」と思って待ち続けます。
+    curl はタイムアウトするか、接続が閉じられた時点で
+    <code>transfer closed with N bytes remaining to read</code> のようなエラーを出します。
+    実際に試してみてください。</p>
+  </details>
+
+  <details class="quiz">
+    <summary>クイズ: なぜこのステップでは <code>Connection: close</code> を付けたのか？</summary>
+    <p style="margin-bottom:0">まだ「1接続で複数リクエスト」を処理できないからです。
+    HTTP/1.1 は既定で接続を使い回す（keep-alive）ので、
+    閉じるつもりなら明示的に宣言する必要があります。step05 で対応します。</p>
+  </details>
+
+  <div class="box do">
+    <div class="box-title">次のステップ</div>
+    <p style="margin-bottom:0">2行目以降＝ヘッダーを解析します。
+    そのために「データが分割して届く」問題にも対処します。</p>
+  </div>
+</section>
+
+</main>
+<script src="assets/deck.js"></script>
+</body>
+</html>
