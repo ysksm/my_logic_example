@@ -100,7 +100,7 @@ curl -s -D- -o/dev/null -H 'Origin: http://notlocalhost:8080' \
 
 ## なぜ「Originをそのまま返す」が危険なのか
 
-`Access-Control-Allow-Origin: <来たOrigin>` ＋ `Allow-Credentials: true` は、
+`Access-Control-Allow-Origin: <来たOrigin>` ＋ `Access-Control-Allow-Credentials: true` は、
 実質的に「**全世界に対して、ログイン中のユーザーとしてAPIを叩き、結果を読む権利**」
 を与えたのと同じです。
 
