@@ -1,0 +1,17 @@
+hardware:
+  exam: one
+  code: "101.1"
+  name: "ハードウェア設定の決定と構成"
+  position: 1011
+
+boot:
+  exam: one
+  code: "101.2"
+  name: "システムのブート"
+  position: 1012
+
+shell:
+  exam: two
+  code: "105.1"
+  name: "シェル環境のカスタマイズと使用"
+  position: 1051

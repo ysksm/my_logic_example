@@ -1,0 +1,196 @@
+exam_code: "102-500"
+chapters:
+  - code: "109.1"
+    name: "インターネットプロトコルの基礎"
+    description: "IPv4/IPv6、サブネットマスク、プライベートアドレス、TCP/UDP/ICMP、代表的なポート番号"
+    position: 1091
+    questions:
+      - code: "109.1-01"
+        body: "プライベート IP アドレスとして定義されている範囲はどれか。2つ選べ。"
+        kind: multiple
+        difficulty: 2
+        explanation: |
+          RFC1918 のプライベートアドレスは 10.0.0.0/8、172.16.0.0/12、192.168.0.0/16 の3つ。
+          169.254.0.0/16 はリンクローカル、127.0.0.0/8 はループバック。
+        choices:
+          - body: "10.0.0.0/8"
+            correct: true
+          - body: "192.168.0.0/16"
+            correct: true
+          - body: "169.254.0.0/16"
+          - body: "127.0.0.0/8"
+      - code: "109.1-02"
+        body: "サブネットマスク 255.255.255.0 のネットワークで、ホストに割り当てられるアドレスの数はいくつか。"
+        kind: single
+        difficulty: 3
+        explanation: |
+          /24 は 2^8 = 256 アドレスだが、ネットワークアドレスとブロードキャストアドレスを除くため
+          ホストに使えるのは 254 個。
+        choices:
+          - body: "254"
+            correct: true
+          - body: "256"
+          - body: "255"
+          - body: "253"
+      - code: "109.1-03"
+        body: "HTTPS、SSH、SMTP の well-known ポート番号の組み合わせとして正しいものはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          HTTPS は 443、SSH は 22、SMTP は 25。ほかに HTTP=80、DNS=53、POP3=110、IMAP=143、
+          FTP=20/21 を押さえておく。/etc/services で確認できる。
+        choices:
+          - body: "443 / 22 / 25"
+            correct: true
+          - body: "443 / 23 / 110"
+          - body: "80 / 22 / 143"
+          - body: "8443 / 22 / 25"
+      - code: "109.1-04"
+        body: "IPv6 アドレスのビット長として正しいものはどれか。"
+        kind: single
+        difficulty: 1
+        explanation: |
+          IPv6 は 128 ビット。16進数4桁×8ブロックをコロンで区切って表記し、連続する 0 は :: で省略できる。
+          IPv4 は 32 ビット。
+        choices:
+          - body: "128 ビット"
+            correct: true
+          - body: "64 ビット"
+          - body: "32 ビット"
+          - body: "256 ビット"
+
+  - code: "109.2"
+    name: "基本的なネットワーク構成"
+    description: "ip, ifconfig, route, NetworkManager, /etc/network/interfaces, hostname, systemd-networkd"
+    position: 1092
+    questions:
+      - code: "109.2-01"
+        body: "iproute2 のコマンドで、インターフェイスに割り当てられた IP アドレスを表示するものはどれか。"
+        kind: single
+        difficulty: 1
+        explanation: |
+          ip addr show（ip a）でアドレスを確認する。ルーティングテーブルは ip route show、
+          リンク状態は ip link show。ifconfig / route は非推奨の旧コマンド。
+        choices:
+          - body: "ip addr show"
+            correct: true
+          - body: "ip route show"
+          - body: "ip link set"
+          - body: "ip neigh show"
+      - code: "109.2-02"
+        body: "デフォルトゲートウェイを 192.168.1.1 に設定する iproute2 のコマンドはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          ip route add default via 192.168.1.1 で追加する。
+          旧コマンドでは route add default gw 192.168.1.1 に相当する。
+        choices:
+          - body: "ip route add default via 192.168.1.1"
+            correct: true
+          - body: "ip route add 192.168.1.1 default"
+          - body: "ip addr add default 192.168.1.1"
+          - body: "route add gw default 192.168.1.1"
+      - code: "109.2-03"
+        body: "NetworkManager をコマンドラインから操作するツールはどれか。2つ選べ。"
+        kind: multiple
+        difficulty: 2
+        explanation: |
+          nmcli はコマンドライン、nmtui はテキストベースの対話 UI。
+          ifup / ifdown は Debian 系の従来型ネットワーク設定コマンド。
+        choices:
+          - body: "nmcli"
+            correct: true
+          - body: "nmtui"
+            correct: true
+          - body: "ifup"
+          - body: "netstat"
+
+  - code: "109.3"
+    name: "基本的なネットワークの問題解決"
+    description: "ping, traceroute, netstat, ss, tcpdump, nc, mtr, ip、ホストの到達性確認"
+    position: 1093
+    questions:
+      - code: "109.3-01"
+        body: "netstat の後継として、ソケットの状態を表示する iproute2 のコマンドはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          ss がソケット統計を表示する。ss -tuln のように、-t=TCP、-u=UDP、-l=LISTEN、-n=名前解決しない、
+          -p=プロセス表示 を組み合わせて使う。
+        choices:
+          - body: "ss"
+            correct: true
+          - body: "ip sock"
+          - body: "sockstat"
+          - body: "lsof -n"
+      - code: "109.3-02"
+        body: "宛先ホストまでの経路上のルータを順に表示するコマンドはどれか。"
+        kind: single
+        difficulty: 1
+        explanation: |
+          traceroute（または tracepath、Windows の tracert 相当）が経路上のホップを表示する。
+          mtr は ping と traceroute を組み合わせた継続的な計測ツール。
+        choices:
+          - body: "traceroute"
+            correct: true
+          - body: "ping"
+          - body: "netcat"
+          - body: "arp"
+      - code: "109.3-03"
+        body: "LISTEN 状態の TCP ポートを、名前解決せずに一覧表示するコマンドはどれか。"
+        kind: single
+        difficulty: 3
+        explanation: |
+          ss -tln（または netstat -tln）で、TCP の LISTEN しているポートを数値表示する。
+          -p を加えると対応するプロセスも表示される（root 権限が必要）。
+        choices:
+          - body: "ss -tln"
+            correct: true
+          - body: "ss -uan"
+          - body: "ss -s"
+          - body: "ss -tp"
+
+  - code: "109.4"
+    name: "クライアント側の DNS 設定"
+    description: "/etc/resolv.conf, /etc/hosts, /etc/nsswitch.conf, host, dig, getent, systemd-resolved"
+    position: 1094
+    questions:
+      - code: "109.4-01"
+        body: "参照する DNS サーバを指定するファイルはどれか。"
+        kind: single
+        difficulty: 1
+        explanation: |
+          /etc/resolv.conf に nameserver、search、domain などを記述する。
+          NetworkManager や systemd-resolved 環境では自動生成されることが多い。
+        choices:
+          - body: "/etc/resolv.conf"
+            correct: true
+          - body: "/etc/hosts"
+          - body: "/etc/nsswitch.conf"
+          - body: "/etc/host.conf"
+      - code: "109.4-02"
+        body: "名前解決の際に、/etc/hosts と DNS のどちらを先に参照するかを決めるファイルはどれか。"
+        kind: single
+        difficulty: 3
+        explanation: |
+          /etc/nsswitch.conf の hosts 行（例: hosts: files dns）で参照順を決める。
+          files が /etc/hosts、dns が DNS を意味する。
+        choices:
+          - body: "/etc/nsswitch.conf"
+            correct: true
+          - body: "/etc/resolv.conf"
+          - body: "/etc/hosts.allow"
+          - body: "/etc/services"
+      - code: "109.4-03"
+        body: "DNS サーバに問い合わせて、詳細な応答（権威セクションなど）まで確認できるコマンドはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          dig は詳細な DNS 応答を表示する。host はより簡潔な出力、
+          getent hosts は nsswitch.conf の設定に従った名前解決を確認できる。
+        choices:
+          - body: "dig"
+            correct: true
+          - body: "host"
+          - body: "getent"
+          - body: "nslookup -sil"

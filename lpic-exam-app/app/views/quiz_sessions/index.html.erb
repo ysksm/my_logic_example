@@ -1,0 +1,53 @@
+<% content_for :title, "演習履歴 | LPIC 演習" %>
+
+<div class="page-head spread">
+  <div>
+    <h1>演習履歴</h1>
+    <p class="subtitle">過去のセッションの正解率と、そのときの間違いだけを再演習できます</p>
+  </div>
+  <%= link_to "演習を始める", new_quiz_session_path, class: "btn btn-primary" %>
+</div>
+
+<div class="card">
+  <% if @quiz_sessions.empty? %>
+    <p class="empty">まだ演習履歴がありません。<%= link_to "最初の演習を始めましょう", new_quiz_session_path %>。</p>
+  <% else %>
+    <table>
+      <thead>
+        <tr>
+          <th>セッション</th>
+          <th class="num">状態</th>
+          <th class="num">解答</th>
+          <th class="num">正解率</th>
+          <th class="num"></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @quiz_sessions.each do |s| %>
+          <tr>
+            <td>
+              <%= link_to s.title, result_quiz_session_path(s) %>
+              <br><span class="small muted"><%= l s.created_at, format: :short %> · <%= s.mode_label %></span>
+            </td>
+            <td class="num"><%= status_label(s) %></td>
+            <td class="num small muted"><%= s.correct_count %> / <%= s.answered_count %>（全<%= s.total_count %>問）</td>
+            <td class="num"><%= accuracy_badge(s.accuracy) %></td>
+            <td class="num">
+              <div class="row" style="justify-content:flex-end">
+                <% if s.finished? %>
+                  <% if s.wrong_count.positive? %>
+                    <%= button_to "間違いを復習", review_quiz_session_path(s), class: "btn btn-sm btn-primary" %>
+                  <% end %>
+                <% else %>
+                  <%= link_to "再開", quiz_session_path(s), class: "btn btn-sm btn-primary" %>
+                <% end %>
+                <%= button_to "削除", quiz_session_path(s), method: :delete, class: "btn btn-sm btn-danger",
+                      form: { data: { turbo_confirm: "このセッションを削除しますか？（解答履歴も消えます）" } } %>
+              </div>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
+</div>

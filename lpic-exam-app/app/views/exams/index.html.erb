@@ -1,0 +1,29 @@
+<% content_for :title, "試験一覧 | LPIC 演習" %>
+
+<div class="page-head">
+  <h1>試験一覧</h1>
+  <p class="subtitle">試験を選ぶと章（主題）ごとの正解率が見られます</p>
+</div>
+
+<div class="grid grid-2">
+  <% @exam_rows.each do |row| %>
+    <div class="card">
+      <div class="spread">
+        <h3 style="margin:0"><%= link_to row[:exam].name, exam_path(row[:exam]) %></h3>
+        <span class="tag"><%= row[:exam].code %></span>
+      </div>
+      <p class="small muted"><%= row[:exam].description %></p>
+      <%= progress_bar(row[:accuracy]) %>
+      <div class="spread small muted" style="margin-top:8px">
+        <span><%= row[:question_count] %> 問中 <%= row[:attempted_questions] %> 問に着手</span>
+        <span>正解率 <%= accuracy_badge(row[:accuracy]) %></span>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <%= link_to "章を選んで解く", new_quiz_session_path(exam_code: row[:exam].code), class: "btn btn-primary btn-sm" %>
+        <%= button_to "模擬試験（30問）", quiz_sessions_path,
+              params: { mode: "exam", exam_id: row[:exam].id, limit: 30, order: "random" },
+              class: "btn btn-sm" %>
+      </div>
+    </div>
+  <% end %>
+</div>

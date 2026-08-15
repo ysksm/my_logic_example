@@ -1,0 +1,194 @@
+exam_code: "102-500"
+chapters:
+  - code: "108.1"
+    name: "システム時刻の保守"
+    description: "date, hwclock, timedatectl, ntpd, chrony, pool.ntp.org"
+    position: 1081
+    questions:
+      - code: "108.1-01"
+        body: "ハードウェアクロック（RTC）をシステムクロックに合わせるコマンドはどれか。"
+        kind: single
+        difficulty: 3
+        explanation: |
+          hwclock -w（--systohc）はシステムクロックの時刻をハードウェアクロックに書き込む。
+          逆に hwclock -s（--hctosys）はハードウェアクロックからシステムクロックへ反映する。
+        choices:
+          - body: "hwclock -w"
+            correct: true
+          - body: "hwclock -s"
+          - body: "hwclock -r"
+          - body: "date -s"
+      - code: "108.1-02"
+        body: "NTP による時刻同期を担うデーモンとして正しいものはどれか。2つ選べ。"
+        kind: multiple
+        difficulty: 2
+        explanation: |
+          ntpd（設定は /etc/ntp.conf）と chronyd（/etc/chrony.conf）が代表的な NTP デーモン。
+          systemd-timesyncd も簡易的な SNTP クライアントとして使われる。
+        choices:
+          - body: "ntpd"
+            correct: true
+          - body: "chronyd"
+            correct: true
+          - body: "syslogd"
+          - body: "crond"
+      - code: "108.1-03"
+        body: "システムの時刻を「2026年8月15日 10時30分」に設定するコマンドはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          date -s "2026-08-15 10:30:00" のように -s で時刻を設定する。
+          timedatectl set-time "2026-08-15 10:30:00" も同様（NTP 同期が有効だと拒否される）。
+        choices:
+          - body: 'date -s "2026-08-15 10:30:00"'
+            correct: true
+          - body: 'date "2026-08-15 10:30:00"'
+          - body: 'date -d "2026-08-15 10:30:00"'
+          - body: 'hwclock -s "2026-08-15 10:30:00"'
+
+  - code: "108.2"
+    name: "システムのログ"
+    description: "rsyslog, syslog のファシリティとプライオリティ, logger, logrotate, journald"
+    position: 1082
+    questions:
+      - code: "108.2-01"
+        body: "syslog の設定「mail.*」の左側「mail」が意味するものはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          syslog のセレクタは「ファシリティ.プライオリティ」の形式。mail はファシリティ（ログの出所）で、
+          * はすべてのプライオリティを意味する。ファシリティには auth、cron、daemon、kern、local0〜7 などがある。
+        choices:
+          - body: "ファシリティ（ログの出力元の種別）"
+            correct: true
+          - body: "プライオリティ（重要度）"
+          - body: "出力先のファイル名"
+          - body: "ログを出力するホスト名"
+      - code: "108.2-02"
+        body: "syslog のプライオリティを重要度の高い順に並べたものとして正しいものはどれか。"
+        kind: single
+        difficulty: 3
+        explanation: |
+          emerg > alert > crit > err > warning > notice > info > debug の順に重要度が下がる。
+          設定で err と書くと「err 以上（err, crit, alert, emerg）」が対象になる。
+        choices:
+          - body: "emerg → alert → crit → err → warning → notice → info → debug"
+            correct: true
+          - body: "debug → info → notice → warning → err → crit → alert → emerg"
+          - body: "crit → emerg → alert → err → warning → info → notice → debug"
+          - body: "emerg → crit → alert → err → notice → warning → debug → info"
+      - code: "108.2-03"
+        body: "ログファイルを定期的に切り替え、古いものを圧縮・削除する仕組みはどれか。"
+        kind: single
+        difficulty: 1
+        explanation: |
+          logrotate は /etc/logrotate.conf と /etc/logrotate.d/ の設定に従ってログをローテートする。
+          通常は cron（または systemd timer）から日次で実行される。
+        choices:
+          - body: "logrotate"
+            correct: true
+          - body: "logger"
+          - body: "journalctl --vacuum"
+          - body: "tmpwatch"
+      - code: "108.2-04"
+        body: "シェルスクリプトからシステムログにメッセージを記録するコマンドはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          logger "message" で syslog にメッセージを送る。-p でファシリティとプライオリティ、
+          -t でタグを指定できる。
+        choices:
+          - body: "logger"
+            correct: true
+          - body: "logsave"
+          - body: "syslog"
+          - body: "journalctl -w"
+
+  - code: "108.3"
+    name: "メール転送エージェント (MTA) の基本"
+    description: "sendmail 互換コマンド、mail, mailq, ~/.forward, エイリアス, newaliases, Postfix/exim"
+    position: 1083
+    questions:
+      - code: "108.3-01"
+        body: "システム全体のメールエイリアスを定義するファイルはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          /etc/aliases に「エイリアス: 転送先」を書き、newaliases（または sendmail -bi）でデータベース
+          (/etc/aliases.db) に反映する。
+        choices:
+          - body: "/etc/aliases"
+            correct: true
+          - body: "~/.forward"
+          - body: "/etc/mail.rc"
+          - body: "/var/spool/mail/aliases"
+      - code: "108.3-02"
+        body: "ユーザ自身が受信メールの転送先を設定するために使うファイルはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          ホームディレクトリの ~/.forward に転送先アドレスを書く。
+          管理者権限は不要で、/etc/aliases の編集より手軽。
+        choices:
+          - body: "~/.forward"
+            correct: true
+          - body: "~/.mailrc"
+          - body: "~/.procmailrc"
+          - body: "/etc/aliases"
+      - code: "108.3-03"
+        body: "送信待ちのメールキューを表示するコマンドはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          mailq（sendmail -bp と同等）でキューの内容を確認する。
+          Postfix では postqueue -p も使える。
+        choices:
+          - body: "mailq"
+            correct: true
+          - body: "mail -q"
+          - body: "sendmail -bd"
+          - body: "newaliases"
+
+  - code: "108.4"
+    name: "プリンターと印刷の管理"
+    description: "CUPS, lpr, lpq, lprm, lpstat, cupsd.conf, /etc/cups/, IPP"
+    position: 1084
+    questions:
+      - code: "108.4-01"
+        body: "Linux で標準的に使われる印刷システムはどれか。"
+        kind: single
+        difficulty: 1
+        explanation: |
+          CUPS（Common UNIX Printing System）が標準で、IPP をベースに動作する。
+          設定は /etc/cups/cupsd.conf、Web インターフェイスは http://localhost:631/。
+        choices:
+          - body: "CUPS"
+            correct: true
+          - body: "LPRng"
+          - body: "Samba"
+          - body: "Ghostscript"
+      - code: "108.4-02"
+        body: "印刷キューにあるジョブを一覧表示するコマンドと、ジョブを削除するコマンドの組み合わせはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          lpq で印刷キューを確認し、lprm <ジョブ番号> でジョブを削除する。
+          lpstat -t でプリンタとキューの状態をまとめて確認できる。
+        choices:
+          - body: "lpq と lprm"
+            correct: true
+          - body: "lpr と lpq"
+          - body: "lpstat と lpr"
+          - body: "lpc と lpr"
+      - code: "108.4-03"
+        body: "CUPS の設定ファイルが置かれているディレクトリはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          /etc/cups/ に cupsd.conf（デーモン設定）と printers.conf（プリンタ定義）などが置かれる。
+        choices:
+          - body: "/etc/cups/"
+            correct: true
+          - body: "/etc/printcap.d/"
+          - body: "/var/spool/cups/conf/"
+          - body: "/usr/share/cups/etc/"

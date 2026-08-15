@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <title><%= content_for(:title) || "LPIC 演習アプリ" %></title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+
+    <%= yield :head %>
+
+    <link rel="icon" href="/icon.svg" type="image/svg+xml">
+
+    <%= stylesheet_link_tag "application", "data-turbo-track": "reload" %>
+    <%= javascript_importmap_tags %>
+  </head>
+
+  <body>
+    <header class="site-header">
+      <div class="container header-inner">
+        <%= link_to "LPIC 演習", root_path, class: "brand" %>
+        <nav class="nav">
+          <%= link_to "ダッシュボード", root_path, class: current_page?(root_path) ? "active" : nil %>
+          <%= link_to "試験・章", exams_path, class: controller_name == "exams" || controller_name == "chapters" ? "active" : nil %>
+          <%= link_to "問題バンク", questions_path, class: controller_name == "questions" ? "active" : nil %>
+          <%= link_to "履歴", quiz_sessions_path, class: controller_name == "quiz_sessions" ? "active" : nil %>
+          <%= link_to "成績", stats_path, class: controller_name == "stats" ? "active" : nil %>
+        </nav>
+        <%= link_to "演習を始める", new_quiz_session_path, class: "btn btn-primary btn-sm" %>
+      </div>
+    </header>
+
+    <main class="container main">
+      <% if notice.present? %>
+        <div class="flash flash-notice"><%= notice %></div>
+      <% end %>
+      <% if alert.present? %>
+        <div class="flash flash-alert"><%= alert %></div>
+      <% end %>
+
+      <%= yield %>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container">
+        LPIC 演習アプリ — 章別演習・間違い復習・正解率トラッキング
+      </div>
+    </footer>
+  </body>
+</html>

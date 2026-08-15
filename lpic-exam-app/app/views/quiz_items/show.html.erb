@@ -1,0 +1,109 @@
+<% content_for :title, "第#{@item.position}問 | #{@quiz_session.title}" %>
+
+<div class="page-head">
+  <p class="subtitle"><%= @quiz_session.mode_label %> — <%= @quiz_session.title %></p>
+  <div class="quiz-progress">
+    <strong>第 <%= @item.position %> 問 / <%= @quiz_session.total_count %> 問</strong>
+    <%= progress_bar(@quiz_session.progress_ratio, level: "info") %>
+    <span class="small muted">正解 <%= @quiz_session.correct_count %> / 解答 <%= @quiz_session.answered_count %>（<%= accuracy_text(@quiz_session.accuracy) %>）</span>
+  </div>
+</div>
+
+<div class="card">
+  <div class="spread small muted">
+    <span>
+      <%= link_to @question.chapter.label, chapter_path(@question.chapter), class: "tag" %>
+    </span>
+    <span>
+      <span class="badge badge-muted"><%= @question.multiple? ? "複数選択" : "単一選択" %></span>
+      <span class="badge badge-muted">難易度: <%= @question.difficulty_label %></span>
+    </span>
+  </div>
+
+  <div class="question-body"><%= @question.body %></div>
+
+  <% if @item.answered? %>
+    <%# ---------- 採点後：正誤と解説を表示 ---------- %>
+    <div class="choices">
+      <% @question.choices.each do |choice| %>
+        <%
+          selected = @item.selected?(choice)
+          klass = if choice.correct
+                    "choice choice-correct"
+                  elsif selected
+                    "choice choice-wrong"
+                  else
+                    "choice"
+                  end
+        %>
+        <div class="<%= klass %>">
+          <span><%= choice.body %></span>
+          <span class="choice-mark">
+            <% if choice.correct %><span class="mark-correct">正解</span><% end %>
+            <% if selected %><span class="<%= choice.correct ? "mark-correct" : "mark-wrong" %>">あなたの解答</span><% end %>
+          </span>
+        </div>
+      <% end %>
+    </div>
+
+    <div class="verdict <%= @item.correct ? "verdict-correct" : "verdict-wrong" %>">
+      <%= @item.correct ? "正解" : "不正解" %>
+    </div>
+
+    <% if @question.explanation.present? %>
+      <div class="explanation"><%= @question.explanation %></div>
+    <% end %>
+    <% if @question.reference.present? %>
+      <p class="small muted">参考: <%= @question.reference %></p>
+    <% end %>
+
+    <div class="row" style="margin-top:18px">
+      <% if @next_item %>
+        <%= link_to "次の問題へ →", quiz_session_quiz_item_path(@quiz_session, @next_item), class: "btn btn-primary" %>
+      <% else %>
+        <%= link_to "結果を見る →", result_quiz_session_path(@quiz_session), class: "btn btn-primary" %>
+      <% end %>
+      <%= link_to "結果画面へ", result_quiz_session_path(@quiz_session), class: "btn btn-sm" if @next_item %>
+    </div>
+  <% else %>
+    <%# ---------- 解答フォーム ---------- %>
+    <%= form_with url: quiz_session_quiz_item_path(@quiz_session, @item), method: :patch, data: { turbo: false } do %>
+      <div class="choices">
+        <% @question.choices.each do |choice| %>
+          <label class="choice" for="choice_<%= choice.id %>">
+            <% if @question.multiple? %>
+              <%= check_box_tag "choice_ids[]", choice.id, false, id: "choice_#{choice.id}" %>
+            <% else %>
+              <%= radio_button_tag "choice_ids[]", choice.id, false, id: "choice_#{choice.id}" %>
+            <% end %>
+            <span><%= choice.body %></span>
+          </label>
+        <% end %>
+      </div>
+      <p class="hint"><%= @question.multiple? ? "当てはまるものをすべて選んでください。" : "1つ選んでください。" %></p>
+      <%= submit_tag "解答する", class: "btn btn-primary" %>
+    <% end %>
+    <div style="margin-top:12px">
+      <%= button_to "ここまでで終了する", finish_quiz_session_path(@quiz_session), class: "btn btn-sm" %>
+    </div>
+  <% end %>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0">このセッションの問題</h3>
+  <div class="row">
+    <% @quiz_session.quiz_items.each do |item| %>
+      <%
+        badge = if !item.answered?
+                  item == @item ? "badge-info" : "badge-muted"
+                elsif item.correct
+                  "badge-good"
+                else
+                  "badge-bad"
+                end
+      %>
+      <%= link_to item.position, quiz_session_quiz_item_path(@quiz_session, item),
+            class: "badge #{badge}", style: "min-width:28px; text-align:center" %>
+    <% end %>
+  </div>
+</div>

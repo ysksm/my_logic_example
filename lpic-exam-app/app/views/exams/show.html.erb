@@ -1,0 +1,49 @@
+<% content_for :title, "#{@exam.name} | LPIC 演習" %>
+
+<div class="page-head spread">
+  <div>
+    <h1><%= @exam.name %> <span class="tag"><%= @exam.code %></span></h1>
+    <p class="subtitle"><%= @exam.description %></p>
+  </div>
+  <%= link_to "章を選んで演習", new_quiz_session_path(exam_code: @exam.code), class: "btn btn-primary" %>
+</div>
+
+<% @topics.each do |topic_code, rows| %>
+  <h2>主題 <%= topic_code %></h2>
+  <div class="card">
+    <table>
+      <thead>
+        <tr>
+          <th>章</th>
+          <th class="num">問題数</th>
+          <th class="num">着手</th>
+          <th style="width:22%">正解率</th>
+          <th class="num">通算</th>
+          <th class="num">最新</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% rows.each do |row| %>
+          <tr>
+            <td>
+              <%= link_to row[:chapter].code, chapter_path(row[:chapter]), class: "tag" %>
+              <%= link_to row[:chapter].name, chapter_path(row[:chapter]) %>
+            </td>
+            <td class="num"><%= row[:question_count] %></td>
+            <td class="num"><%= row[:attempted_questions] %></td>
+            <td><%= progress_bar(row[:accuracy]) %></td>
+            <td class="num"><%= accuracy_badge(row[:accuracy]) %></td>
+            <td class="num small muted"><%= accuracy_text(row[:latest_accuracy]) %></td>
+            <td class="num">
+              <%= button_to "解く", quiz_sessions_path,
+                    params: { mode: "chapter", exam_id: @exam.id, chapter_ids: [ row[:chapter].id ],
+                              limit: 10, order: "random" },
+                    class: "btn btn-sm" %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>
