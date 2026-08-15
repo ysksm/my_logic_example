@@ -16,6 +16,7 @@
 | [webcam-go](./webcam-go) | メディア / ストリーミング | Go + AVFoundation/v4l2 + WebSocket | 🟢 実用レベル | — |
 | [ddd-diagram-generator](./ddd-diagram-generator) | DDD 静的解析 | Go + React + Vite | 🟡 動作する試作 | — |
 | [jd-go](./jd-go) | Jira 連携 | Go + DuckDB + HTMX/Alpine | 🟡 動作する試作 | — |
+| [lpic-exam-app](./lpic-exam-app) | 学習 / 試験対策 | Ruby on Rails 8 + SQLite + Hotwire | 🟡 動作する試作 | — |
 | [screen-flow-designer](./screen-flow-designer) | 画面遷移図 | React + TypeScript + React Flow + Playwright | 🟡 動作する試作 | — |
 | [screen-transition-map](./screen-transition-map) | 画面遷移図 / ドキュメント | React + TypeScript + React Flow + Playwright | 🟡 動作する試作 | — |
 | [stock-price-viewer](./stock-price-viewer) | データ ETL | Python + marimo + yfinance | 🟡 動作する試作 | — |
@@ -66,6 +67,9 @@ TypeScript ソースから Aggregate / Entity / Value Object を抽出して、�
 
 #### [jd-go](./jd-go) — Jira → DuckDB 同期 + ダッシュボード
 Jira issue を取得して DuckDB に蓄積し、HTMX + Alpine.js + ECharts のダッシュボードで可視化する Go アプリ。Wails のデスクトップ版もビルド可能、SSE 対応、Tailwind CSS。39 ファイル規模、Makefile 完備。テストとドキュメントは弱め。
+
+#### [lpic-exam-app](./lpic-exam-app) — LPIC 章別演習アプリ
+LPIC-1 (101/102) の受験対策アプリ。章（LPIC の主題番号）を指定して 1 問ずつ解き、その場で正誤と解説を表示。解答履歴を `QuizItem` に全件残し、そこから通算正解率と「最新解答ベースの正解率」を集計する。間違えた問題だけを再演習する復習モードを 3 種類（そのセッションの間違い / 直近の解答が不正解 / 一度でも間違えた）備える。問題データは YAML 管理で code をキーにした upsert のため、問題を追加・修正しても解答履歴が壊れない。42 章 139 問を同梱、モデル + 統合テスト 38 件。
 
 #### [screen-flow-designer](./screen-flow-designer) — React Flow 画面遷移図デザイナー
 画面をノード、遷移(クリック / フォーム送信など)をエッジとして GUI で編集できる画面遷移図ツール。dagre 自動レイアウト、localStorage 自動保存、JSON エクスポート / インポート(置換・マージ)対応。同梱の Playwright クローラーが実サイトを巡回して同フォーマットの JSON を生成し、マージインポートで手動配置を保持したまま図へ反映できる。

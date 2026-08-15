@@ -1,0 +1,53 @@
+lspci_ok:
+  question: lspci
+  body: "lspci"
+  correct: true
+  position: 1
+
+lspci_ng:
+  question: lspci
+  body: "lsusb"
+  correct: false
+  position: 2
+
+procfs_proc:
+  question: procfs
+  body: "/proc"
+  correct: true
+  position: 1
+
+procfs_sys:
+  question: procfs
+  body: "/sys"
+  correct: true
+  position: 2
+
+procfs_dev:
+  question: procfs
+  body: "/dev"
+  correct: false
+  position: 3
+
+journal_ok:
+  question: journal
+  body: "journalctl -k"
+  correct: true
+  position: 1
+
+journal_ng:
+  question: journal
+  body: "systemctl status kernel"
+  correct: false
+  position: 2
+
+profile_ok:
+  question: profile
+  body: "/etc/profile"
+  correct: true
+  position: 1
+
+profile_ng:
+  question: profile
+  body: "~/.bashrc"
+  correct: false
+  position: 2

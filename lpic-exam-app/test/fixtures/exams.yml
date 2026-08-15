@@ -1,0 +1,11 @@
+one:
+  code: "101-500"
+  name: "LPIC-1 101 試験"
+  description: "テスト用"
+  position: 1
+
+two:
+  code: "102-500"
+  name: "LPIC-1 102 試験"
+  description: "テスト用"
+  position: 2

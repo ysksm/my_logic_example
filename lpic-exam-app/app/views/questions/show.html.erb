@@ -1,0 +1,51 @@
+<% content_for :title, "問題 #{@question.code} | LPIC 演習" %>
+
+<div class="page-head">
+  <p class="subtitle">
+    <%= link_to @question.chapter.exam.name, exam_path(@question.chapter.exam) %> /
+    <%= link_to @question.chapter.label, chapter_path(@question.chapter) %>
+  </p>
+  <h1>問題 <span class="tag"><%= @question.code %></span></h1>
+</div>
+
+<div class="card">
+  <div class="spread small muted">
+    <span><%= @question.multiple? ? "複数選択" : "単一選択" %> · 難易度 <%= @question.difficulty_label %></span>
+  </div>
+  <div class="question-body"><%= @question.body %></div>
+  <div class="choices">
+    <% @question.choices.each do |choice| %>
+      <div class="choice <%= "choice-correct" if choice.correct %>">
+        <span><%= choice.body %></span>
+        <% if choice.correct %><span class="choice-mark mark-correct">正解</span><% end %>
+      </div>
+    <% end %>
+  </div>
+  <% if @question.explanation.present? %>
+    <div class="explanation"><%= @question.explanation %></div>
+  <% end %>
+  <% if @question.reference.present? %>
+    <p class="small muted">参考: <%= @question.reference %></p>
+  <% end %>
+</div>
+
+<h2>解答履歴</h2>
+<div class="card">
+  <% if @history.empty? %>
+    <p class="empty">まだ解答していません。</p>
+  <% else %>
+    <table>
+      <tbody>
+        <% @history.each do |item| %>
+          <tr>
+            <td><%= l item.answered_at, format: :short %></td>
+            <td><%= link_to item.quiz_session.title, result_quiz_session_path(item.quiz_session) %></td>
+            <td class="num">
+              <span class="badge <%= item.correct ? "badge-good" : "badge-bad" %>"><%= item.correct ? "正解" : "不正解" %></span>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
+</div>

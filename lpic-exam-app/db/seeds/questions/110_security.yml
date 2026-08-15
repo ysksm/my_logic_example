@@ -1,0 +1,162 @@
+exam_code: "102-500"
+chapters:
+  - code: "110.1"
+    name: "セキュリティ管理業務の実施"
+    description: "SUID/SGID の監査、パスワードエイジング、ulimit, sudo, who/w/last, nmap, lsof, fuser"
+    position: 1101
+    questions:
+      - code: "110.1-01"
+        body: "システム全体から SUID が設定されたファイルを探すコマンドはどれか。"
+        kind: single
+        difficulty: 3
+        explanation: |
+          find / -perm -u+s -type f（または -perm -4000）で SUID ファイルを検索する。
+          SGID は -perm -g+s（-2000）。定期的な監査項目として問われる。
+        choices:
+          - body: "find / -perm -u+s -type f"
+            correct: true
+          - body: "find / -perm 0755 -type f"
+          - body: "find / -user root -type f"
+          - body: "ls -lR / | grep s"
+      - code: "110.1-02"
+        body: "ユーザ user1 のパスワード有効期限などのエイジング情報を変更するコマンドはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          chage は /etc/shadow のエイジング情報を変更する。-l で表示、-M で最大有効日数、
+          -E で失効日を指定する。
+        choices:
+          - body: "chage"
+            correct: true
+          - body: "usermod -e"
+          - body: "passwd -S"
+          - body: "chsh"
+      - code: "110.1-03"
+        body: "シェルから、そのセッションで利用できるリソース上限（オープンファイル数など）を確認・設定するコマンドはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          ulimit -a で現在の上限を一覧表示する。-n はオープンファイル数、-u はプロセス数。
+          永続的な設定は /etc/security/limits.conf で行う。
+        choices:
+          - body: "ulimit"
+            correct: true
+          - body: "sysctl"
+          - body: "nice"
+          - body: "quota"
+      - code: "110.1-04"
+        body: "sudo の設定を安全に編集するために使うべきコマンドはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          visudo は /etc/sudoers を編集し、保存時に構文チェックを行うため、記述ミスで sudo が使えなくなる
+          事故を防げる。個別設定は /etc/sudoers.d/ に置く。
+        choices:
+          - body: "visudo"
+            correct: true
+          - body: "vi /etc/sudoers"
+          - body: "sudo -e"
+          - body: "sudoedit /etc/sudoers"
+
+  - code: "110.2"
+    name: "ホストのセキュリティ設定"
+    description: "/etc/inittab と不要サービス、TCP Wrapper、/etc/nologin、シャドウパスワード、xinetd"
+    position: 1102
+    questions:
+      - code: "110.2-01"
+        body: "TCP Wrapper によるアクセス制御で使用されるファイルはどれか。2つ選べ。"
+        kind: multiple
+        difficulty: 2
+        explanation: |
+          /etc/hosts.allow と /etc/hosts.deny で許可・拒否を設定する。
+          allow が先に評価され、どちらにも一致しなければ許可される。
+        choices:
+          - body: "/etc/hosts.allow"
+            correct: true
+          - body: "/etc/hosts.deny"
+            correct: true
+          - body: "/etc/hosts"
+          - body: "/etc/host.conf"
+      - code: "110.2-02"
+        body: "root 以外の一般ユーザのログインを一時的に禁止するために作成するファイルはどれか。"
+        kind: single
+        difficulty: 3
+        explanation: |
+          /etc/nologin を作成すると、root 以外のログインが拒否され、その内容がメッセージとして表示される。
+          メンテナンス終了後は削除する。
+        choices:
+          - body: "/etc/nologin"
+            correct: true
+          - body: "/etc/securetty"
+          - body: "/etc/shells"
+          - body: "/etc/login.defs"
+      - code: "110.2-03"
+        body: "root が直接ログインできる端末を制限するファイルはどれか。"
+        kind: single
+        difficulty: 3
+        explanation: |
+          /etc/securetty に列挙された端末からのみ root のログインが許可される。
+          SSH 経由の root ログインは sshd_config の PermitRootLogin で制御する。
+        choices:
+          - body: "/etc/securetty"
+            correct: true
+          - body: "/etc/nologin"
+          - body: "/etc/sudoers"
+          - body: "/etc/passwd"
+
+  - code: "110.3"
+    name: "暗号化によるデータの保護"
+    description: "ssh, ssh-keygen, ssh-agent, authorized_keys, known_hosts, GnuPG, ポートフォワーディング"
+    position: 1103
+    questions:
+      - code: "110.3-01"
+        body: "SSH の公開鍵認証で、接続先サーバ側に登録する公開鍵を書き込むファイルはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          接続先ユーザのホームにある ~/.ssh/authorized_keys に公開鍵を追記する。
+          パーミッションは .ssh が 700、authorized_keys が 600 である必要がある。
+        choices:
+          - body: "~/.ssh/authorized_keys"
+            correct: true
+          - body: "~/.ssh/known_hosts"
+          - body: "~/.ssh/id_rsa.pub"
+          - body: "/etc/ssh/ssh_host_rsa_key.pub"
+      - code: "110.3-02"
+        body: "SSH 秘密鍵のパスフレーズを一度入力すれば、以後の接続で再入力を省ける仕組みはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          ssh-agent を起動し、ssh-add で鍵を登録するとメモリ上に保持され、パスフレーズの再入力が不要になる。
+        choices:
+          - body: "ssh-agent と ssh-add"
+            correct: true
+          - body: "ssh-keyscan"
+          - body: "ssh-copy-id"
+          - body: "sshd の UsePAM"
+      - code: "110.3-03"
+        body: "GnuPG で自分の鍵ペアを新規に作成するコマンドはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          gpg --gen-key（または --full-generate-key）で鍵ペアを作成する。
+          鍵の一覧は gpg --list-keys、エクスポートは gpg --export、暗号化は gpg -e。
+        choices:
+          - body: "gpg --gen-key"
+            correct: true
+          - body: "gpg --import"
+          - body: "gpg --export"
+          - body: "ssh-keygen -t rsa"
+      - code: "110.3-04"
+        body: "ローカルの 8080 番ポートへの接続を、SSH 経由でリモートホストの 80 番ポートに転送するコマンドはどれか。"
+        kind: single
+        difficulty: 3
+        explanation: |
+          ssh -L 8080:localhost:80 user@remote はローカルフォワーディング。
+          -R は逆向き（リモートフォワーディング）、-D は SOCKS プロキシ（動的フォワーディング）。
+        choices:
+          - body: "ssh -L 8080:localhost:80 user@remote"
+            correct: true
+          - body: "ssh -R 8080:localhost:80 user@remote"
+          - body: "ssh -D 8080 user@remote"
+          - body: "ssh -X -p 8080 user@remote"

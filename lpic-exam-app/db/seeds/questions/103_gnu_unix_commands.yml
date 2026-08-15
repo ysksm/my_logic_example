@@ -1,0 +1,401 @@
+exam_code: "101-500"
+chapters:
+  - code: "103.1"
+    name: "コマンドラインの操作"
+    description: "シェル変数と環境変数、export、history、man、bash の起動ファイル、引用符"
+    position: 1031
+    questions:
+      - code: "103.1-01"
+        body: "シェル変数を子プロセスにも引き継がれる環境変数にするコマンドはどれか。"
+        kind: single
+        difficulty: 1
+        explanation: |
+          export VAR で環境変数になり、そこから起動したプロセスに引き継がれる。
+          env は環境変数の表示や一時的な設定、set はシェル変数を含む一覧表示とシェルオプション設定に使う。
+        choices:
+          - body: "export"
+            correct: true
+          - body: "set"
+          - body: "declare -r"
+          - body: "local"
+      - code: "103.1-02"
+        body: "直前に実行したコマンドを再実行する bash の履歴展開はどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          !! は直前のコマンドに展開される。!n は履歴番号 n、!string は string で始まる直近のコマンド、
+          !$ は直前のコマンドの最後の引数に展開される。
+        choices:
+          - body: "!!"
+            correct: true
+          - body: "!$"
+          - body: "^^"
+          - body: "$?"
+      - code: "103.1-03"
+        body: "変数展開もコマンド置換も一切行わず、文字列をそのまま扱う引用符はどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          シングルクォート ' ' の中では $ も ` も特殊文字として解釈されない。
+          ダブルクォート " " の中では変数展開・コマンド置換が行われる。
+        choices:
+          - body: "シングルクォート ' '"
+            correct: true
+          - body: "ダブルクォート \" \""
+          - body: "バッククォート ` `"
+          - body: "波括弧 { }"
+      - code: "103.1-04"
+        body: "man コマンドで、コマンド名ではなくキーワードから該当するマニュアルを検索する方法はどれか。2つ選べ。"
+        kind: multiple
+        difficulty: 2
+        explanation: |
+          man -k <keyword> と apropos <keyword> は同じ働きで、マニュアルの説明文をキーワード検索する。
+          man -f と whatis は完全一致するコマンド名の短い説明を表示する。
+        choices:
+          - body: "man -k keyword"
+            correct: true
+          - body: "apropos keyword"
+            correct: true
+          - body: "whatis keyword"
+          - body: "man -f keyword"
+
+  - code: "103.2"
+    name: "フィルタを使ったテキストストリームの処理"
+    description: "cat, cut, head, tail, sort, uniq, wc, tr, sed, nl, od, join, paste, split, expand"
+    position: 1032
+    questions:
+      - code: "103.2-01"
+        body: "ファイル中の重複した連続行を1行にまとめ、それぞれの出現回数を付けて表示するコマンドはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          uniq -c は連続する重複行をまとめ、先頭に出現回数を付ける。
+          uniq は「連続した」行しか比較しないため、通常は sort file | uniq -c のように sort と組み合わせる。
+        choices:
+          - body: "uniq -c"
+            correct: true
+          - body: "uniq -d"
+          - body: "sort -u"
+          - body: "wc -l"
+      - code: "103.2-02"
+        body: "コロン区切りの /etc/passwd から1番目と3番目のフィールドを取り出すコマンドはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          cut -d: -f1,3 /etc/passwd のように、-d で区切り文字、-f で列番号を指定する。
+          -c は文字位置での切り出し。
+        choices:
+          - body: "cut -d: -f1,3 /etc/passwd"
+            correct: true
+          - body: "cut -d: -c1,3 /etc/passwd"
+          - body: "cut -f: -d1,3 /etc/passwd"
+          - body: "split -d: -f1,3 /etc/passwd"
+      - code: "103.2-03"
+        body: "ファイルの末尾を表示し続け、追記された内容をリアルタイムに追いかけるコマンドはどれか。"
+        kind: single
+        difficulty: 1
+        explanation: |
+          tail -f file はファイルの追記を監視して表示し続ける。-n で行数を指定できる。
+          head は先頭を表示するコマンド。
+        choices:
+          - body: "tail -f"
+            correct: true
+          - body: "head -f"
+          - body: "cat -n"
+          - body: "less -n"
+      - code: "103.2-04"
+        body: "標準入力の小文字をすべて大文字に変換するコマンドはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          tr 'a-z' 'A-Z' は文字単位の変換を行う。tr -d で削除、tr -s で連続する文字の圧縮ができる。
+          tr はファイル名を引数に取らず、標準入力から読む点に注意。
+        choices:
+          - body: "tr 'a-z' 'A-Z'"
+            correct: true
+          - body: "sed 'a-z/A-Z'"
+          - body: "cut -u"
+          - body: "expand -u"
+
+  - code: "103.3"
+    name: "基本的なファイル管理の実行"
+    description: "cp, mv, rm, mkdir, rmdir, find, file, ls、ワイルドカード、tar/gzip/bzip2/xz/cpio/dd"
+    position: 1033
+    questions:
+      - code: "103.3-01"
+        body: "カレントディレクトリ以下から、サイズが 10MB を超えるファイルを探すコマンドはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          find . -size +10M で 10MB より大きいファイルを検索する。+ は「より大きい」、- は「より小さい」を意味し、
+          単位は c（バイト）、k、M、G が使える。
+        choices:
+          - body: "find . -size +10M"
+            correct: true
+          - body: "find . -size 10M"
+          - body: "find . -size -10M"
+          - body: "find . -maxsize 10M"
+      - code: "103.3-02"
+        body: "ディレクトリ dir を丸ごと gzip 圧縮した tar アーカイブ archive.tar.gz にするコマンドはどれか。"
+        kind: single
+        difficulty: 1
+        explanation: |
+          tar czf archive.tar.gz dir の c は作成、z は gzip、f はファイル名指定。
+          展開は tar xzf、内容一覧は tar tzf。bzip2 は j、xz は J を使う。
+        choices:
+          - body: "tar czf archive.tar.gz dir"
+            correct: true
+          - body: "tar xzf archive.tar.gz dir"
+          - body: "tar tzf archive.tar.gz dir"
+          - body: "tar cjf archive.tar.gz dir"
+      - code: "103.3-03"
+        body: "シンボリックリンクやパーミッション、タイムスタンプを保ったままディレクトリをコピーする cp のオプションはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          cp -a（--archive）は -dR --preserve=all と同等で、再帰的かつ属性を保持してコピーする。
+          -r は再帰コピーのみで属性は保持されない。
+        choices:
+          - body: "cp -a"
+            correct: true
+          - body: "cp -r"
+          - body: "cp -f"
+          - body: "cp -u"
+
+  - code: "103.4"
+    name: "ストリーム、パイプ、リダイレクトの使用"
+    description: "標準入出力とエラー出力、>, >>, 2>, &>, |, tee, xargs, here document"
+    position: 1034
+    questions:
+      - code: "103.4-01"
+        body: "コマンドの標準出力と標準エラー出力の両方を、ファイル log.txt に追記するものはどれか。"
+        kind: single
+        difficulty: 3
+        explanation: |
+          cmd >> log.txt 2>&1 は標準出力を追記モードで開き、標準エラーをその複製先（同じファイル）に向ける。
+          bash では cmd &>> log.txt とも書ける。2>&1 >> log.txt は順序が逆で、標準エラーは端末に残る。
+        choices:
+          - body: "cmd >> log.txt 2>&1"
+            correct: true
+          - body: "cmd 2>&1 >> log.txt"
+          - body: "cmd > log.txt 2>&1"
+          - body: "cmd 2>> log.txt 1>&2 >log.txt"
+      - code: "103.4-02"
+        body: "パイプで受け取った内容を画面に表示しつつ、同時にファイルにも保存するコマンドはどれか。"
+        kind: single
+        difficulty: 1
+        explanation: |
+          tee は標準入力を標準出力とファイルの両方へ書き出す。-a を付けると追記になる。
+        choices:
+          - body: "tee"
+            correct: true
+          - body: "cat"
+          - body: "split"
+          - body: "script"
+      - code: "103.4-03"
+        body: "標準入力から受け取った文字列を、別のコマンドの引数として渡すコマンドはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          xargs は標準入力の内容をコマンドライン引数に組み立てて実行する。
+          find ... -print0 | xargs -0 rm のように、空白を含むファイル名は -print0 / -0 で扱う。
+        choices:
+          - body: "xargs"
+            correct: true
+          - body: "tee"
+          - body: "exec"
+          - body: "eval"
+
+  - code: "103.5"
+    name: "プロセスの生成、監視、終了"
+    description: "ps, top, jobs, bg, fg, kill, killall, pgrep, pkill, nohup, screen/tmux, watch, free, uptime"
+    position: 1035
+    questions:
+      - code: "103.5-01"
+        body: "実行中のプロセスに終了を要求し、プロセス側が後始末をしてから終了できるシグナルはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          SIGTERM（15）は kill のデフォルトシグナルで、プロセスが捕捉して正常終了処理を行える。
+          SIGKILL（9）は捕捉できず強制終了となるため、まず TERM を試すのが定石。
+        choices:
+          - body: "SIGTERM (15)"
+            correct: true
+          - body: "SIGKILL (9)"
+          - body: "SIGHUP (1)"
+          - body: "SIGSTOP (19)"
+      - code: "103.5-02"
+        body: "フォアグラウンドで実行中のコマンドを一時停止して、シェルに戻すキー操作はどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          Ctrl+Z は SIGTSTP を送ってジョブを一時停止し、bg でバックグラウンド実行、fg で再びフォアグラウンドに戻せる。
+          Ctrl+C は SIGINT による中断。
+        choices:
+          - body: "Ctrl+Z"
+            correct: true
+          - body: "Ctrl+C"
+          - body: "Ctrl+D"
+          - body: "Ctrl+S"
+      - code: "103.5-03"
+        body: "ログアウトしてもコマンドを実行し続けさせたい。適切なものはどれか。2つ選べ。"
+        kind: multiple
+        difficulty: 3
+        explanation: |
+          nohup は SIGHUP を無視させ、出力を nohup.out に保存する。
+          screen や tmux は端末セッションを切り離して（detach）継続実行できる。
+          & だけではログアウト時に SIGHUP を受けて終了する場合がある。
+        choices:
+          - body: "nohup コマンド &"
+            correct: true
+          - body: "screen または tmux の中で実行して detach する"
+            correct: true
+          - body: "コマンド &"
+          - body: "コマンドの前に fg を付ける"
+      - code: "103.5-04"
+        body: "システム全体のプロセスを、CPU 使用率順に画面を更新しながら表示するコマンドはどれか。"
+        kind: single
+        difficulty: 1
+        explanation: |
+          top は定期的に画面を更新してプロセスを表示する。より高機能な htop もある。
+          ps はその瞬間のスナップショットを表示する。
+        choices:
+          - body: "top"
+            correct: true
+          - body: "ps aux"
+          - body: "uptime"
+          - body: "vmstat"
+
+  - code: "103.6"
+    name: "プロセスの実行優先度の変更"
+    description: "nice 値、nice、renice、top からの優先度変更"
+    position: 1036
+    questions:
+      - code: "103.6-01"
+        body: "Linux の nice 値が取り得る範囲として正しいものはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          nice 値は -20（最優先）から 19（最も控えめ）までで、既定は 0。
+          値を下げる（優先度を上げる）操作には root 権限が必要。
+        choices:
+          - body: "-20 〜 19"
+            correct: true
+          - body: "0 〜 39"
+          - body: "-19 〜 20"
+          - body: "1 〜 99"
+      - code: "103.6-02"
+        body: "すでに実行中のプロセス（PID 1234）の nice 値を 10 に変更するコマンドはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          renice は実行中プロセスの nice 値を変更する。renice 10 -p 1234、あるいは renice -n 10 -p 1234 と書く。
+          nice は「これから起動するコマンド」に対して使う。
+        choices:
+          - body: "renice 10 -p 1234"
+            correct: true
+          - body: "nice -n 10 -p 1234"
+          - body: "nice 10 1234"
+          - body: "kill -n 10 1234"
+      - code: "103.6-03"
+        body: "コマンドを nice 値 5 で起動する正しい書式はどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          nice -n 5 command のように -n で nice 値を指定する。nice 5 command という書式は不正。
+          指定を省略すると nice 値は 10 加算される。
+        choices:
+          - body: "nice -n 5 command"
+            correct: true
+          - body: "nice 5 command"
+          - body: "nice --priority=5 command"
+          - body: "renice -n 5 command"
+
+  - code: "103.7"
+    name: "正規表現を使用したテキストファイルの検索"
+    description: "grep, egrep, fgrep, sed、基本正規表現と拡張正規表現、メタキャラクタ"
+    position: 1037
+    questions:
+      - code: "103.7-01"
+        body: "行頭が # で始まる行を除外して表示する grep コマンドはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          grep -v '^#' file は、^#（行頭の #）にマッチする行を -v で反転して除外する。
+          ^ は行頭、$ は行末を表すアンカー。
+        choices:
+          - body: "grep -v '^#' file"
+            correct: true
+          - body: "grep '^#' file"
+          - body: "grep -v '#$' file"
+          - body: "grep -x '#' file"
+      - code: "103.7-02"
+        body: "拡張正規表現（ERE）を使って grep を実行するオプションはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          grep -E（egrep 相当）は拡張正規表現を有効にし、+ ? | () をエスケープなしで使える。
+          -F（fgrep 相当）は正規表現を使わない固定文字列検索。
+        choices:
+          - body: "grep -E"
+            correct: true
+          - body: "grep -F"
+          - body: "grep -w"
+          - body: "grep -r"
+      - code: "103.7-03"
+        body: "ファイル中のすべての「foo」を「bar」に置換して標準出力に表示する sed コマンドはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          sed 's/foo/bar/g' file の g フラグで各行のすべての出現を置換する。g がないと各行の最初の1つだけ。
+          ファイルを直接書き換えるには -i を付ける。
+        choices:
+          - body: "sed 's/foo/bar/g' file"
+            correct: true
+          - body: "sed 's/foo/bar/' file"
+          - body: "sed 'y/foo/bar/' file"
+          - body: "sed -n '/foo/bar/p' file"
+
+  - code: "103.8"
+    name: "vi を使った基本的なファイル編集"
+    description: "vi のモード、カーソル移動、編集・検索・置換、保存と終了"
+    position: 1038
+    questions:
+      - code: "103.8-01"
+        body: "vi で、変更を保存せずに強制的に終了するコマンドはどれか。"
+        kind: single
+        difficulty: 1
+        explanation: |
+          :q! は変更を破棄して終了する。保存して終了は :wq または :x、ZZ。
+        choices:
+          - body: ":q!"
+            correct: true
+          - body: ":wq"
+          - body: ":w!"
+          - body: "ZZ"
+      - code: "103.8-02"
+        body: "vi のコマンドモードで、カーソル行を削除（カット）する操作はどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          dd はカーソル行を削除してバッファに入れる。yy はコピー（ヤンク）、p は貼り付け、
+          x は1文字削除。
+        choices:
+          - body: "dd"
+            correct: true
+          - body: "yy"
+          - body: "p"
+          - body: "u"
+      - code: "103.8-03"
+        body: "vi でファイル全体の「old」を「new」に置換するコマンドはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          :%s/old/new/g の % はファイル全行、g は行内すべてを意味する。
+          確認しながら置換するには末尾に c を付けて :%s/old/new/gc とする。
+        choices:
+          - body: ":%s/old/new/g"
+            correct: true
+          - body: ":s/old/new/"
+          - body: ":g/old/new/"
+          - body: ":r/old/new/g"

@@ -1,0 +1,171 @@
+exam_code: "101-500"
+chapters:
+  - code: "101.1"
+    name: "ハードウェア設定の決定と構成"
+    description: "BIOS/UEFI、デバイスファイル、/proc・/sys、lspci・lsusb、udev、カーネルモジュール"
+    position: 1011
+    questions:
+      - code: "101.1-01"
+        body: "システムに接続されたPCIデバイスの一覧を表示するコマンドはどれか。"
+        kind: single
+        difficulty: 1
+        explanation: |
+          lspci は PCI バス上のデバイスを一覧表示する。-v で詳細、-k で使用中のカーネルドライバを表示できる。
+          USB デバイスは lsusb、ブロックデバイスは lsblk で確認する。
+        choices:
+          - body: "lspci"
+            correct: true
+          - body: "lsusb"
+          - body: "lsdev"
+          - body: "lsmod"
+      - code: "101.1-02"
+        body: "カーネルが認識しているハードウェア情報やプロセス情報が、ファイルとして参照できる仮想ファイルシステムはどれか。2つ選べ。"
+        kind: multiple
+        difficulty: 2
+        explanation: |
+          /proc はプロセスとカーネルの情報を提供する仮想ファイルシステム（/proc/cpuinfo、/proc/interrupts など）。
+          /sys（sysfs）はデバイスとドライバの階層情報を提供し、udev が利用する。
+          /dev はデバイスファイルの置き場所であり、/boot はカーネルイメージ等の置き場所。
+        choices:
+          - body: "/proc"
+            correct: true
+          - body: "/sys"
+            correct: true
+          - body: "/dev"
+          - body: "/boot"
+      - code: "101.1-03"
+        body: "現在ロードされているカーネルモジュールを一覧表示するコマンドはどれか。"
+        kind: single
+        difficulty: 1
+        explanation: |
+          lsmod は /proc/modules の内容を整形して表示する。
+          modprobe は依存関係を解決してモジュールをロード/アンロード（-r）し、
+          modinfo はモジュールの情報を表示、insmod は依存を解決せずに単体でロードする。
+        choices:
+          - body: "lsmod"
+            correct: true
+          - body: "modinfo"
+          - body: "modprobe -l"
+          - body: "insmod --list"
+      - code: "101.1-04"
+        body: "udev がデバイス検出時に適用するルールファイルのうち、管理者が独自に追加するものを置くディレクトリはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          管理者定義のルールは /etc/udev/rules.d/ に置く。
+          /lib/udev/rules.d/（または /usr/lib/udev/rules.d/）はパッケージが提供するデフォルトルールで、
+          同名ファイルを /etc/udev/rules.d/ に置くと上書きできる。
+        choices:
+          - body: "/etc/udev/rules.d/"
+            correct: true
+          - body: "/lib/udev/rules.d/"
+          - body: "/proc/udev/"
+          - body: "/etc/sysconfig/udev/"
+
+  - code: "101.2"
+    name: "システムのブート"
+    description: "ブートシーケンス、ブートローダへのパラメータ渡し、dmesg、journalctl、SysVinit と systemd"
+    position: 1012
+    questions:
+      - code: "101.2-01"
+        body: "systemd を採用したシステムで、直近のブート時のカーネルメッセージだけを表示するコマンドはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          journalctl -k（--dmesg と同義）でカーネルメッセージを表示し、-b で今回のブート分に限定する。
+          dmesg もカーネルリングバッファを表示するが、リングバッファが上書きされると過去分は失われる。
+        choices:
+          - body: "journalctl -k -b"
+            correct: true
+          - body: "journalctl -u kernel"
+          - body: "systemctl status kernel"
+          - body: "cat /var/log/boot"
+      - code: "101.2-02"
+        body: "BIOS を用いた PC の一般的なブート順序として正しいものはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          BIOS → ブートローダ（MBR の第1段階、続いて第2段階）→ カーネルと initramfs のロード → init（systemd 等）
+          の順に進む。UEFI の場合は BIOS の代わりに UEFI ファームウェアが EFI システムパーティション上の
+          ブートローダを直接読み込む。
+        choices:
+          - body: "BIOS → ブートローダ → カーネル/initramfs → init(systemd)"
+            correct: true
+          - body: "BIOS → カーネル → ブートローダ → init(systemd)"
+          - body: "ブートローダ → BIOS → init(systemd) → カーネル"
+          - body: "BIOS → init(systemd) → ブートローダ → カーネル"
+      - code: "101.2-03"
+        body: "GRUB のブートメニューでカーネル行に追加すると、シングルユーザモード（緊急保守モード）で起動できるパラメータはどれか。2つ選べ。"
+        kind: multiple
+        difficulty: 3
+        explanation: |
+          SysVinit 系では single または 1 を指定するとシングルユーザモードになる。
+          systemd では systemd.unit=rescue.target / emergency.target を指定する方法もある。
+          quiet は起動メッセージを抑制するだけ、ro はルートを読み取り専用でマウントする指定。
+        choices:
+          - body: "single"
+            correct: true
+          - body: "1"
+            correct: true
+          - body: "quiet"
+          - body: "ro"
+
+  - code: "101.3"
+    name: "ランレベル/ブートターゲットの変更とシステムのシャットダウン・リブート"
+    description: "systemd ターゲット、SysVinit ランレベル、shutdown、wall、既定ターゲットの設定"
+    position: 1013
+    questions:
+      - code: "101.3-01"
+        body: "systemd で、次回起動時の既定のターゲットをマルチユーザ（CUI）に設定するコマンドはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          systemctl set-default multi-user.target で /etc/systemd/system/default.target のシンボリックリンクが
+          張り替えられる。isolate は「いま」ターゲットを切り替えるだけで、次回起動には影響しない。
+        choices:
+          - body: "systemctl set-default multi-user.target"
+            correct: true
+          - body: "systemctl isolate multi-user.target"
+          - body: "systemctl enable multi-user.target"
+          - body: "systemctl default multi-user"
+      - code: "101.3-02"
+        body: "10分後にシステムを停止し、ログイン中のユーザに警告メッセージを通知するコマンドはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          shutdown -h +10 "メッセージ" は10分後に halt し、その間ログイン中の端末に警告を送る。
+          -r は再起動、now は即時実行。shutdown -c で予約をキャンセルできる。
+        choices:
+          - body: 'shutdown -h +10 "メンテナンスのため停止します"'
+            correct: true
+          - body: 'shutdown -r now "メンテナンスのため停止します"'
+          - body: 'halt -t 10 "メンテナンスのため停止します"'
+          - body: 'init 10 "メンテナンスのため停止します"'
+      - code: "101.3-03"
+        body: "SysVinit のランレベル 3 に相当する systemd のターゲットはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          ランレベル3（CUIのマルチユーザ）は multi-user.target に対応する。
+          ランレベル5（GUI）は graphical.target、ランレベル1（シングルユーザ）は rescue.target、
+          ランレベル0は poweroff.target、6は reboot.target に対応する。
+        choices:
+          - body: "multi-user.target"
+            correct: true
+          - body: "graphical.target"
+          - body: "rescue.target"
+          - body: "basic.target"
+      - code: "101.3-04"
+        body: "現在アクティブな systemd のターゲットを確認できるコマンドはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          systemctl get-default は「既定の」ターゲットを表示する点に注意。
+          いま何が動いているかは systemctl list-units --type=target で確認する。
+          runlevel コマンドは互換のため残されており、直前と現在のランレベルを表示する。
+        choices:
+          - body: "systemctl list-units --type=target"
+            correct: true
+          - body: "systemctl set-default"
+          - body: "systemctl mask target"
+          - body: "telinit --status"

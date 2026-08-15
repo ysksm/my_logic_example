@@ -1,0 +1,111 @@
+exam_code: "102-500"
+chapters:
+  - code: "106.1"
+    name: "X11 のインストールと設定"
+    description: "Xorg, xorg.conf, DISPLAY, xhost, xauth, X のリモート表示, Wayland"
+    position: 1061
+    questions:
+      - code: "106.1-01"
+        body: "X クライアントが接続する X サーバを指定する環境変数はどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          DISPLAY にはホスト名:ディスプレイ番号.スクリーン番号（例 :0.0、host:0）を設定する。
+          ローカルの場合ホスト名は省略される。
+        choices:
+          - body: "DISPLAY"
+            correct: true
+          - body: "XSERVER"
+          - body: "TERM"
+          - body: "XAUTHORITY"
+      - code: "106.1-02"
+        body: "X サーバへの接続を、特定ホストからのみ許可するコマンドはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          xhost +hostname で許可、xhost -hostname で拒否する。xhost + は全ホストを許可するため危険。
+          より安全な方式として xauth によるマジッククッキー認証がある。
+        choices:
+          - body: "xhost"
+            correct: true
+          - body: "xauth"
+          - body: "xdpyinfo"
+          - body: "xrandr"
+      - code: "106.1-03"
+        body: "X11 の GUI アプリケーションを SSH 経由でリモート表示するための ssh のオプションはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          ssh -X（信頼しないモードの X11 転送）または -Y（信頼するモード）で X11 転送を有効にする。
+          サーバ側では sshd_config の X11Forwarding yes が必要。
+        choices:
+          - body: "ssh -X"
+            correct: true
+          - body: "ssh -L"
+          - body: "ssh -D"
+          - body: "ssh -N"
+
+  - code: "106.2"
+    name: "グラフィカルデスクトップ"
+    description: "デスクトップ環境、ディスプレイマネージャ、X11 と Wayland、VNC、RDP、SPICE"
+    position: 1062
+    questions:
+      - code: "106.2-01"
+        body: "グラフィカルなログイン画面を提供し、X セッションを開始するプログラムの総称はどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          ディスプレイマネージャ（XDM、GDM、KDM/SDDM、LightDM など）がログイン画面を出してセッションを起動する。
+          ウィンドウマネージャはウィンドウの装飾や配置を担当する別のコンポーネント。
+        choices:
+          - body: "ディスプレイマネージャ"
+            correct: true
+          - body: "ウィンドウマネージャ"
+          - body: "デスクトップ環境"
+          - body: "X サーバ"
+      - code: "106.2-02"
+        body: "リモートのデスクトップ画面を転送するプロトコル・仕組みとして正しいものはどれか。2つ選べ。"
+        kind: multiple
+        difficulty: 2
+        explanation: |
+          VNC（RFB プロトコル）と RDP はリモートデスクトップの代表的な方式。
+          仮想マシン向けには SPICE も使われる。NFS はファイル共有、CUPS は印刷のためのもの。
+        choices:
+          - body: "VNC"
+            correct: true
+          - body: "RDP"
+            correct: true
+          - body: "NFS"
+          - body: "CUPS"
+
+  - code: "106.3"
+    name: "アクセシビリティ"
+    description: "スティッキーキー、スローキー、スクリーンリーダー、ハイコントラスト、オンスクリーンキーボード"
+    position: 1063
+    questions:
+      - code: "106.3-01"
+        body: "Shift や Ctrl などの修飾キーを同時押しせず、順番に押すだけで組み合わせとして扱えるようにする機能はどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          スティッキーキー（Sticky Keys）は修飾キーを押した状態として保持する。
+          スローキーは一定時間押し続けないと入力とみなさない機能、バウンスキーは連打の誤入力を無視する機能。
+        choices:
+          - body: "スティッキーキー"
+            correct: true
+          - body: "スローキー"
+          - body: "バウンスキー"
+          - body: "マウスキー"
+      - code: "106.3-02"
+        body: "画面の内容を読み上げるアクセシビリティ支援ツールはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          Orca は GNOME 環境のスクリーンリーダー。Emacspeak も読み上げ環境として知られる。
+          GOK はオンスクリーンキーボード、Xmag は画面拡大ツール。
+        choices:
+          - body: "Orca"
+            correct: true
+          - body: "GOK"
+          - body: "Xmag"
+          - body: "xkbset"

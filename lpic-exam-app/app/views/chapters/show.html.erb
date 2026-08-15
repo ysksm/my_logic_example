@@ -1,0 +1,62 @@
+<% content_for :title, "#{@chapter.label} | LPIC 演習" %>
+
+<div class="page-head spread">
+  <div>
+    <p class="subtitle"><%= link_to @exam.name, exam_path(@exam) %></p>
+    <h1><span class="tag"><%= @chapter.code %></span> <%= @chapter.name %></h1>
+    <p class="subtitle"><%= @chapter.description %></p>
+  </div>
+  <%= button_to "この章を解く（10問）", quiz_sessions_path,
+        params: { mode: "chapter", exam_id: @exam.id, chapter_ids: [ @chapter.id ], limit: 10, order: "random" },
+        class: "btn btn-primary" %>
+</div>
+
+<div class="card">
+  <div class="grid grid-3">
+    <div class="stat">
+      <div class="value"><%= accuracy_text(@stats[:accuracy]) %></div>
+      <div class="label">通算正解率</div>
+    </div>
+    <div class="stat">
+      <div class="value"><%= @stats[:attempted_questions] %> / <%= @stats[:question_count] %></div>
+      <div class="label">着手した問題</div>
+    </div>
+    <div class="stat">
+      <div class="value"><%= accuracy_text(@stats[:latest_accuracy]) %></div>
+      <div class="label">最新解答ベースの正解率</div>
+    </div>
+  </div>
+</div>
+
+<h2>この章の問題（<%= @questions.size %> 問）</h2>
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th>問題</th>
+        <th class="num">形式</th>
+        <th class="num">難易度</th>
+        <th class="num">直近</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @questions.each do |question| %>
+        <% latest = @latest_results[question.id] %>
+        <tr>
+          <td><%= link_to truncate(question.body, length: 70), question_path(question) %></td>
+          <td class="num small muted"><%= question.multiple? ? "複数選択" : "単一選択" %></td>
+          <td class="num small muted"><%= question.difficulty_label %></td>
+          <td class="num">
+            <% if latest.nil? %>
+              <span class="badge badge-muted">未挑戦</span>
+            <% elsif latest.correct %>
+              <span class="badge badge-good">正解</span>
+            <% else %>
+              <span class="badge badge-bad">不正解</span>
+            <% end %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>

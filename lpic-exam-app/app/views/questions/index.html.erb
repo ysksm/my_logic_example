@@ -1,0 +1,61 @@
+<% content_for :title, "問題バンク | LPIC 演習" %>
+
+<div class="page-head">
+  <h1>問題バンク</h1>
+  <p class="subtitle">問題と解説を検索して読めます（採点は行いません）</p>
+</div>
+
+<div class="card">
+  <%= form_with url: questions_path, method: :get, data: { turbo: false } do %>
+    <div class="row">
+      <%= select_tag :exam_code,
+            options_from_collection_for_select(@exams, :code, :name, @exam&.code),
+            include_blank: "すべての試験" %>
+      <%= select_tag :chapter_code,
+            options_from_collection_for_select(Chapter.ordered, :code, :label, @chapter&.code),
+            include_blank: "すべての章" %>
+      <%= select_tag :status, options_for_select([
+            [ "すべて", "all" ],
+            [ "直近で間違えた問題", "wrong" ],
+            [ "未挑戦の問題", "unattempted" ]
+          ], @status) %>
+      <%= text_field_tag :q, @keyword, placeholder: "キーワード" %>
+      <%= submit_tag "絞り込む", class: "btn btn-sm" %>
+    </div>
+  <% end %>
+</div>
+
+<div class="card">
+  <p class="small muted"><%= @questions.size %> 件</p>
+  <% if @questions.empty? %>
+    <p class="empty">該当する問題がありません。</p>
+  <% else %>
+    <table>
+      <thead>
+        <tr>
+          <th>章</th>
+          <th>問題</th>
+          <th class="num">直近</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @questions.each do |question| %>
+          <% latest = @latest_results[question.id] %>
+          <tr>
+            <td><%= link_to question.chapter.code, chapter_path(question.chapter), class: "tag" %></td>
+            <td><%= link_to truncate(question.body, length: 80), question_path(question) %></td>
+            <td class="num">
+              <% if latest.nil? %>
+                <span class="badge badge-muted">未挑戦</span>
+              <% elsif latest.correct %>
+                <span class="badge badge-good">正解</span>
+              <% else %>
+                <span class="badge badge-bad">不正解</span>
+              <% end %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
+</div>

@@ -1,0 +1,302 @@
+exam_code: "101-500"
+chapters:
+  - code: "104.1"
+    name: "パーティションとファイルシステムの作成"
+    description: "fdisk, gdisk, parted, mkfs, mkswap, ext2/3/4, XFS, Btrfs, VFAT, exFAT"
+    position: 1041
+    questions:
+      - code: "104.1-01"
+        body: "/dev/sdb1 に ext4 ファイルシステムを作成するコマンドはどれか。"
+        kind: single
+        difficulty: 1
+        explanation: |
+          mkfs.ext4 /dev/sdb1（または mkfs -t ext4 /dev/sdb1）でファイルシステムを作成する。
+          mke2fs -t ext4 でも同じ。
+        choices:
+          - body: "mkfs.ext4 /dev/sdb1"
+            correct: true
+          - body: "mkswap /dev/sdb1"
+          - body: "fsck.ext4 /dev/sdb1"
+          - body: "tune2fs -t ext4 /dev/sdb1"
+      - code: "104.1-02"
+        body: "2TB を超えるディスクのパーティションを扱えるパーティション形式と、その操作に使えるコマンドの組み合わせとして適切なものはどれか。"
+        kind: single
+        difficulty: 3
+        explanation: |
+          MBR は 2TiB までしか扱えないため、大容量ディスクでは GPT を使う。GPT の操作には gdisk や parted を使う。
+          従来の fdisk も新しいバージョンでは GPT に対応しているが、試験では gdisk/parted が GPT 対応として問われる。
+        choices:
+          - body: "GPT — gdisk / parted"
+            correct: true
+          - body: "MBR — fdisk"
+          - body: "GPT — mkfs"
+          - body: "MBR — parted のみ"
+      - code: "104.1-03"
+        body: "スワップ領域を作成し、有効化する手順の組み合わせとして正しいものはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          mkswap でスワップ署名を書き込み、swapon で有効化する。無効化は swapoff。
+          起動時に自動で有効にするには /etc/fstab に swap エントリを追加する。
+        choices:
+          - body: "mkswap → swapon"
+            correct: true
+          - body: "mkfs.swap → mount"
+          - body: "swapon → mkswap"
+          - body: "fdisk -s → swapon"
+
+  - code: "104.2"
+    name: "ファイルシステムの整合性の保持"
+    description: "fsck, e2fsck, tune2fs, dumpe2fs, xfs_repair, xfs_db, du, df"
+    position: 1042
+    questions:
+      - code: "104.2-01"
+        body: "ext ファイルシステムのスーパーブロック情報やブロックグループ情報を表示するコマンドはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          dumpe2fs はスーパーブロック情報とブロックグループ情報を表示する。-h でスーパーブロックのみ。
+          tune2fs -l でもスーパーブロック情報を表示できる。
+        choices:
+          - body: "dumpe2fs"
+            correct: true
+          - body: "mkfs.ext4 -n"
+          - body: "df -i"
+          - body: "xfs_info"
+      - code: "104.2-02"
+        body: "ext4 ファイルシステムの「マウント回数によるチェック」の間隔を変更するコマンドはどれか。"
+        kind: single
+        difficulty: 3
+        explanation: |
+          tune2fs -c <回数> で最大マウント回数、-i <間隔> でチェック間隔（時間ベース）を設定する。
+          -L はボリュームラベルの設定。
+        choices:
+          - body: "tune2fs -c"
+            correct: true
+          - body: "e2fsck -c"
+          - body: "dumpe2fs -c"
+          - body: "mke2fs -c"
+      - code: "104.2-03"
+        body: "ファイルシステムごとの空き容量と使用率を確認するコマンドはどれか。"
+        kind: single
+        difficulty: 1
+        explanation: |
+          df はマウントされたファイルシステム単位の容量を表示する（-h で人間が読みやすい単位、-i で inode）。
+          du はディレクトリ・ファイル単位の使用量を集計する。
+        choices:
+          - body: "df"
+            correct: true
+          - body: "du"
+          - body: "free"
+          - body: "lsblk -f"
+
+  - code: "104.3"
+    name: "ファイルシステムのマウントとアンマウントの制御"
+    description: "mount, umount, /etc/fstab, UUID とラベル, systemd の mount ユニット, blkid"
+    position: 1043
+    questions:
+      - code: "104.3-01"
+        body: "/etc/fstab の6番目のフィールド（fs_passno）が意味するものはどれか。"
+        kind: single
+        difficulty: 3
+        explanation: |
+          /etc/fstab は「デバイス／マウントポイント／種類／オプション／dump／fsck の順序」の6フィールドから成る。
+          6番目の fs_passno は起動時 fsck のチェック順で、0 はチェックしない、1 はルート、2 はその他。
+        choices:
+          - body: "起動時に fsck を実行する順序"
+            correct: true
+          - body: "dump コマンドのバックアップ対象かどうか"
+          - body: "マウントオプション"
+          - body: "ファイルシステムの種類"
+      - code: "104.3-02"
+        body: "デバイス名の変動に影響されずに /etc/fstab でパーティションを指定する方法として適切なものはどれか。2つ選べ。"
+        kind: multiple
+        difficulty: 2
+        explanation: |
+          UUID=... や LABEL=... で指定すれば、/dev/sdb が /dev/sdc になっても正しくマウントされる。
+          UUID とラベルは blkid コマンドで確認できる。
+        choices:
+          - body: "UUID=xxxxxxxx-xxxx-..."
+            correct: true
+          - body: "LABEL=data"
+            correct: true
+          - body: "/dev/sdb1"
+          - body: "MAJOR:MINOR 番号"
+      - code: "104.3-03"
+        body: "使用中でアンマウントできないファイルシステムについて、どのプロセスが使用しているかを調べるコマンドはどれか。2つ選べ。"
+        kind: multiple
+        difficulty: 3
+        explanation: |
+          lsof +D /mnt や fuser -m /mnt で、そのマウントポイントを使用しているプロセスを特定できる。
+          fuser -km /mnt を使うと該当プロセスに SIGKILL を送れる。
+        choices:
+          - body: "lsof"
+            correct: true
+          - body: "fuser"
+            correct: true
+          - body: "mount -l"
+          - body: "df -T"
+
+  - code: "104.5"
+    name: "ファイルのパーミッションと所有者の管理"
+    description: "chmod, chown, chgrp, umask, SUID/SGID/スティッキービット"
+    position: 1045
+    questions:
+      - code: "104.5-01"
+        body: "umask が 022 のとき、新規に作成される通常ファイルのパーミッションはどれか。"
+        kind: single
+        difficulty: 3
+        explanation: |
+          ファイルの基準値は 666、ディレクトリは 777。umask 022 を引くと、ファイルは 644（rw-r--r--）、
+          ディレクトリは 755（rwxr-xr-x）になる。
+        choices:
+          - body: "644 (rw-r--r--)"
+            correct: true
+          - body: "755 (rwxr-xr-x)"
+          - body: "666 (rw-rw-rw-)"
+          - body: "022 (----w--w-)"
+      - code: "104.5-02"
+        body: "/tmp のように誰でも書き込めるが、他人のファイルは削除できないようにする特殊ビットはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          スティッキービット（chmod 1777 や chmod +t）を立てると、ディレクトリ内のファイルは所有者と root だけが
+          削除・改名できる。ls では末尾が t と表示される。
+        choices:
+          - body: "スティッキービット"
+            correct: true
+          - body: "SUID"
+          - body: "SGID"
+          - body: "ACL のマスク"
+      - code: "104.5-03"
+        body: "ファイルの所有者を user1、所有グループを group1 に同時に変更するコマンドはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          chown user1:group1 file で所有者とグループを同時に変更できる（chown user1.group1 file も可）。
+          グループだけの変更は chgrp group1 file。
+        choices:
+          - body: "chown user1:group1 file"
+            correct: true
+          - body: "chmod user1:group1 file"
+          - body: "chgrp user1:group1 file"
+          - body: "chown -g group1 -u user1 file"
+      - code: "104.5-04"
+        body: "実行時に、そのファイルの所有者の権限で動作させる特殊ビットはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          SUID（chmod 4755）を付けると、実行者ではなくファイル所有者の権限で実行される（例: /usr/bin/passwd）。
+          SGID（2755）は所有グループの権限で実行され、ディレクトリに付けると新規ファイルがそのグループを継承する。
+        choices:
+          - body: "SUID"
+            correct: true
+          - body: "SGID"
+          - body: "スティッキービット"
+          - body: "実行ビット"
+
+  - code: "104.6"
+    name: "ハードリンクとシンボリックリンクの作成と変更"
+    description: "ln, ln -s, inode、リンクの性質と制限"
+    position: 1046
+    questions:
+      - code: "104.6-01"
+        body: "ハードリンクについての説明として正しいものはどれか。2つ選べ。"
+        kind: multiple
+        difficulty: 3
+        explanation: |
+          ハードリンクは同一 inode に対する別名なので、同じファイルシステム内でしか作れず、
+          ディレクトリに対しては（通常）作成できない。元のファイル名を消してもデータは残る。
+        choices:
+          - body: "同じファイルシステム内でしか作成できない"
+            correct: true
+          - body: "元のファイル名を削除してもデータにアクセスできる"
+            correct: true
+          - body: "異なるファイルシステムをまたいで作成できる"
+          - body: "リンク先が存在しなくても作成できる"
+      - code: "104.6-02"
+        body: "ファイル original に対するシンボリックリンク link を作成するコマンドはどれか。"
+        kind: single
+        difficulty: 1
+        explanation: |
+          ln -s original link のように、-s を付けるとシンボリックリンクになる。
+          -s なしだとハードリンクになる。
+        choices:
+          - body: "ln -s original link"
+            correct: true
+          - body: "ln original link"
+          - body: "ln -h original link"
+          - body: "link -s original link"
+      - code: "104.6-03"
+        body: "ファイルの inode 番号を表示する ls のオプションはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          ls -i で inode 番号を表示する。ハードリンク同士は同じ inode 番号になるので、確認に使える。
+        choices:
+          - body: "ls -i"
+            correct: true
+          - body: "ls -l"
+          - body: "ls -n"
+          - body: "ls -d"
+
+  - code: "104.7"
+    name: "システムファイルの検索とファイルの正しい配置"
+    description: "FHS、/usr・/var・/etc の役割、find, locate, updatedb, whereis, which, type"
+    position: 1047
+    questions:
+      - code: "104.7-01"
+        body: "FHS において、システムの起動に必須で単独パーティションにしてはならないディレクトリはどれか。2つ選べ。"
+        kind: multiple
+        difficulty: 3
+        explanation: |
+          /etc と /bin（および /sbin、/lib、/dev）はルートファイルシステムに必要で、
+          別パーティションにするとマウント前に参照できず起動できなくなる。
+          /home や /var は分離して構わない。
+        choices:
+          - body: "/etc"
+            correct: true
+          - body: "/bin"
+            correct: true
+          - body: "/home"
+          - body: "/var"
+      - code: "104.7-02"
+        body: "locate コマンドが参照するデータベースを更新するコマンドはどれか。"
+        kind: single
+        difficulty: 1
+        explanation: |
+          updatedb が locate 用のデータベース（mlocate.db）を作り直す。
+          設定ファイルは /etc/updatedb.conf で、除外パスなどを指定できる。
+        choices:
+          - body: "updatedb"
+            correct: true
+          - body: "makewhatis"
+          - body: "ldconfig"
+          - body: "mandb"
+      - code: "104.7-03"
+        body: "コマンドのバイナリ、ソース、マニュアルページの場所をまとめて表示するコマンドはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          whereis はバイナリ・ソース・マニュアルの場所を表示する。
+          which は PATH 上で実行される実体のパスだけを表示し、type はシェルがどう解釈するか（エイリアス、
+          組み込みコマンドなど）を示す。
+        choices:
+          - body: "whereis"
+            correct: true
+          - body: "which"
+          - body: "type"
+          - body: "locate"
+      - code: "104.7-04"
+        body: "FHS で「可変データ（ログ、スプール、キャッシュなど）」を置くディレクトリはどれか。"
+        kind: single
+        difficulty: 1
+        explanation: |
+          /var は変化するデータを置く。ログは /var/log、メールやプリンタのスプールは /var/spool、
+          一時的でも再起動をまたぐキャッシュは /var/cache に置く。
+        choices:
+          - body: "/var"
+            correct: true
+          - body: "/usr"
+          - body: "/opt"
+          - body: "/srv"

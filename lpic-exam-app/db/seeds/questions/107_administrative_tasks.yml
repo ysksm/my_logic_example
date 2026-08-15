@@ -1,0 +1,162 @@
+exam_code: "102-500"
+chapters:
+  - code: "107.1"
+    name: "ユーザーとグループの管理および関連するシステムファイルの管理"
+    description: "useradd, usermod, userdel, groupadd, passwd, /etc/passwd, /etc/shadow, /etc/group, getent"
+    position: 1071
+    questions:
+      - code: "107.1-01"
+        body: "暗号化されたパスワードと有効期限情報が格納されているファイルはどれか。"
+        kind: single
+        difficulty: 1
+        explanation: |
+          /etc/shadow にハッシュ化されたパスワードとパスワードエイジング情報が入り、root のみ読める。
+          /etc/passwd の第2フィールドは通常 x となっていて、shadow を参照することを示す。
+        choices:
+          - body: "/etc/shadow"
+            correct: true
+          - body: "/etc/passwd"
+          - body: "/etc/group"
+          - body: "/etc/gshadow"
+      - code: "107.1-02"
+        body: "/etc/passwd の各行のフィールド構成として正しいものはどれか。"
+        kind: single
+        difficulty: 3
+        explanation: |
+          ユーザ名:パスワード(x):UID:GID:コメント(GECOS):ホームディレクトリ:ログインシェル の7フィールド。
+        choices:
+          - body: "ユーザ名:x:UID:GID:コメント:ホームディレクトリ:ログインシェル"
+            correct: true
+          - body: "ユーザ名:UID:GID:x:ホームディレクトリ:コメント:ログインシェル"
+          - body: "ユーザ名:x:GID:UID:ホームディレクトリ:ログインシェル:コメント"
+          - body: "ユーザ名:パスワードハッシュ:UID:GID:ホームディレクトリ:ログインシェル"
+      - code: "107.1-03"
+        body: "ユーザ user1 のアカウントを一時的にロック（ログイン不可に）するコマンドはどれか。2つ選べ。"
+        kind: multiple
+        difficulty: 3
+        explanation: |
+          passwd -l user1 と usermod -L user1 はパスワードハッシュの先頭に ! を付けてロックする。
+          解除はそれぞれ passwd -u、usermod -U。passwd -d はパスワードを削除するもので、ロックではない。
+        choices:
+          - body: "passwd -l user1"
+            correct: true
+          - body: "usermod -L user1"
+            correct: true
+          - body: "passwd -d user1"
+          - body: "userdel -f user1"
+      - code: "107.1-04"
+        body: "ユーザ user1 を補助グループ wheel に追加し、既存の補助グループを維持するコマンドはどれか。"
+        kind: single
+        difficulty: 3
+        explanation: |
+          usermod -aG wheel user1 の -a（append）が重要で、これを付けないと -G で指定した以外の
+          補助グループから外れてしまう。-g は基本グループの変更。
+        choices:
+          - body: "usermod -aG wheel user1"
+            correct: true
+          - body: "usermod -G wheel user1"
+          - body: "usermod -g wheel user1"
+          - body: "groupadd -u user1 wheel"
+
+  - code: "107.2"
+    name: "ジョブスケジューリングによるシステム管理業務の自動化"
+    description: "cron, crontab, /etc/crontab, cron.d, anacron, at, systemd timer, cron.allow/deny"
+    position: 1072
+    questions:
+      - code: "107.2-01"
+        body: "crontab のフィールド「0 3 * * 1」が意味するスケジュールはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          フィールドは「分 時 日 月 曜日」の順。0 3 * * 1 は毎週月曜日の 3:00 を意味する
+          （曜日は 0 または 7 が日曜、1 が月曜）。
+        choices:
+          - body: "毎週月曜日の午前3時"
+            correct: true
+          - body: "毎月1日の午前3時"
+          - body: "毎日午前1時3分"
+          - body: "毎週日曜日の午前3時"
+      - code: "107.2-02"
+        body: "自分のユーザの crontab を編集するコマンドはどれか。"
+        kind: single
+        difficulty: 1
+        explanation: |
+          crontab -e で編集、-l で一覧表示、-r で削除する。
+          他ユーザの crontab を扱うには root で crontab -u user -e を使う。
+        choices:
+          - body: "crontab -e"
+            correct: true
+          - body: "crontab -l"
+          - body: "crontab -r"
+          - body: "vi /etc/crontab"
+      - code: "107.2-03"
+        body: "ノート PC のように常時起動していないマシンで、電源が入っていなかった期間の定期ジョブを起動後に実行する仕組みはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          anacron は最後に実行してからの経過日数を /var/spool/anacron に記録し、
+          実行されなかったジョブを次回起動時に実行する。設定は /etc/anacrontab。
+        choices:
+          - body: "anacron"
+            correct: true
+          - body: "at"
+          - body: "batch"
+          - body: "cron.d"
+      - code: "107.2-04"
+        body: "一度だけ指定時刻にコマンドを実行させるコマンドと、その予約一覧を確認するコマンドの組み合わせはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          at で予約し、atq（at -l）で一覧、atrm（at -d）で削除する。
+          利用可否は /etc/at.allow と /etc/at.deny で制御する。
+        choices:
+          - body: "at と atq"
+            correct: true
+          - body: "at と atrm"
+          - body: "batch と crontab -l"
+          - body: "cron と crontab -l"
+
+  - code: "107.3"
+    name: "ローカライゼーションと国際化"
+    description: "locale, LANG, LC_*, TZ, timedatectl, iconv, 文字コード（UTF-8, ISO-8859, ASCII）"
+    position: 1073
+    questions:
+      - code: "107.3-01"
+        body: "すべてのロケールカテゴリを一括で上書きし、最も優先される環境変数はどれか。"
+        kind: single
+        difficulty: 3
+        explanation: |
+          LC_ALL が設定されていると、他の LC_* や LANG より優先されてすべてのカテゴリを上書きする。
+          LANG は個別指定がない場合のデフォルトとして働く。
+        choices:
+          - body: "LC_ALL"
+            correct: true
+          - body: "LANG"
+          - body: "LC_CTYPE"
+          - body: "LANGUAGE"
+      - code: "107.3-02"
+        body: "文字コードを EUC-JP から UTF-8 に変換するコマンドはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          iconv -f EUC-JP -t UTF-8 file で変換する。-f が変換元、-t が変換先。
+          日本語専用の nkf も同様の用途で使われる。
+        choices:
+          - body: "iconv -f EUC-JP -t UTF-8 file"
+            correct: true
+          - body: "iconv -t EUC-JP -f UTF-8 file"
+          - body: "tr EUC-JP UTF-8 < file"
+          - body: "locale -f EUC-JP -t UTF-8 file"
+      - code: "107.3-03"
+        body: "システムのタイムゾーンを Asia/Tokyo に設定する systemd 系のコマンドはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          timedatectl set-timezone Asia/Tokyo で /etc/localtime のリンクが張り替えられる。
+          タイムゾーン定義は /usr/share/zoneinfo 配下にある。
+        choices:
+          - body: "timedatectl set-timezone Asia/Tokyo"
+            correct: true
+          - body: "timedatectl set-time Asia/Tokyo"
+          - body: "hwclock --timezone Asia/Tokyo"
+          - body: "localectl set-timezone Asia/Tokyo"

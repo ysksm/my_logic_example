@@ -1,0 +1,118 @@
+<% content_for :title, "結果 | #{@quiz_session.title}" %>
+
+<div class="page-head">
+  <p class="subtitle"><%= @quiz_session.mode_label %> · <%= l @quiz_session.created_at, format: :short %></p>
+  <h1><%= @quiz_session.title %></h1>
+</div>
+
+<div class="card">
+  <div class="grid grid-3">
+    <div class="stat">
+      <div class="value"><%= accuracy_text(@quiz_session.accuracy) %></div>
+      <div class="label">正解率</div>
+    </div>
+    <div class="stat">
+      <div class="value"><%= @quiz_session.correct_count %> / <%= @quiz_session.answered_count %></div>
+      <div class="label">正解数 / 解答数</div>
+    </div>
+    <div class="stat">
+      <div class="value"><%= duration_text(@quiz_session.duration) %></div>
+      <div class="label">所要時間</div>
+    </div>
+  </div>
+  <div style="margin-top:14px"><%= progress_bar(@quiz_session.accuracy) %></div>
+</div>
+
+<div class="card">
+  <div class="row">
+    <% if @wrong_items.any? %>
+      <%= button_to "間違えた #{@wrong_items.size} 問だけもう一度解く", review_quiz_session_path(@quiz_session),
+            class: "btn btn-primary" %>
+    <% else %>
+      <span class="badge badge-good">全問正解</span>
+    <% end %>
+    <%= button_to "同じ条件でもう一度", quiz_sessions_path,
+          params: @quiz_session.filters.compact.merge(
+            "mode" => @quiz_session.mode,
+            "source_quiz_session_id" => @quiz_session.source_quiz_session_id
+          ).compact,
+          class: "btn" %>
+    <%= link_to "ダッシュボードへ", root_path, class: "btn" %>
+  </div>
+</div>
+
+<% if @quiz_session.current_item %>
+  <div class="card">
+    <p class="small muted" style="margin:0">未解答が <%= @quiz_session.total_count - @quiz_session.answered_count %> 問あります。</p>
+    <%= link_to "続きから再開する", quiz_session_path(@quiz_session), class: "btn btn-sm btn-primary" %>
+  </div>
+<% end %>
+
+<h2>章別の内訳</h2>
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th>章</th>
+        <th class="num">出題</th>
+        <th class="num">正解</th>
+        <th style="width:28%">正解率</th>
+        <th class="num"></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @breakdown.each do |row| %>
+        <tr>
+          <td><%= link_to row[:chapter].label, chapter_path(row[:chapter]) %></td>
+          <td class="num"><%= row[:answered] %></td>
+          <td class="num"><%= row[:correct] %></td>
+          <td><%= progress_bar(row[:accuracy]) %></td>
+          <td class="num"><%= accuracy_badge(row[:accuracy]) %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
+
+<h2>解答の振り返り</h2>
+<% @items.each do |item| %>
+  <div class="card">
+    <div class="spread small muted">
+      <span>第 <%= item.position %> 問 · <span class="tag"><%= item.question.chapter.code %></span></span>
+      <span>
+        <% if !item.answered? %>
+          <span class="badge badge-muted">未解答</span>
+        <% elsif item.correct %>
+          <span class="badge badge-good">正解</span>
+        <% else %>
+          <span class="badge badge-bad">不正解</span>
+        <% end %>
+      </span>
+    </div>
+    <div class="question-body"><%= item.question.body %></div>
+    <div class="choices">
+      <% item.question.choices.each do |choice| %>
+        <%
+          selected = item.selected?(choice)
+          klass = if choice.correct
+                    "choice choice-correct"
+                  elsif selected
+                    "choice choice-wrong"
+                  else
+                    "choice"
+                  end
+        %>
+        <div class="<%= klass %>">
+          <span><%= choice.body %></span>
+          <span class="choice-mark">
+            <% if choice.correct %><span class="mark-correct">正解</span><% end %>
+            <% if selected %><span class="<%= choice.correct ? "mark-correct" : "mark-wrong" %>">選択</span><% end %>
+          </span>
+        </div>
+      <% end %>
+    </div>
+    <% if item.question.explanation.present? %>
+      <div class="explanation"><%= item.question.explanation %></div>
+    <% end %>
+  </div>
+<% end %>

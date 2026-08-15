@@ -1,0 +1,113 @@
+<% content_for :title, "成績 | LPIC 演習" %>
+
+<div class="page-head">
+  <h1>成績</h1>
+  <p class="subtitle">通算正解率・章別正解率・直近の学習ペース</p>
+</div>
+
+<div class="card">
+  <div class="grid grid-3">
+    <div class="stat">
+      <div class="value"><%= accuracy_text(@overall[:accuracy]) %></div>
+      <div class="label">通算正解率</div>
+    </div>
+    <div class="stat">
+      <div class="value"><%= @overall[:correct] %></div>
+      <div class="label">正解数</div>
+    </div>
+    <div class="stat">
+      <div class="value"><%= @overall[:wrong] %></div>
+      <div class="label">不正解数</div>
+    </div>
+  </div>
+</div>
+
+<h2>試験別</h2>
+<div class="card">
+  <table>
+    <thead>
+      <tr><th>試験</th><th class="num">問題数</th><th class="num">着手</th><th class="num">解答</th><th style="width:25%">正解率</th><th class="num"></th></tr>
+    </thead>
+    <tbody>
+      <% @exam_rows.each do |row| %>
+        <tr>
+          <td><%= link_to row[:exam].name, exam_path(row[:exam]) %></td>
+          <td class="num"><%= row[:question_count] %></td>
+          <td class="num"><%= row[:attempted_questions] %></td>
+          <td class="num"><%= row[:answered] %></td>
+          <td><%= progress_bar(row[:accuracy]) %></td>
+          <td class="num"><%= accuracy_badge(row[:accuracy]) %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
+
+<h2>章別</h2>
+<div class="card">
+  <%= form_with url: stats_path, method: :get, data: { turbo: false } do %>
+    <div class="row">
+      <%= select_tag :exam_code, options_from_collection_for_select(@exams, :code, :name, @exam&.code),
+            include_blank: "すべての試験" %>
+      <%= submit_tag "絞り込む", class: "btn btn-sm" %>
+    </div>
+  <% end %>
+
+  <table style="margin-top:12px">
+    <thead>
+      <tr>
+        <th>章</th>
+        <th class="num">問題数</th>
+        <th class="num">着手</th>
+        <th class="num">解答</th>
+        <th style="width:22%">正解率</th>
+        <th class="num">通算</th>
+        <th class="num">最新</th>
+        <th class="num"></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @chapter_rows.each do |row| %>
+        <tr>
+          <td>
+            <%= link_to row[:chapter].code, chapter_path(row[:chapter]), class: "tag" %>
+            <%= link_to row[:chapter].name, chapter_path(row[:chapter]) %>
+          </td>
+          <td class="num"><%= row[:question_count] %></td>
+          <td class="num"><%= row[:attempted_questions] %></td>
+          <td class="num"><%= row[:answered] %></td>
+          <td><%= progress_bar(row[:accuracy]) %></td>
+          <td class="num"><%= accuracy_badge(row[:accuracy]) %></td>
+          <td class="num small muted"><%= accuracy_text(row[:latest_accuracy]) %></td>
+          <td class="num">
+            <%= button_to "解く", quiz_sessions_path,
+                  params: { mode: "chapter", chapter_ids: [ row[:chapter].id ], limit: 10, order: "random" },
+                  class: "btn btn-sm" %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
+
+<h2>直近14日の学習ペース</h2>
+<div class="card">
+  <% if @daily.empty? %>
+    <p class="empty">直近の解答履歴がありません。</p>
+  <% else %>
+    <table>
+      <thead><tr><th>日付</th><th class="num">解答数</th><th class="num">正解数</th><th style="width:30%">正解率</th><th class="num"></th></tr></thead>
+      <tbody>
+        <% @daily.each do |row| %>
+          <tr>
+            <td><%= row[:date] %></td>
+            <td class="num"><%= row[:answered] %></td>
+            <td class="num"><%= row[:correct] %></td>
+            <td><%= progress_bar(row[:accuracy]) %></td>
+            <td class="num"><%= accuracy_badge(row[:accuracy]) %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
+</div>

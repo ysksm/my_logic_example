@@ -1,0 +1,9 @@
+exams:
+  - code: "101-500"
+    name: "LPIC-1 101 試験"
+    description: "システムアーキテクチャ／Linuxのインストールとパッケージ管理／GNUとUnixコマンド／デバイス・ファイルシステム・FHS"
+    position: 1
+  - code: "102-500"
+    name: "LPIC-1 102 試験"
+    description: "シェルとスクリプト／ユーザーインターフェイスとデスクトップ／管理業務／重要なシステムサービス／ネットワークの基礎／セキュリティ"
+    position: 2

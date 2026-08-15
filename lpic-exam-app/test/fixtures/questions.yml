@@ -1,0 +1,31 @@
+lspci:
+  chapter: hardware
+  code: "t-101.1-01"
+  body: "PCI デバイスを一覧表示するコマンドはどれか。"
+  kind: single
+  difficulty: 1
+  explanation: "lspci を使う。"
+
+procfs:
+  chapter: hardware
+  code: "t-101.1-02"
+  body: "仮想ファイルシステムを2つ選べ。"
+  kind: multiple
+  difficulty: 2
+  explanation: "/proc と /sys。"
+
+journal:
+  chapter: boot
+  code: "t-101.2-01"
+  body: "カーネルメッセージを表示するコマンドはどれか。"
+  kind: single
+  difficulty: 2
+  explanation: "journalctl -k を使う。"
+
+profile:
+  chapter: shell
+  code: "t-105.1-01"
+  body: "ログインシェルで最初に読まれる全体設定はどれか。"
+  kind: single
+  difficulty: 2
+  explanation: "/etc/profile。"

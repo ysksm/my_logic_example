@@ -1,0 +1,69 @@
+<% content_for :title, "演習を始める | LPIC 演習" %>
+
+<div class="page-head">
+  <h1>演習を始める</h1>
+  <p class="subtitle">出題範囲・出題数・並び順を指定してセッションを作ります</p>
+</div>
+
+<%= form_with url: quiz_sessions_path, method: :post, data: { turbo: false } do %>
+  <div class="card">
+    <div class="field">
+      <label>出題モード</label>
+      <div class="row">
+        <% QuizSession::MODES.except("review_session").each do |value, label| %>
+          <label class="check-line">
+            <%= radio_button_tag :mode, value, @mode == value %>
+            <span><%= label %></span>
+          </label>
+        <% end %>
+      </div>
+      <p class="hint">
+        章別演習＝選んだ章から出題 ／ 模擬試験＝試験全体からランダム ／
+        苦手問題の復習＝間違えた問題のみ ／ 未挑戦の問題＝まだ出題されていない問題のみ
+      </p>
+    </div>
+
+    <div class="field">
+      <label for="exam_id">試験</label>
+      <%= select_tag :exam_id,
+            options_from_collection_for_select(@exams, :id, :name, @exam&.id),
+            include_blank: "指定しない（全試験）" %>
+      <span class="hint">模擬試験では必須です。章別演習では、章を選ばなかったときの出題範囲になります。復習モードでは範囲の絞り込みに使われます。</span>
+    </div>
+
+    <fieldset>
+      <legend>章（複数選択可・未選択なら試験全体）</legend>
+      <% @exams.each do |exam| %>
+        <h3><%= exam.name %></h3>
+        <div class="chapter-list">
+          <% exam.chapters.ordered.each do |chapter| %>
+            <label class="check-line">
+              <%= check_box_tag "chapter_ids[]", chapter.id, @selected_chapter_ids.include?(chapter.id), id: "chapter_#{chapter.id}" %>
+              <span><span class="tag"><%= chapter.code %></span> <%= chapter.name %></span>
+            </label>
+          <% end %>
+        </div>
+      <% end %>
+    </fieldset>
+
+    <div class="row">
+      <div class="field">
+        <label for="limit">出題数</label>
+        <%= number_field_tag :limit, 10, min: 1, max: QuizBuilder::MAX_LIMIT, style: "width:110px" %>
+      </div>
+      <div class="field">
+        <label for="order">並び順</label>
+        <%= select_tag :order, options_for_select([ [ "ランダム", "random" ], [ "章・問題番号順", "sequential" ] ]) %>
+      </div>
+      <div class="field">
+        <label for="wrong_scope">復習の対象（復習モードのみ）</label>
+        <%= select_tag :wrong_scope, options_for_select([
+              [ "直近の解答が不正解（#{@wrong_counts[:last]}問）", "last" ],
+              [ "一度でも間違えた（#{@wrong_counts[:ever]}問）", "ever" ]
+            ]) %>
+      </div>
+    </div>
+
+    <%= submit_tag "この条件で開始", class: "btn btn-primary" %>
+  </div>
+<% end %>

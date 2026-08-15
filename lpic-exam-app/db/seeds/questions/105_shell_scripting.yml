@@ -1,0 +1,119 @@
+exam_code: "102-500"
+chapters:
+  - code: "105.1"
+    name: "シェル環境のカスタマイズと使用"
+    description: "~/.bashrc, ~/.bash_profile, /etc/profile, エイリアス, 関数, PATH, /etc/skel"
+    position: 1051
+    questions:
+      - code: "105.1-01"
+        body: "bash のログインシェル起動時に、全ユーザ共通で読み込まれるファイルはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          ログインシェルではまず /etc/profile が読まれ、続いて ~/.bash_profile、~/.bash_login、~/.profile の
+          いずれか最初に見つかったものが読まれる。~/.bashrc は非ログインの対話シェルで読まれる。
+        choices:
+          - body: "/etc/profile"
+            correct: true
+          - body: "~/.bashrc"
+          - body: "/etc/bashrc"
+          - body: "~/.bash_logout"
+      - code: "105.1-02"
+        body: "新規ユーザ作成時に、ホームディレクトリへコピーされる雛形ファイルが置かれているディレクトリはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          /etc/skel の内容が新規ユーザのホームディレクトリにコピーされる。
+          .bashrc や .profile の初期値をここに置いておく。
+        choices:
+          - body: "/etc/skel"
+            correct: true
+          - body: "/etc/default/useradd"
+          - body: "/usr/share/defaults"
+          - body: "/home/template"
+      - code: "105.1-03"
+        body: "設定したエイリアスを解除するコマンドはどれか。"
+        kind: single
+        difficulty: 1
+        explanation: |
+          unalias name で解除、unalias -a ですべて解除する。
+          一時的にエイリアスを無視して元のコマンドを実行するには \\ls のようにバックスラッシュを付ける。
+        choices:
+          - body: "unalias"
+            correct: true
+          - body: "unset"
+          - body: "alias -d"
+          - body: "noalias"
+      - code: "105.1-04"
+        body: "現在のシェルで、指定したファイルの内容を読み込んで実行する（子プロセスを作らない）ものはどれか。2つ選べ。"
+        kind: multiple
+        difficulty: 2
+        explanation: |
+          source file と . file は同じ意味で、現在のシェルの中でファイルを実行する。
+          そのため設定した変数やエイリアスが現在のシェルに残る。bash file は子プロセスで実行される。
+        choices:
+          - body: "source file"
+            correct: true
+          - body: ". file"
+            correct: true
+          - body: "bash file"
+          - body: "exec file"
+
+  - code: "105.2"
+    name: "簡単なスクリプトのカスタマイズや作成"
+    description: "シェバン、条件分岐、ループ、test、位置パラメータ、終了ステータス、seq"
+    position: 1052
+    questions:
+      - code: "105.2-01"
+        body: "直前に実行したコマンドの終了ステータスを参照する変数はどれか。"
+        kind: single
+        difficulty: 1
+        explanation: |
+          $? に直前のコマンドの終了ステータスが入る。0 が成功、0 以外が異常終了を意味する。
+          $$ は現在のシェルの PID、$! は直近のバックグラウンドジョブの PID、$0 はスクリプト名。
+        choices:
+          - body: "$?"
+            correct: true
+          - body: "$!"
+          - body: "$$"
+          - body: "$#"
+      - code: "105.2-02"
+        body: "シェルスクリプトに渡された引数の個数が入る変数はどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          $# は引数の個数。$1、$2 …は各引数、$@ と $* は全引数を表す
+          （"$@" は各引数を個別のクォートで展開する点が異なる）。
+        choices:
+          - body: "$#"
+            correct: true
+          - body: "$@"
+          - body: "$*"
+          - body: "$0"
+      - code: "105.2-03"
+        body: "スクリプト1行目に書く「シェバン」として、bash で実行させるために正しいものはどれか。"
+        kind: single
+        difficulty: 1
+        explanation: |
+          #!/bin/bash のように #! に続けてインタプリタの絶対パスを書く。
+          #!/usr/bin/env bash と書くと PATH 上の bash を使うので可搬性が高い。
+        choices:
+          - body: "#!/bin/bash"
+            correct: true
+          - body: "#/bin/bash"
+          - body: "!#/bin/bash"
+          - body: "# bash"
+      - code: "105.2-04"
+        body: "ファイル /tmp/data が存在するかどうかを判定する test の書式として正しいものはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          [ -f /tmp/data ] は「通常ファイルとして存在するか」を判定する。
+          -e は種類を問わず存在するか、-d はディレクトリか、-r/-w/-x は読み書き実行の可否を判定する。
+          [ と ] の内側には必ず空白が必要。
+        choices:
+          - body: "[ -f /tmp/data ]"
+            correct: true
+          - body: "[ -s /tmp/data"
+          - body: "[-f /tmp/data]"
+          - body: "test =f /tmp/data"

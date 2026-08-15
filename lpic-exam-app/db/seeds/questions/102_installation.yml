@@ -1,0 +1,272 @@
+exam_code: "101-500"
+chapters:
+  - code: "102.1"
+    name: "ハードディスクのレイアウト設計"
+    description: "パーティション設計、/home・/var・/boot の分離、スワップ、LVM、EFI システムパーティション"
+    position: 1021
+    questions:
+      - code: "102.1-01"
+        body: "UEFI ブートのシステムでブートローダを格納するために必要なパーティションと、そのファイルシステムの組み合わせはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          EFI システムパーティション（ESP）は FAT32 でフォーマットし、通常 /boot/efi にマウントする。
+          ext4 や XFS では UEFI ファームウェアが読めない。
+        choices:
+          - body: "EFI システムパーティション（FAT32）"
+            correct: true
+          - body: "/boot パーティション（ext4）"
+          - body: "スワップパーティション（swap）"
+          - body: "ルートパーティション（XFS）"
+      - code: "102.1-02"
+        body: "LVM で、複数の物理ボリューム(PV)をまとめて論理ボリューム(LV)を切り出す中間の構成要素はどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          LVM は PV（物理ボリューム）→ VG（ボリュームグループ）→ LV（論理ボリューム）の3階層で構成される。
+          PE（物理エクステント）は VG を分割した割り当て単位。
+        choices:
+          - body: "ボリュームグループ(VG)"
+            correct: true
+          - body: "物理エクステント(PE)"
+          - body: "パーティションテーブル"
+          - body: "RAID アレイ"
+      - code: "102.1-03"
+        body: "ログの肥大化でルートファイルシステムが埋まるのを防ぐために、独立したパーティションにすると効果的なディレクトリはどれか。"
+        kind: single
+        difficulty: 1
+        explanation: |
+          ログは /var/log 配下に蓄積されるため、/var を分離するとルートファイルシステムの枯渇を防げる。
+          /etc や /bin をルートから分離してはならない（起動時にマウント前から必要になるため）。
+        choices:
+          - body: "/var"
+            correct: true
+          - body: "/etc"
+          - body: "/bin"
+          - body: "/lib"
+
+  - code: "102.2"
+    name: "ブートマネージャのインストール"
+    description: "GRUB Legacy と GRUB 2、grub.cfg、grub-install、grub-mkconfig、UEFI ブート"
+    position: 1022
+    questions:
+      - code: "102.2-01"
+        body: "GRUB 2 において、管理者が設定を編集する対象として正しいものはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          GRUB 2 では /boot/grub/grub.cfg を直接編集せず、/etc/default/grub と /etc/grub.d/ 配下のスクリプトを
+          編集してから grub-mkconfig（Red Hat 系では grub2-mkconfig）で grub.cfg を生成する。
+        choices:
+          - body: "/etc/default/grub と /etc/grub.d/ を編集して grub-mkconfig で生成する"
+            correct: true
+          - body: "/boot/grub/grub.cfg を直接編集する"
+          - body: "/boot/grub/menu.lst を直接編集する"
+          - body: "/etc/lilo.conf を編集して lilo を実行する"
+      - code: "102.2-02"
+        body: "GRUB Legacy で設定ファイルとして使われていたファイルはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          GRUB Legacy は /boot/grub/menu.lst（ディストリビューションによっては grub.conf）を使い、
+          設定はそのまま反映された。GRUB 2 は grub.cfg を自動生成する。
+        choices:
+          - body: "/boot/grub/menu.lst"
+            correct: true
+          - body: "/boot/grub/grub.cfg"
+          - body: "/etc/default/grub"
+          - body: "/etc/grub.d/40_custom"
+      - code: "102.2-03"
+        body: "GRUB Legacy の表記で 1 台目のディスクの 1 番目のパーティションを指すものはどれか。"
+        kind: single
+        difficulty: 3
+        explanation: |
+          GRUB Legacy はディスク・パーティションとも 0 から数えるため (hd0,0) が第1ディスクの第1パーティション。
+          GRUB 2 ではパーティション番号が 1 から始まるため (hd0,1) と書く。
+        choices:
+          - body: "(hd0,0)"
+            correct: true
+          - body: "(hd0,1)"
+          - body: "(hd1,1)"
+          - body: "(sda,1)"
+
+  - code: "102.3"
+    name: "共有ライブラリの管理"
+    description: "ldd、ldconfig、/etc/ld.so.conf、LD_LIBRARY_PATH、動的リンクと静的リンク"
+    position: 1023
+    questions:
+      - code: "102.3-01"
+        body: "実行ファイルが必要とする共有ライブラリを調べるコマンドはどれか。"
+        kind: single
+        difficulty: 1
+        explanation: |
+          ldd /path/to/binary で依存する共有ライブラリとその解決先を表示する。
+          ldconfig はキャッシュ（/etc/ld.so.cache）を再構築するコマンドで、-p でキャッシュ内容を表示する。
+        choices:
+          - body: "ldd"
+            correct: true
+          - body: "ldconfig"
+          - body: "nm"
+          - body: "strings"
+      - code: "102.3-02"
+        body: "共有ライブラリの検索パスを追加した後、キャッシュを更新するために実行するコマンドはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          /etc/ld.so.conf（または /etc/ld.so.conf.d/*.conf）にパスを追記した後、ldconfig を実行して
+          /etc/ld.so.cache を再生成する。
+        choices:
+          - body: "ldconfig"
+            correct: true
+          - body: "ldd -r"
+          - body: "depmod"
+          - body: "updatedb"
+      - code: "102.3-03"
+        body: "一時的に共有ライブラリの検索パスを追加するために使用する環境変数はどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          LD_LIBRARY_PATH に追加するとそのプロセス（と子プロセス）だけ検索パスが増える。
+          LD_PRELOAD は特定のライブラリを優先的にロードさせる別の変数。
+        choices:
+          - body: "LD_LIBRARY_PATH"
+            correct: true
+          - body: "LD_PRELOAD"
+          - body: "LIBRARY_PATH"
+          - body: "PATH"
+
+  - code: "102.4"
+    name: "Debian パッケージ管理の使用"
+    description: "dpkg、apt-get / apt-cache / apt、/etc/apt/sources.list、dpkg-reconfigure"
+    position: 1024
+    questions:
+      - code: "102.4-01"
+        body: "あるファイルがどの Debian パッケージによって提供されているかを、インストール済みパッケージから調べるコマンドはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          dpkg -S <ファイルパス>（--search）で、インストール済みパッケージの中から提供元を検索する。
+          dpkg -L <パッケージ> は逆に、パッケージが提供するファイル一覧を表示する。
+        choices:
+          - body: "dpkg -S /usr/bin/vim"
+            correct: true
+          - body: "dpkg -L /usr/bin/vim"
+          - body: "apt-cache show /usr/bin/vim"
+          - body: "dpkg -l /usr/bin/vim"
+      - code: "102.4-02"
+        body: "設定ファイルを残したままパッケージ本体だけを削除する dpkg のオプションはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          dpkg -r（--remove）は設定ファイルを残して削除する。
+          設定ファイルまで完全に削除するには dpkg -P（--purge）を使う。
+        choices:
+          - body: "dpkg -r"
+            correct: true
+          - body: "dpkg -P"
+          - body: "dpkg -i"
+          - body: "dpkg -V"
+      - code: "102.4-03"
+        body: "APT のパッケージリスト（リポジトリのインデックス）を最新化するコマンドはどれか。"
+        kind: single
+        difficulty: 1
+        explanation: |
+          apt-get update はリポジトリのインデックスを取得するだけで、パッケージ自体は更新しない。
+          実際にインストール済みパッケージを更新するのは apt-get upgrade（または dist-upgrade / full-upgrade）。
+        choices:
+          - body: "apt-get update"
+            correct: true
+          - body: "apt-get upgrade"
+          - body: "apt-cache update"
+          - body: "dpkg --update"
+
+  - code: "102.5"
+    name: "RPM および YUM/DNF パッケージ管理の使用"
+    description: "rpm、rpm2cpio、yum / dnf、zypper、リポジトリ設定"
+    position: 1025
+    questions:
+      - code: "102.5-01"
+        body: "インストール済みの RPM パッケージのうち、指定したファイルを提供しているパッケージを調べるコマンドはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          rpm -qf <ファイル>（query file）で提供元パッケージを表示する。
+          rpm -ql <パッケージ> はパッケージ内のファイル一覧、rpm -qi はパッケージ情報を表示する。
+        choices:
+          - body: "rpm -qf /etc/httpd/conf/httpd.conf"
+            correct: true
+          - body: "rpm -ql /etc/httpd/conf/httpd.conf"
+          - body: "rpm -qi /etc/httpd/conf/httpd.conf"
+          - body: "rpm -V /etc/httpd/conf/httpd.conf"
+      - code: "102.5-02"
+        body: "RPM パッケージからファイルを展開するために rpm2cpio と組み合わせて使うコマンドはどれか。"
+        kind: single
+        difficulty: 3
+        explanation: |
+          rpm2cpio pkg.rpm | cpio -id のように、cpio でアーカイブを展開する。
+          -i は展開、-d は必要なディレクトリを作成するオプション。
+        choices:
+          - body: "cpio"
+            correct: true
+          - body: "tar"
+          - body: "ar"
+          - body: "unzip"
+      - code: "102.5-03"
+        body: "YUM/DNF のリポジトリ定義ファイルを配置するディレクトリはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          /etc/yum.repos.d/ 配下に *.repo ファイルとして定義する（DNF も同じ場所を参照する）。
+          /etc/yum.conf は全体設定ファイル。
+        choices:
+          - body: "/etc/yum.repos.d/"
+            correct: true
+          - body: "/etc/apt/sources.list.d/"
+          - body: "/var/lib/rpm/"
+          - body: "/etc/dnf/repos/"
+
+  - code: "102.6"
+    name: "仮想化ゲストとしての Linux"
+    description: "仮想マシンとコンテナ、cloud-init、D-Bus マシン ID、SSH ホスト鍵の重複"
+    position: 1026
+    questions:
+      - code: "102.6-01"
+        body: "クラウド上の仮想マシン初回起動時に、SSH 公開鍵の配置やホスト名設定などの初期化を行う仕組みはどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          cloud-init はクラウドのメタデータサービスから user-data を取得し、初回起動時にユーザ作成・鍵配置・
+          パッケージインストールなどを行う。
+        choices:
+          - body: "cloud-init"
+            correct: true
+          - body: "systemd-firstboot"
+          - body: "kickstart"
+          - body: "preseed"
+      - code: "102.6-02"
+        body: "仮想マシンのテンプレートを複製して運用するとき、複製元から引き継がれると問題になるため再生成すべきものはどれか。2つ選べ。"
+        kind: multiple
+        difficulty: 3
+        explanation: |
+          SSH ホスト鍵（/etc/ssh/ssh_host_*）と D-Bus マシン ID（/etc/machine-id）は個体ごとに固有であるべきで、
+          複製すると鍵の重複や DHCP のリース衝突などの問題を起こす。
+        choices:
+          - body: "SSH ホスト鍵"
+            correct: true
+          - body: "/etc/machine-id"
+            correct: true
+          - body: "/etc/passwd"
+          - body: "/etc/fstab"
+      - code: "102.6-03"
+        body: "ホスト OS のカーネルを共有し、プロセスを名前空間で分離する仮想化方式はどれか。"
+        kind: single
+        difficulty: 2
+        explanation: |
+          コンテナ（LXC、Docker など）はカーネルを共有し、namespace と cgroup でリソースとビューを分離する。
+          完全仮想化（KVM など）はゲストごとに独自のカーネルを動かす。
+        choices:
+          - body: "コンテナ型仮想化"
+            correct: true
+          - body: "完全仮想化"
+          - body: "準仮想化"
+          - body: "エミュレーション"

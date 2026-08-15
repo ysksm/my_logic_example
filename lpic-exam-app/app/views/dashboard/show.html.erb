@@ -1,0 +1,130 @@
+<% content_for :title, "ダッシュボード | LPIC 演習" %>
+
+<div class="page-head">
+  <h1>ダッシュボード</h1>
+  <p class="subtitle">章を選んで解く・間違えた問題だけ復習する・正解率を確認する</p>
+</div>
+
+<div class="card">
+  <div class="grid grid-3">
+    <div class="stat">
+      <div class="value"><%= accuracy_text(@overall[:accuracy]) %></div>
+      <div class="label">通算正解率</div>
+    </div>
+    <div class="stat">
+      <div class="value"><%= @overall[:answered] %></div>
+      <div class="label">解答数</div>
+    </div>
+    <div class="stat">
+      <div class="value"><%= @overall[:wrong] %></div>
+      <div class="label">不正解数</div>
+    </div>
+  </div>
+</div>
+
+<h2>復習する</h2>
+<div class="grid grid-3">
+  <div class="card">
+    <h3 style="margin-top:0">直近で間違えた問題</h3>
+    <p class="small muted">最後の解答が不正解だった問題（<%= @wrong_counts[:last] %> 問）。正解できるようになるまで繰り返します。</p>
+    <%= button_to "この #{@wrong_counts[:last]} 問を解く", quiz_sessions_path,
+          params: { mode: "review_wrong", wrong_scope: "last", limit: QuizBuilder::MAX_LIMIT, order: "random" },
+          class: "btn btn-primary btn-block", disabled: @wrong_counts[:last].zero? %>
+  </div>
+  <div class="card">
+    <h3 style="margin-top:0">一度でも間違えた問題</h3>
+    <p class="small muted">過去に一度でも落とした問題（<%= @wrong_counts[:ever] %> 問）。総ざらいに使います。</p>
+    <%= button_to "この #{@wrong_counts[:ever]} 問を解く", quiz_sessions_path,
+          params: { mode: "review_wrong", wrong_scope: "ever", limit: QuizBuilder::MAX_LIMIT, order: "random" },
+          class: "btn btn-block", disabled: @wrong_counts[:ever].zero? %>
+  </div>
+  <div class="card">
+    <h3 style="margin-top:0">未挑戦の問題</h3>
+    <p class="small muted">まだ一度も出題されていない問題（<%= @wrong_counts[:unattempted] %> 問）。</p>
+    <%= button_to "未挑戦から 10 問", quiz_sessions_path,
+          params: { mode: "unattempted", limit: 10, order: "random" },
+          class: "btn btn-block", disabled: @wrong_counts[:unattempted].zero? %>
+  </div>
+</div>
+
+<% if @in_progress.any? %>
+  <h2>進行中のセッション</h2>
+  <div class="card">
+    <table>
+      <tbody>
+        <% @in_progress.each do |s| %>
+          <tr>
+            <td><%= link_to s.title, quiz_session_path(s) %><br><span class="small muted"><%= l s.created_at, format: :short %></span></td>
+            <td class="num small muted"><%= s.answered_count %> / <%= s.total_count %> 問</td>
+            <td class="num"><%= link_to "再開", quiz_session_path(s), class: "btn btn-sm btn-primary" %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>
+
+<h2>試験ごとの進捗</h2>
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th>試験</th>
+        <th class="num">問題数</th>
+        <th class="num">着手</th>
+        <th class="num">解答数</th>
+        <th class="num">正解率</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @exam_rows.each do |row| %>
+        <tr>
+          <td><%= link_to row[:exam].name, exam_path(row[:exam]) %> <span class="tag"><%= row[:exam].code %></span></td>
+          <td class="num"><%= row[:question_count] %></td>
+          <td class="num"><%= row[:attempted_questions] %></td>
+          <td class="num"><%= row[:answered] %></td>
+          <td class="num"><%= accuracy_badge(row[:accuracy]) %></td>
+          <td class="num"><%= link_to "演習", new_quiz_session_path(exam_code: row[:exam].code), class: "btn btn-sm" %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
+
+<% if @weak_chapters.any? %>
+  <h2>苦手な章 <span class="small muted">（3回以上解答した章のうち正解率が低い順）</span></h2>
+  <div class="card">
+    <table>
+      <tbody>
+        <% @weak_chapters.each do |row| %>
+          <tr>
+            <td><%= link_to row[:chapter].label, chapter_path(row[:chapter]) %></td>
+            <td style="width:35%"><%= progress_bar(row[:accuracy]) %></td>
+            <td class="num"><%= accuracy_badge(row[:accuracy]) %></td>
+            <td class="num small muted"><%= row[:correct] %>/<%= row[:answered] %></td>
+            <td class="num"><%= link_to "この章を解く", new_quiz_session_path(chapter_code: row[:chapter].code), class: "btn btn-sm" %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>
+
+<% if @recent_sessions.any? %>
+  <h2>最近の結果</h2>
+  <div class="card">
+    <table>
+      <tbody>
+        <% @recent_sessions.each do |s| %>
+          <tr>
+            <td><%= link_to s.title, result_quiz_session_path(s) %><br><span class="small muted"><%= l s.created_at, format: :short %> · <%= s.mode_label %></span></td>
+            <td class="num small muted"><%= s.correct_count %>/<%= s.answered_count %> 問正解</td>
+            <td class="num"><%= accuracy_badge(s.accuracy) %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+    <p class="small" style="margin-bottom:0"><%= link_to "すべての履歴を見る →", quiz_sessions_path %></p>
+  </div>
+<% end %>
