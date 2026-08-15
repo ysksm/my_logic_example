@@ -12,6 +12,92 @@ def _():
 
 
 @app.cell
+def _():
+    import duckdb
+
+    DATABASE_URL = "./data/youtube.duckdb"
+    engine = duckdb.connect(DATABASE_URL, read_only=True)
+    return (engine,)
+
+
+@app.cell
+def _(channels, engine, mo):
+    _df = mo.sql(
+        f"""
+        SELECT * FROM "channels" LIMIT 100
+        """,
+        engine=engine
+    )
+    return
+
+
+@app.cell
+def _(engine, mo, transcripts):
+    _df = mo.sql(
+        f"""
+        SELECT * FROM "transcripts" LIMIT 100
+        """,
+        engine=engine
+    )
+    return
+
+
+@app.cell
+def _(engine, mo, videos):
+    _df = mo.sql(
+        f"""
+        SELECT * FROM "videos" LIMIT 100
+        """,
+        engine=engine
+    )
+    return
+
+
+@app.cell
+def _(channel_history, engine, mo):
+    _df = mo.sql(
+        f"""
+        SELECT * FROM "channel_history" LIMIT 100
+        """,
+        engine=engine
+    )
+    return
+
+
+@app.cell
+def _(engine, mo, sync_history):
+    _df = mo.sql(
+        f"""
+        SELECT * FROM "sync_history" LIMIT 100
+        """,
+        engine=engine
+    )
+    return
+
+
+@app.cell
+def _(engine, mo, thumbnails):
+    _df = mo.sql(
+        f"""
+        SELECT * FROM "thumbnails" LIMIT 100
+        """,
+        engine=engine
+    )
+    return
+
+
+@app.cell
+def _(engine, mo, video_history):
+    _df = mo.sql(
+        f"""
+        SELECT * FROM "video_history" LIMIT 100
+        """,
+        engine=engine
+    )
+    return
+
+
+@app.cell
 def _(mo):
     mo.md(r"""
     # YouTube List
@@ -417,7 +503,7 @@ def _(
         f"- サムネ画像: **{_thumbs_result['fetched']}** 件取得"
         f"（{_thumbs_result['total']} 件対象 / エラー {len(_thumbs_result['errors'])}）"
     )
-    return (extras_result,)
+    return
 
 
 @app.cell
