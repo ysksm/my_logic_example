@@ -7,7 +7,9 @@ class QuizBuilder
   MAX_LIMIT = 200
   ORDERS = %w[random sequential].freeze
 
-  class NoQuestionsError < StandardError; end
+  class Error < StandardError; end
+  class NoQuestionsError < Error; end
+  class MissingExamError < Error; end
 
   attr_reader :mode, :exam, :chapter_ids, :limit, :order, :source_session, :wrong_scope
 
@@ -23,6 +25,10 @@ class QuizBuilder
   end
 
   def build!
+    # 模擬試験は「1つの試験を通しで解く」ためのモードなので、
+    # 試験が未指定のまま全試験を混ぜて出題することはしない。
+    raise MissingExamError, "模擬試験では試験を選択してください" if mode == "exam" && exam.nil?
+
     questions = pick_questions
     raise NoQuestionsError, "条件に合う問題がありません" if questions.empty?
 

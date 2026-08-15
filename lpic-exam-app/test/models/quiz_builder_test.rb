@@ -65,6 +65,21 @@ class QuizBuilderTest < ActiveSupport::TestCase
     end
   end
 
+  test "模擬試験で試験が未指定なら MissingExamError を投げる（全試験が混ざらない）" do
+    error = assert_raises(QuizBuilder::MissingExamError) do
+      QuizBuilder.new(mode: "exam", exam: nil, limit: 100).build!
+    end
+
+    assert_match "試験を選択してください", error.message
+    assert_equal 0, QuizSession.count, "セッションは作られない"
+  end
+
+  test "章別演習は試験も章も未指定なら全体から出題する" do
+    session = QuizBuilder.new(mode: "chapter", limit: 100).build!
+
+    assert_equal Question.active.count, session.total_count
+  end
+
   test "非公開(active=false)の問題は出題されない" do
     questions(:lspci).update!(active: false)
 

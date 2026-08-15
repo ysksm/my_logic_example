@@ -85,6 +85,14 @@ class QuizFlowTest < ActionDispatch::IntegrationTest
     assert_select ".flash-alert"
   end
 
+  test "模擬試験で試験を選ばなかった場合はエラーメッセージを出す" do
+    post quiz_sessions_path, params: { mode: "exam", limit: 30 }
+
+    assert_equal 0, QuizSession.count
+    follow_redirect!
+    assert_select ".flash-alert", /試験を選択してください/
+  end
+
   test "途中で終了してから再開できる" do
     session = QuizBuilder.new(mode: "chapter", chapter_ids: [ chapters(:hardware).id ], limit: 2).build!
 

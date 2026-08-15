@@ -39,7 +39,7 @@ QuizSession（演習セッション: 出題条件・状態・開始/終了時刻
 | モード | 対象となる問題 | 用途 |
 |---|---|---|
 | `chapter` 章別演習 | 選択した章（未選択なら試験全体） | 学習中の章を集中的に |
-| `exam` 模擬試験 | 試験全体からランダム | 本番前の総合演習 |
+| `exam` 模擬試験 | 指定した試験全体からランダム（試験の指定が必須） | 本番前の総合演習 |
 | `review_wrong` 苦手問題の復習 | `last`: 直近の解答が不正解 ／ `ever`: 一度でも間違えた | **R3** の中心機能 |
 | `review_session` セッションの復習 | 指定セッションで間違えた問題 | 結果画面の「間違えた N 問だけもう一度」 |
 | `unattempted` 未挑戦 | まだ一度も出題されていない問題 | 取りこぼし防止 |
@@ -132,7 +132,12 @@ chapters:
 
 - 既存問題の本文・選択肢・解説の修正 → 反映される（**解答履歴は保持**）
 - 新規問題の追加 → 追加される
+- 選択肢を減らした場合 → 余った分だけが削除される
 - 正解の選択肢が1つも無い問題があると、その場でエラーになる（データ不備の検知）
+
+選択肢は `position` をキーに更新するため、文言を直しても `Choice` の id は変わりません。
+`QuizItem#selected_choice_ids` は選択肢の id を保持しているので、これを維持しないと
+過去の解答が「どれを選んだか分からない」状態になります。
 
 問題を出題対象から外したいときは、DB 上で `questions.active` を `false` にします。
 
@@ -159,8 +164,9 @@ app/models/
   quiz_item.rb        1問の解答と採点（grade!）、latest_per_question スコープ
   question.rb         採点ロジックと復習用スコープ（last_answer_wrong / ever_wrong / unattempted）
 app/controllers/      dashboard, exams, chapters, quiz_sessions, quiz_items, questions, stats
+lib/seed_loader.rb    YAML → DB の upsert（id を維持するのが役割）
 db/seeds/             exams.yml と questions/*.yml（問題データ）
-test/                 モデルテスト + 統合テスト
+test/                 モデルテスト + seed テスト + 統合テスト
 ```
 
 ## 5. 今後の拡張案

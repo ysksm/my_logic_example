@@ -33,7 +33,7 @@ class QuizSessionsController < ApplicationController
 
     session = builder.build!
     redirect_to quiz_session_path(session)
-  rescue QuizBuilder::NoQuestionsError => e
+  rescue QuizBuilder::Error => e
     redirect_back fallback_location: new_quiz_session_path, alert: e.message
   end
 

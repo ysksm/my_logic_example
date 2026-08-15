@@ -28,7 +28,7 @@
       <%= select_tag :exam_id,
             options_from_collection_for_select(@exams, :id, :name, @exam&.id),
             include_blank: "指定しない（全試験）" %>
-      <span class="hint">章別演習・模擬試験では必須です。復習モードでは範囲の絞り込みに使われます。</span>
+      <span class="hint">模擬試験では必須です。章別演習では、章を選ばなかったときの出題範囲になります。復習モードでは範囲の絞り込みに使われます。</span>
     </div>
 
     <fieldset>
