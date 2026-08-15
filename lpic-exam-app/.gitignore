@@ -4,6 +4,11 @@
 # belong in git's global ignore instead:
 #   `$XDG_CONFIG_HOME/git/ignore` or `~/.config/git/ignore`
 
+# モノレポ直下の .gitignore が bin/ と lib/ を（他言語向けの成果物として）除外しているため、
+# Rails アプリの実行スクリプトとライブラリを明示的に再包含する。
+!bin/
+!lib/
+
 # Ignore bundler config.
 /.bundle
 
