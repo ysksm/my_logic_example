@@ -44,7 +44,7 @@ const server = net.createServer((socket) => {
     const lines = headText.split("\r\n");
     const [method, target, version] = lines[0].split(" ");
 
-    const headers = {};
+    const headers = Object.create(null);
     for (const line of lines.slice(1)) {
       const colon = line.indexOf(":");
       if (colon === -1) continue;
