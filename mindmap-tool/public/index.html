@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>マインドマップ生成ツール</title>
+<style>
+  :root {
+    --border: #e2e8f0;
+    --accent: #2563eb;
+    --bg: #f8fafc;
+    --text: #1e293b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; height: 100vh; display: flex; flex-direction: column;
+    font-family: 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic', sans-serif;
+    background: var(--bg); color: var(--text); font-size: 14px;
+  }
+  header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 16px; background: #fff; border-bottom: 1px solid var(--border);
+  }
+  header h1 { font-size: 16px; margin: 0; flex: 1; }
+  main { flex: 1; display: flex; min-height: 0; }
+  .pane { display: flex; flex-direction: column; min-width: 0; }
+  #left { width: 380px; border-right: 1px solid var(--border); background: #fff; }
+  #right { flex: 1; overflow: auto; padding: 16px; }
+  .section { padding: 12px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
+  .section h2 { font-size: 13px; margin: 0; color: #64748b; }
+  textarea {
+    width: 100%; resize: vertical; border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px; font-size: 13px; font-family: inherit;
+  }
+  #speechText { min-height: 110px; }
+  #yamlText { min-height: 220px; font-family: ui-monospace, Menlo, Consolas, monospace; flex: 1; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  button {
+    border: 1px solid var(--border); background: #fff; border-radius: 8px;
+    padding: 7px 12px; font-size: 13px; cursor: pointer; font-family: inherit;
+  }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  #micBtn.recording { background: #dc2626; border-color: #dc2626; color: #fff; }
+  input[type="text"] {
+    border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px;
+    font-size: 13px; font-family: inherit; width: 140px;
+  }
+  select { border: 1px solid var(--border); border-radius: 8px; padding: 7px; font-size: 13px; }
+  #status { font-size: 12px; color: #64748b; min-height: 1.2em; }
+  #status.error { color: #dc2626; }
+  #preview svg { max-width: none; }
+  .yaml-section { flex: 1; min-height: 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🧠 マインドマップ生成ツール</h1>
+  <span id="engineBadge"></span>
+</header>
+<main>
+  <div class="pane" id="left">
+    <div class="section">
+      <h2>1. 話す / 書く</h2>
+      <textarea id="speechText" placeholder="考えていることを話すか、ここに書いてください。&#10;例: 新しいサービスを考えている。ターゲットは個人開発者で…"></textarea>
+      <div class="row">
+        <button id="micBtn" title="音声入力(対応ブラウザのみ)">🎤 音声入力</button>
+        <button id="generateBtn" class="primary">AIでマップ生成</button>
+        <label><input type="checkbox" id="appendMode" checked> 既存マップに追記</label>
+      </div>
+    </div>
+    <div class="section yaml-section">
+      <h2>2. YAML(手動編集も可)</h2>
+      <textarea id="yamlText" spellcheck="false"></textarea>
+      <div class="row">
+        <button id="previewBtn">再描画</button>
+        <button id="exportBtn">HTML書き出し</button>
+      </div>
+    </div>
+    <div class="section">
+      <h2>3. 保存 / 読み込み</h2>
+      <div class="row">
+        <input type="text" id="mapName" placeholder="マップ名">
+        <button id="saveBtn">保存</button>
+        <select id="mapList"><option value="">-- 保存済み --</option></select>
+        <button id="loadBtn">読込</button>
+      </div>
+    </div>
+    <div class="section"><div id="status"></div></div>
+  </div>
+  <div class="pane" id="right"><div id="preview"></div></div>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const status = (msg, isError = false) => {
+  $("status").textContent = msg;
+  $("status").className = isError ? "error" : "";
+};
+
+async function api(path, options) {
+  const res = await fetch(path, {
+    headers: { "Content-Type": "application/json" },
+    ...options,
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `HTTP ${res.status}`);
+  }
+  return res;
+}
+
+async function generate() {
+  const text = $("speechText").value.trim();
+  if (!text) { status("発話テキストを入力してください", true); return; }
+  $("generateBtn").disabled = true;
+  status("AIがマインドマップを生成中…");
+  try {
+    const currentYaml = $("appendMode").checked ? $("yamlText").value.trim() : "";
+    const res = await api("/api/generate", {
+      method: "POST",
+      body: JSON.stringify({ text, currentYaml: currentYaml || undefined }),
+    });
+    const data = await res.json();
+    $("yamlText").value = data.yaml;
+    $("preview").innerHTML = data.svg;
+    $("engineBadge").textContent =
+      data.engine === "claude" ? "engine: Claude" : "engine: フォールバック(APIキー未設定)";
+    status("生成しました。YAMLは手で調整して「再描画」できます。");
+  } catch (err) {
+    status("生成に失敗: " + err.message, true);
+  } finally {
+    $("generateBtn").disabled = false;
+  }
+}
+
+async function preview() {
+  const yaml = $("yamlText").value.trim();
+  if (!yaml) { status("YAMLが空です", true); return; }
+  try {
+    const res = await api("/api/preview", { method: "POST", body: JSON.stringify({ yaml }) });
+    const data = await res.json();
+    $("preview").innerHTML = data.svg;
+    status("再描画しました: " + data.title);
+  } catch (err) {
+    status("YAMLエラー: " + err.message, true);
+  }
+}
+
+async function exportHtml() {
+  const yaml = $("yamlText").value.trim();
+  if (!yaml) { status("YAMLが空です", true); return; }
+  try {
+    const res = await api("/api/export", { method: "POST", body: JSON.stringify({ yaml }) });
+    const blob = await res.blob();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "mindmap.html";
+    a.click();
+    URL.revokeObjectURL(a.href);
+    status("HTMLを書き出しました");
+  } catch (err) {
+    status("書き出し失敗: " + err.message, true);
+  }
+}
+
+async function refreshMapList() {
+  try {
+    const res = await api("/api/maps");
+    const data = await res.json();
+    const select = $("mapList");
+    select.innerHTML = '<option value="">-- 保存済み --</option>';
+    for (const name of data.maps) {
+      const option = document.createElement("option");
+      option.value = option.textContent = name;
+      select.appendChild(option);
+    }
+  } catch { /* 一覧取得失敗は無視 */ }
+}
+
+async function saveMap() {
+  const name = $("mapName").value.trim();
+  const yaml = $("yamlText").value.trim();
+  if (!name) { status("マップ名を入力してください", true); return; }
+  if (!yaml) { status("YAMLが空です", true); return; }
+  try {
+    await api("/api/maps/" + encodeURIComponent(name), {
+      method: "PUT",
+      body: JSON.stringify({ yaml }),
+    });
+    status("保存しました: " + name);
+    refreshMapList();
+  } catch (err) {
+    status("保存失敗: " + err.message, true);
+  }
+}
+
+async function loadMap() {
+  const name = $("mapList").value;
+  if (!name) { status("読み込むマップを選択してください", true); return; }
+  try {
+    const res = await api("/api/maps/" + encodeURIComponent(name));
+    const data = await res.json();
+    $("yamlText").value = data.yaml;
+    $("mapName").value = name;
+    await preview();
+  } catch (err) {
+    status("読み込み失敗: " + err.message, true);
+  }
+}
+
+// --- 音声入力 (Web Speech API) ---
+let recognition = null;
+let recording = false;
+function setupSpeech() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    $("micBtn").disabled = true;
+    $("micBtn").title = "このブラウザは音声入力に未対応です(Chrome推奨)";
+    return;
+  }
+  recognition = new SR();
+  recognition.lang = "ja-JP";
+  recognition.continuous = true;
+  recognition.interimResults = false;
+  recognition.onresult = (event) => {
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      if (event.results[i].isFinal) {
+        $("speechText").value += event.results[i][0].transcript + "。\n";
+      }
+    }
+  };
+  recognition.onerror = (event) => status("音声認識エラー: " + event.error, true);
+  recognition.onend = () => { if (recording) recognition.start(); };
+}
+function toggleMic() {
+  if (!recognition) return;
+  recording = !recording;
+  $("micBtn").classList.toggle("recording", recording);
+  $("micBtn").textContent = recording ? "⏹ 停止" : "🎤 音声入力";
+  if (recording) { recognition.start(); status("録音中…話してください"); }
+  else { recognition.stop(); status("録音を停止しました"); }
+}
+
+$("generateBtn").addEventListener("click", generate);
+$("previewBtn").addEventListener("click", preview);
+$("exportBtn").addEventListener("click", exportHtml);
+$("saveBtn").addEventListener("click", saveMap);
+$("loadBtn").addEventListener("click", loadMap);
+$("micBtn").addEventListener("click", toggleMic);
+setupSpeech();
+refreshMapList();
+</script>
+</body>
+</html>

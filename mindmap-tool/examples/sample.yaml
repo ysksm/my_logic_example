@@ -1,0 +1,29 @@
+title: 新サービスのアイデア整理
+root:
+  text: 新サービスのアイデア
+  children:
+    - text: ターゲット
+      children:
+        - text: 個人開発者
+        - text: 小規模チーム
+          note: 5人以下を想定
+    - text: 主な機能
+      children:
+        - text: 音声入力
+          children:
+            - text: Web Speech API
+        - text: AI構造化
+          note: 発話をYAMLのツリーに変換
+        - text: マインドマップ表示
+          children:
+            - text: SVG描画
+            - text: HTMLエクスポート
+    - text: 技術スタック
+      children:
+        - text: Bun + TypeScript
+        - text: Claude API
+        - text: YAML
+    - text: 今後の課題
+      children:
+        - text: ノード編集UI
+        - text: リアルタイム文字起こし
