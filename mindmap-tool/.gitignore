@@ -1,0 +1,4 @@
+node_modules/
+data/*.yaml
+*.html
+!public/index.html
