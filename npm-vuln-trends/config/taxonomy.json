@@ -1,0 +1,16 @@
+{
+  "taxonomy_version": "2026-09-14.1",
+  "note": "CWE から表示用の内容別カテゴリへの対応。表示用の独自分類であり、重大度は別軸で保持する。",
+  "categories": [
+    { "id": "exec",       "label": "コマンド・コード実行", "cwes": ["CWE-78", "CWE-94", "CWE-77", "CWE-88", "CWE-502"], "priority": 10 },
+    { "id": "xss",        "label": "XSS",                  "cwes": ["CWE-79", "CWE-80", "CWE-83"],                     "priority": 20 },
+    { "id": "traversal",  "label": "パストラバーサル",     "cwes": ["CWE-22", "CWE-23", "CWE-36", "CWE-59"],           "priority": 30 },
+    { "id": "proto",      "label": "Prototype Pollution",  "cwes": ["CWE-1321", "CWE-915"],                            "priority": 40 },
+    { "id": "resource",   "label": "ReDoS・リソース枯渇",  "cwes": ["CWE-1333", "CWE-400", "CWE-770", "CWE-405", "CWE-674", "CWE-834", "CWE-409"],      "priority": 50 },
+    { "id": "ssrf",       "label": "SSRF",                 "cwes": ["CWE-918"],                                        "priority": 60 },
+    { "id": "authz",      "label": "認証・認可",           "cwes": ["CWE-287", "CWE-862", "CWE-863", "CWE-285", "CWE-306"], "priority": 70 },
+    { "id": "other",      "label": "その他",               "cwes": [],                                                 "priority": 900 },
+    { "id": "unclassified", "label": "未分類",             "cwes": [],                                                 "priority": 999 }
+  ],
+  "known_other_cwes": ["CWE-200", "CWE-201", "CWE-327", "CWE-338", "CWE-601", "CWE-352", "CWE-611", "CWE-390", "CWE-20", "CWE-93", "CWE-116", "CWE-183", "CWE-626", "CWE-755"]
+}

@@ -1,0 +1,42 @@
+{
+  "registry_version": "2026-09-13.1",
+  "note": "監視対象ライブラリの台帳。package 名・公式 repository・bugs URL・対象期間を記録する。",
+  "defaults": {
+    "bug_labels": ["bug", "type: bug", "kind/bug", "Type: Bug"],
+    "confirmed_labels": ["confirmed", "accepting prs", "has-pr", "triaged"],
+    "duplicate_labels": ["duplicate"],
+    "invalid_labels": ["invalid", "wontfix", "question", "support", "works-as-intended"]
+  },
+  "packages": [
+    {
+      "name": "lodash",
+      "repository": "lodash/lodash",
+      "bugs_url": "https://github.com/lodash/lodash/issues",
+      "since": "2026-01-01",
+      "until": null
+    },
+    {
+      "name": "axios",
+      "repository": "axios/axios",
+      "bugs_url": "https://github.com/axios/axios/issues",
+      "since": "2026-01-01",
+      "until": null
+    },
+    {
+      "name": "express",
+      "repository": "expressjs/express",
+      "bugs_url": "https://github.com/expressjs/express/issues",
+      "since": "2026-01-01",
+      "until": null,
+      "monorepo_paths": ["packages/express"]
+    },
+    {
+      "name": "webpack",
+      "repository": "webpack/webpack",
+      "bugs_url": "https://github.com/webpack/webpack/issues",
+      "since": "2026-01-01",
+      "until": null,
+      "bug_labels": ["bug"]
+    }
+  ]
+}
