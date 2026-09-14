@@ -18,6 +18,7 @@
 | [jd-go](./jd-go) | Jira 連携 | Go + DuckDB + HTMX/Alpine | 🟡 動作する試作 | — |
 | [lpic-exam-app](./lpic-exam-app) | 学習 / 試験対策 | Ruby on Rails 8 + SQLite + Hotwire | 🟡 動作する試作 | — |
 | [screen-flow-designer](./screen-flow-designer) | 画面遷移図 | React + TypeScript + React Flow + Playwright | 🟡 動作する試作 | — |
+| [npm-vuln-trends](./npm-vuln-trends) | セキュリティ / 集計 | Bun + TypeScript + SQLite + 静的 HTML/SVG | 🟡 動作する試作 | — |
 | [screen-transition-map](./screen-transition-map) | 画面遷移図 / ドキュメント | React + TypeScript + React Flow + Playwright | 🟡 動作する試作 | — |
 | [stock-price-viewer](./stock-price-viewer) | データ ETL | Python + marimo + yfinance | 🟡 動作する試作 | — |
 | [babylon-js-learning](./babylon-js-learning) | 3D 学習 | Babylon.js (CDN) + HTML/JS | 🔵 学習用 | ✅ |
@@ -73,6 +74,9 @@ LPIC-1 (101/102) の受験対策アプリ。章（LPIC の主題番号）を指�
 
 #### [screen-flow-designer](./screen-flow-designer) — React Flow 画面遷移図デザイナー
 画面をノード、遷移(クリック / フォーム送信など)をエッジとして GUI で編集できる画面遷移図ツール。dagre 自動レイアウト、localStorage 自動保存、JSON エクスポート / インポート(置換・マージ)対応。同梱の Playwright クローラーが実サイトを巡回して同フォーマットの JSON を生成し、マージインポートで手動配置を保持したまま図へ反映できる。
+
+#### [npm-vuln-trends](./npm-vuln-trends) — npm の不具合・脆弱性の時系列集計
+GitHub Advisory Database / OSV / GitHub Issues / npm audit から公式情報を収集し、内容別 (CWE→カテゴリ) の変化を月次で可視化するツール。原本保存 → 正規化・履歴 → 月次集計 → 静的 HTML/SVG/CSV のパイプライン構成で、SQLite 1 ファイルと静的出力だけで完結する。alias による重複統合・公開月と観測時点の区別 (`--as-of`)・撤回の除外・欠測と 0 件の区別といった「数え方の不変条件」をテストで固定している。実データなしでも `bun run demo` で全体を確認できる。
 
 #### [screen-transition-map](./screen-transition-map) — 画面遷移マップ (データ駆動ビューア)
 React SPA の画面遷移をマインドマップ風のツリー図で可視化し、画面キャプチャ・画面一覧・文言一覧・呼び出し元/先の関係・画面間の操作方法 (data-op) をまとめて閲覧できるビューア。screen-map JSON を読み込むだけのデータ駆動構成で、生成手段は差し替え可能 (手書き / 同梱の実験的 Playwright コレクター)。data-op / data-wording 属性規約、検証用サンプル SPA 同梱。

@@ -1,0 +1,19 @@
+{
+  "name": "npm-vuln-trends",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "collect": "bun run src/index.ts collect",
+    "aggregate": "bun run src/index.ts aggregate",
+    "report": "bun run src/index.ts report",
+    "demo": "bun run src/index.ts demo",
+    "serve": "bun run src/index.ts serve",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.2",
+    "typescript": "^5.9.2"
+  }
+}
