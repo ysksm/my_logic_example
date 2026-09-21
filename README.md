@@ -122,7 +122,7 @@ YouTube Data API でチャンネル／動画情報を取得して DuckDB に保�
 ### 📄 資料
 
 #### [docs/](./docs) — 横断ドキュメント
-個別プロジェクトに紐づかないドキュメント置き場。AI 統合戦略についての解説 Markdown、インフォグラフィック (SVG)、スライド (HTML / Markdown) を収録。
+個別プロジェクトに紐づかないドキュメント置き場。AI 統合戦略についての解説 Markdown、インフォグラフィック (SVG)、スライド (HTML / Markdown)、タッチ端末の ghost click 解説スライド ([ghost-click.slides.html](./docs/ghost-click.slides.html)) を収録。
 
 ## 技術スタック別インデックス
 

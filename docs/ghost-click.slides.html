@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ghost Click 解説 — タッチ端末で canvas → dialog のボタンが勝手に押される現象と 7 つの対策</title>
+<style>
+  :root {
+    --bg: #f7f6f2;
+    --panel: #fffffe;
+    --panel-edge: #e3e1da;
+    --panel-alt: #f1efe9;
+    --ink: #151b2b;
+    --ink-soft: #4a5568;
+    --ink-faint: #8a93a3;
+    --teal: #1f8a7e;
+    --teal-ink: #155f57;
+    --teal-soft: #ddefec;
+    --red: #d64545;
+    --red-ink: #a83232;
+    --red-soft: #fbecec;
+    --blue: #4f86c6;
+    --blue-ink: #3a6ba8;
+    --blue-soft: #eaf0f8;
+    --amber: #d98c3e;
+    --amber-ink: #b36e25;
+    --amber-soft: #fff4e5;
+    --code-bg: #0e121d;
+    --code-ink: #e6eaf2;
+    --code-dim: #9aa3b5;
+    --code-good: #9cd98c;
+    --code-bad: #ff8a80;
+    --dark-bg: #151b2b;
+    --dark-ink: #f7f6f2;
+    --dark-soft: #c5ccd9;
+    --shadow: 0 1px 2px rgba(21,27,43,.08), 0 4px 12px rgba(21,27,43,.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0e121d;
+      --panel: #1a2030;
+      --panel-edge: #2c3446;
+      --panel-alt: #151b2b;
+      --ink: #f0f2f6;
+      --ink-soft: #bfc8d6;
+      --ink-faint: #8a93a3;
+      --teal-ink: #5bc0b2;
+      --teal-soft: #163a36;
+      --red-ink: #ff8a80;
+      --red-soft: #3a1f22;
+      --blue-ink: #8fb4e8;
+      --blue-soft: #1c2740;
+      --amber-ink: #e8b06c;
+      --amber-soft: #3a2c18;
+      --shadow: 0 1px 2px rgba(0,0,0,.5), 0 4px 12px rgba(0,0,0,.4);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e121d; --panel: #1a2030; --panel-edge: #2c3446; --panel-alt: #151b2b;
+    --ink: #f0f2f6; --ink-soft: #bfc8d6; --ink-faint: #8a93a3;
+    --teal-ink: #5bc0b2; --teal-soft: #163a36; --red-ink: #ff8a80; --red-soft: #3a1f22;
+    --blue-ink: #8fb4e8; --blue-soft: #1c2740; --amber-ink: #e8b06c; --amber-soft: #3a2c18;
+    --shadow: 0 1px 2px rgba(0,0,0,.5), 0 4px 12px rgba(0,0,0,.4);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", Meiryo, system-ui, sans-serif;
+    line-height: 1.6;
+    overflow: hidden;
+  }
+  code, .mono, pre {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, "Roboto Mono", monospace;
+  }
+
+  .deck { height: 100dvh; display: flex; flex-direction: column; }
+  .progress { height: 4px; background: var(--panel-edge); }
+  .progress #bar { height: 100%; background: var(--teal); width: 0; transition: width .25s ease; }
+
+  .stage { flex: 1; position: relative; overflow: hidden; }
+  .slide {
+    position: absolute; inset: 0;
+    display: none;
+    padding: clamp(16px, 3vh, 40px) clamp(16px, 5vw, 80px);
+    overflow-y: auto;
+  }
+  .slide.active { display: flex; flex-direction: column; animation: rise .3s ease; }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .slide.active { animation: none; } }
+
+  .slide.dark { background: var(--dark-bg); color: var(--dark-ink); }
+  .slide.dark .lead, .slide.dark p { color: var(--dark-soft); }
+  .slide.dark h1, .slide.dark h2, .slide.dark h3 { color: var(--dark-ink); }
+  .slide.dark .eyebrow { color: #e06c6c; }
+
+  .slide-body { flex: 1; display: flex; flex-direction: column; justify-content: center; max-width: 1180px; width: 100%; margin: 0 auto; gap: clamp(10px, 2vh, 22px); }
+
+  .eyebrow {
+    color: var(--red);
+    font-size: .78rem; font-weight: 700; letter-spacing: .16em; text-transform: uppercase;
+    margin: 0;
+  }
+  .eyebrow.fix { color: var(--teal); }
+  .eyebrow.b { color: var(--blue-ink); }
+  .eyebrow.c { color: var(--amber-ink); }
+  h1 { font-size: clamp(1.9rem, 5vw, 3.6rem); line-height: 1.15; margin: 0; text-wrap: balance; font-weight: 700; }
+  h2 { font-size: clamp(1.35rem, 3vw, 2.2rem); line-height: 1.2; margin: 0; text-wrap: balance; font-weight: 700; }
+  h3 { font-size: clamp(1rem, 1.6vw, 1.25rem); margin: 0; line-height: 1.3; font-weight: 700; }
+  p { margin: 0; }
+  p.lead { font-size: clamp(1rem, 1.8vw, 1.2rem); color: var(--ink-soft); max-width: 46em; }
+  p.note { font-size: clamp(.9rem, 1.4vw, 1.05rem); color: var(--ink-soft); }
+  b { font-weight: 700; }
+
+  .grid { display: grid; gap: clamp(10px, 1.6vw, 20px); }
+  .grid.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .grid.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .grid.side { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
+  @media (max-width: 800px) { .grid.cols-2, .grid.cols-3, .grid.side { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    border-radius: 12px;
+    padding: clamp(12px, 1.8vw, 24px);
+    display: flex; flex-direction: column; gap: .5rem;
+    box-shadow: var(--shadow);
+  }
+  .card p { color: var(--ink-soft); font-size: clamp(.9rem, 1.4vw, 1.05rem); }
+  .card .role { font-size: .75rem; font-weight: 700; letter-spacing: .12em; color: var(--teal-ink); }
+  .card.danger { background: var(--red-soft); border: 2px solid var(--red); }
+  .card.danger .role { color: var(--red-ink); }
+  .card.teal { background: var(--teal-soft); border-color: transparent; }
+  .card.teal .role { color: var(--teal-ink); }
+  .card.amber { background: var(--amber-soft); border-color: transparent; }
+  .card.amber .role { color: var(--amber-ink); }
+  .card.blue { background: var(--blue-soft); border-color: transparent; }
+  .card.blue .role { color: var(--blue-ink); }
+  .card.top-teal { border-top: 5px solid var(--teal); }
+  .card.top-blue { border-top: 5px solid var(--blue); }
+  .card.top-amber { border-top: 5px solid var(--amber); }
+  .card .big { font-size: clamp(1.4rem, 2.6vw, 2rem); font-weight: 700; color: var(--ink); }
+
+  .callout {
+    background: var(--dark-bg); color: var(--dark-ink);
+    padding: clamp(12px, 1.6vw, 20px) clamp(14px, 2vw, 28px);
+    border-radius: 10px; font-size: clamp(1rem, 1.7vw, 1.2rem);
+  }
+  .callout.soft { background: var(--teal-soft); color: var(--teal-ink); }
+  .callout.warn { background: var(--amber-soft); color: var(--ink); border: 1px solid #e8c99a; }
+  .callout.bad { background: var(--red-soft); color: var(--ink); }
+  .callout .role { display: block; font-size: .75rem; font-weight: 700; letter-spacing: .12em; margin-bottom: .3rem; }
+  .callout.warn .role { color: var(--amber-ink); }
+  .callout.bad .role { color: var(--red-ink); }
+  .callout.soft .role { color: var(--teal-ink); }
+
+  pre {
+    margin: 0;
+    background: var(--code-bg); color: var(--code-ink);
+    padding: clamp(12px, 1.6vw, 22px) clamp(14px, 2vw, 26px);
+    border-radius: 10px;
+    font-size: clamp(.78rem, 1.25vw, .98rem);
+    line-height: 1.55;
+    overflow-x: auto;
+  }
+  pre .dim { color: var(--code-dim); }
+  pre .good { color: var(--code-good); }
+  pre .bad { color: var(--code-bad); font-weight: 700; }
+  pre .ok { color: var(--code-good); }
+  code.inline { background: var(--panel-alt); border: 1px solid var(--panel-edge); padding: 0 .35em; border-radius: 4px; font-size: .92em; }
+  .slide.dark code.inline { background: #263042; border-color: #3a4560; }
+
+  /* event flow */
+  .flow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .flow .ev {
+    flex: 1 1 0; min-width: 0;
+    text-align: center; padding: .55rem .2rem; border-radius: 8px;
+    font-family: ui-monospace, Menlo, Consolas, monospace; font-size: clamp(.7rem, 1.2vw, .95rem);
+    background: var(--teal-soft); color: var(--teal-ink); font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+  .flow .ev.compat { background: var(--red-soft); color: var(--red-ink); }
+  .flow .arrow { color: var(--ink-faint); font-size: .9rem; }
+  .flow-legend { display: grid; grid-template-columns: 4fr 3fr; gap: clamp(10px, 2vw, 28px); }
+  .flow-legend > div { border-top: 4px solid var(--teal); padding-top: .6rem; }
+  .flow-legend > div.compat { border-top-color: var(--red); }
+  .flow-legend h3.t { color: var(--teal-ink); }
+  .flow-legend h3.r { color: var(--red-ink); }
+  @media (max-width: 800px) { .flow-legend { grid-template-columns: 1fr; } }
+
+  .steps { display: flex; flex-direction: column; gap: .6rem; }
+  .steps .step { display: flex; gap: 1rem; align-items: center; background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 10px; padding: .8rem 1.2rem; }
+  .steps .step .n { font-size: 1.4rem; font-weight: 700; color: var(--teal-ink); font-family: ui-monospace, Menlo, monospace; min-width: 2ch; }
+  .steps .step p { color: var(--ink); font-size: clamp(.95rem, 1.5vw, 1.15rem); }
+
+  .annot { display: flex; flex-direction: column; gap: .9rem; }
+  .annot > div { border-left: 4px solid var(--red); padding-left: .9rem; }
+  .annot > div.t { border-left-color: var(--teal); }
+  .annot .when { font-size: .8rem; font-weight: 700; color: var(--code-bad); font-family: ui-monospace, Menlo, monospace; }
+  .annot > div.t .when { color: #5bc0b2; }
+  .slide.dark .annot p { color: var(--dark-soft); }
+
+  table { border-collapse: collapse; width: 100%; font-size: clamp(.8rem, 1.3vw, 1rem); background: var(--panel); border: 1px solid var(--panel-edge); }
+  th, td { padding: .5rem .7rem; text-align: left; border-bottom: 1px solid var(--panel-edge); vertical-align: top; }
+  th { background: var(--dark-bg); color: var(--dark-ink); font-weight: 700; }
+  tr:nth-child(even) td { background: var(--panel-alt); }
+  td.ok { color: var(--teal-ink); font-weight: 600; }
+  td.blk { color: var(--amber-ink); font-weight: 600; }
+
+  .takeaways { display: flex; flex-direction: column; gap: .9rem; }
+  .takeaways > div { display: flex; gap: 1rem; align-items: baseline; }
+  .takeaways .n { font-size: 1.8rem; font-weight: 700; color: #5bc0b2; min-width: 2ch; }
+  .takeaways p { font-size: clamp(1.05rem, 2vw, 1.4rem); color: var(--dark-ink) !important; }
+
+  .stat { background: var(--dark-bg); color: var(--dark-ink); border-radius: 12px; padding: clamp(16px, 3vw, 36px); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .2rem; text-align: center; }
+  .stat .num { font-size: clamp(3rem, 8vw, 6.5rem); font-weight: 700; color: #5bc0b2; line-height: 1; }
+  .stat p { color: var(--dark-soft) !important; }
+
+  .hud {
+    display: flex; align-items: center; gap: 12px;
+    padding: 8px clamp(12px, 3vw, 24px);
+    border-top: 1px solid var(--panel-edge);
+    background: var(--panel);
+    font-size: .82rem; color: var(--ink-soft);
+  }
+  .hud .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hud .kbd-hint { display: none; }
+  @media (min-width: 720px) { .hud .kbd-hint { display: inline; } }
+  kbd { font-family: inherit; border: 1px solid var(--panel-edge); border-bottom-width: 2px; border-radius: 4px; padding: 0 .35em; font-size: .78em; background: var(--panel-alt); }
+  .hud button {
+    font: inherit; padding: 6px 12px; border-radius: 6px;
+    border: 1px solid var(--panel-edge); background: var(--panel-alt); color: var(--ink);
+    cursor: pointer; touch-action: manipulation;
+  }
+  .hud button:hover { border-color: var(--teal); }
+  .hud .count { font-family: ui-monospace, Menlo, monospace; }
+</style>
+</head>
+<body>
+<div class="deck">
+  <div class="progress"><div id="bar"></div></div>
+  <div class="stage">
+
+    <!-- 1. 表紙 -->
+    <section class="slide dark">
+      <div class="slide-body">
+        <p class="eyebrow">React / タッチ UI</p>
+        <h1>Ghost Click を<br>理解して潰す</h1>
+        <p class="lead" style="max-width:40em;">canvas をタップしたら、開いたばかりのダイアログの「削除」が勝手に押された。<br>その仕組みと、7 つの対策。</p>
+        <p class="note" style="color:var(--ink-faint);">react-ghost-click-poc · React 18 + TypeScript + Playwright</p>
+      </div>
+    </section>
+
+    <!-- 2. 現象 -->
+    <section class="slide">
+      <div class="slide-body">
+        <p class="eyebrow">現象</p>
+        <h2>タップ 1 回で「削除」が実行される</h2>
+        <div class="grid cols-3">
+          <div class="card">
+            <span class="role">STEP 1</span>
+            <h3>canvas 上のパーツをタップ</h3>
+            <p>pointerup でヒットテストし、パーツを選択する。ドラッグ系 UI でよくある実装。</p>
+          </div>
+          <div class="card">
+            <span class="role">STEP 2</span>
+            <h3>指の真下にダイアログが開く</h3>
+            <p>同期的に showModal()。先頭の「削除」ボタンがちょうどタップ位置に重なる。</p>
+          </div>
+          <div class="card danger">
+            <span class="role">STEP 3</span>
+            <h3>触っていない「削除」が実行される</h3>
+            <p>ダイアログは一瞬で閉じ、パーツが消える。ユーザーは 1 回しかタップしていない。</p>
+          </div>
+        </div>
+        <p class="note">マウスでは起きない。タッチ端末（スマホ、タブレット、タッチパネル PC）だけで起きる。</p>
+      </div>
+    </section>
+
+    <!-- 3. イベント列 -->
+    <section class="slide">
+      <div class="slide-body">
+        <p class="eyebrow">仕組み</p>
+        <h2>タップ 1 回で 7 つのイベントが飛ぶ</h2>
+        <div class="flow">
+          <span class="ev">pointerdown</span><span class="arrow">▶</span>
+          <span class="ev">touchstart</span><span class="arrow">▶</span>
+          <span class="ev">pointerup</span><span class="arrow">▶</span>
+          <span class="ev">touchend</span><span class="arrow">▶</span>
+          <span class="ev compat">mousedown</span><span class="arrow">▶</span>
+          <span class="ev compat">mouseup</span><span class="arrow">▶</span>
+          <span class="ev compat">click</span>
+        </div>
+        <div class="flow-legend">
+          <div>
+            <h3 class="t">ポインタ / タッチイベント</h3>
+            <p class="note">指の動きそのもの。ターゲットは指を下ろした要素に固定される。</p>
+          </div>
+          <div class="compat">
+            <h3 class="r">互換マウスイベント</h3>
+            <p class="note">タッチ非対応ページを動かすためにブラウザが後から生成する。<b>touchend の後に、タッチ座標を改めてヒットテスト</b>して送り先が決まる。</p>
+          </div>
+        </div>
+        <p class="note">後半の 3 つは Touch Events 仕様の「compatibility mouse events」。現代ブラウザでは viewport meta があれば 300ms 遅延なしで touchend 直後に来る。</p>
+      </div>
+    </section>
+
+    <!-- 4. なぜ起きる -->
+    <section class="slide">
+      <div class="slide-body">
+        <p class="eyebrow">仕組み</p>
+        <h2>click の送り先は「いつ」決まるか</h2>
+        <div class="grid cols-2">
+          <div class="card">
+            <h3 style="color:var(--teal-ink);">マウス</h3>
+            <p>click のターゲットは <b>mousedown と mouseup の共通祖先</b>。DOM が変わっても送り先は変わらない。</p>
+            <p>pointerup でダイアログを開いても、click は canvas に落ちる。</p>
+            <p style="color:var(--teal-ink); font-weight:700;">→ 安全</p>
+          </div>
+          <div class="card danger">
+            <h3 style="color:var(--red-ink);">タッチ</h3>
+            <p>互換 click は <b>touchend の後に改めてヒットテスト</b>される。pointerup で DOM を変えると、変わった後の要素に落ちる。</p>
+            <p>指の真下に現れたボタンが、そのまま click される。</p>
+            <p style="color:var(--red-ink); font-weight:700;">→ ghost click</p>
+          </div>
+        </div>
+        <div class="callout"><b>pointerup で同期的に UI を変える</b> ＋ <b>新しい要素が指の真下にある</b> ＝ ghost click</div>
+        <p class="note">ポイントは「同期的」。React 18 の discrete event の更新はイベント終了時に同期 flush されるため、pointerup の setState でも互換 click が来る前に DOM が変わる。</p>
+      </div>
+    </section>
+
+    <!-- 5. 実測ログ -->
+    <section class="slide dark">
+      <div class="slide-body">
+        <p class="eyebrow">実測</p>
+        <h2>window capture で観測したログ（対策なし）</h2>
+        <div class="grid side">
+<pre><span class="dim">  0.0ms  pointerdown touch → canvas
+  2.5ms  touchstart        → canvas
+ 10.5ms  pointerup   touch → canvas</span>
+<span class="good"> 12.3ms  note ダイアログを開く (パーツ A)</span>
+<span class="dim"> 20.0ms  touchend          → canvas</span>
+ 27.9ms  mousedown         → dialog-delete
+ 29.9ms  mouseup           → dialog-delete
+<span class="bad"> 30.9ms  click       touch → dialog-delete 👻</span>
+<span class="good"> 34.4ms  note 「削除」ハンドラ実行: パーツ A を削除</span></pre>
+          <div class="annot">
+            <div class="t"><span class="when">12.3ms</span><p>pointerup の直後、ダイアログが DOM に入る</p></div>
+            <div><span class="when">27.9ms 〜</span><p>互換マウスイベントの送り先が canvas から dialog-delete に変わっている</p></div>
+            <div><span class="when">30.9ms</span><p>click の pointerType は touch。指を離してから 10ms 後に「削除」が押される</p></div>
+          </div>
+        </div>
+        <p class="note" style="color:var(--ink-faint);">headless Chromium（Playwright, Pixel 7 プロファイル）での実測。時間は最初の pointerdown からの相対値。</p>
+      </div>
+    </section>
+
+    <!-- 6. 再現条件 -->
+    <section class="slide">
+      <div class="slide-body">
+        <p class="eyebrow">再現</p>
+        <h2>POC の再現条件</h2>
+        <div class="steps">
+          <div class="step"><span class="n">01</span><p>canvas の onPointerUp でヒットテストし、<code class="inline">&lt;dialog&gt;</code> を showModal() で同期的に開く（useLayoutEffect）</p></div>
+          <div class="step"><span class="n">02</span><p>タップ位置に出るコンテキストメニュー風ダイアログ。先頭の「削除」ボタンの中心をタップ座標に合わせる</p></div>
+          <div class="step"><span class="n">03</span><p>viewport meta と <code class="inline">touch-action: manipulation</code> で、旧来の 300ms click 遅延が無い現代ブラウザ標準の状態</p></div>
+        </div>
+        <p class="note">画面中央のモーダルでも、ボタンがたまたま指の下にあれば同じことが起きる。再現を確実にするためタップ位置に置いている。Playwright の <code class="inline">page.touchscreen.tap()</code> は互換 click まで生成するので、CI で再現を固定できる。</p>
+      </div>
+    </section>
+
+    <!-- 7. 対策の全体像 -->
+    <section class="slide">
+      <div class="slide-body">
+        <p class="eyebrow fix">対策</p>
+        <h2>対策は 3 系統 7 種類</h2>
+        <div class="grid cols-3">
+          <div class="card top-teal">
+            <span class="role">A. 発生させない</span>
+            <h3>互換 click を作らせない、または ghost が存在しない位置で開く</h3>
+            <p>1. touchend で preventDefault()<br>2. pointerup ではなく click で開く</p>
+          </div>
+          <div class="card top-blue">
+            <span class="role" style="color:var(--blue-ink);">B. タイミングをずらす</span>
+            <h3>互換 click が canvas に落ちきってからダイアログを開く</h3>
+            <p>3. setTimeout(400ms) 後に開く<br>4. 互換 click を 1 回待ってから開く</p>
+          </div>
+          <div class="card top-amber">
+            <span class="role" style="color:var(--amber-ink);">C. 届いても無害化</span>
+            <h3>ghost が来ることを前提に、受け側で捨てる</h3>
+            <p>5. ダイアログ側の時間ガード<br>6. 透明シールドで吸収<br>7. pointerdown と click の整合性チェック</p>
+          </div>
+        </div>
+        <p class="note">POC ではプルダウンで切り替えられ、すべて Playwright で「ghost で削除されない」「本物のタップは動く」を確認済み。</p>
+      </div>
+    </section>
+
+    <!-- 8. 対策 1 -->
+    <section class="slide">
+      <div class="slide-body">
+        <p class="eyebrow fix">対策 A</p>
+        <h2>1. touchend で preventDefault()</h2>
+        <div class="grid side">
+<pre>const onPointerUp = (e) =&gt; {
+  if (hit) {
+    openDialog(part);
+    openedDuringTouch.current = true;
+  }
+};
+const onTouchEnd = (e) =&gt; {
+  if (openedDuringTouch.current) {
+<span class="good">    e.preventDefault(); // 互換 click を作らせない</span>
+  }
+  openedDuringTouch.current = false;
+};</pre>
+          <div style="display:flex; flex-direction:column; gap:.8rem;">
+            <p class="note">Touch Events 仕様の正攻法。touchend を preventDefault すると mousedown / mouseup / click が<b>生成されない</b>。</p>
+            <div class="callout soft"><span class="role">ログ: click が存在しない</span><code>pointerup → canvas<br>note ダイアログを開く<br>touchend → canvas<br>（以降なし）</code></div>
+            <p class="note">React の onTouchEnd は非 passive で登録されるので効く（touchstart / touchmove / wheel は passive）。開いたタップでだけ呼ぶこと。pointerup の preventDefault では click は止まらない。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 9. 対策 2 -->
+    <section class="slide">
+      <div class="slide-body">
+        <p class="eyebrow fix">対策 A</p>
+        <h2>2. pointerup ではなく click で開く</h2>
+        <div class="grid side">
+<pre><span class="dim">// before</span>
+<span class="bad">&lt;canvas onPointerUp={openIfHit} /&gt;</span>
+
+<span class="dim">// after</span>
+<span class="good">&lt;canvas onClick={openIfHit} /&gt;</span>
+
+<span class="dim">// click はイベント列の最後。
+// この後に来る ghost は存在しない。</span></pre>
+          <div style="display:flex; flex-direction:column; gap:.8rem;">
+            <p class="note">タップ列の最後のイベントで開けば、ダイアログが現れた後に飛んでくる互換イベントはない。最も単純。</p>
+            <div class="callout soft"><span class="role">ログ: click は canvas に落ちる</span><code>touchend → canvas<br>mousedown → canvas<br>click touch → canvas<br>note ダイアログを開く</code></div>
+            <p class="note">ドラッグ操作を持つ canvas は pointerup で状態を確定させたいことが多く、click に寄せられない場合がある。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 10. 対策 3・4 -->
+    <section class="slide">
+      <div class="slide-body">
+        <p class="eyebrow b">対策 B</p>
+        <h2>3・4. 開くのを互換 click の後にずらす</h2>
+        <div class="grid cols-2">
+          <div class="card">
+            <h3>3. setTimeout(400ms)</h3>
+<pre>const onPointerUp = () =&gt; {
+  if (hit) setTimeout(open, 400);
+};</pre>
+            <p>単純で確実。ただし体感遅延が出て、マウスでも同じだけ待たされる。400ms は旧来の 300ms 遅延 + α の経験則。</p>
+          </div>
+          <div class="card">
+            <h3>4. 互換 click を 1 回待つ</h3>
+<pre>window.addEventListener("click",
+  () =&gt; setTimeout(open, 0),
+  { capture: true, once: true });
+setTimeout(open, 400); // fallback</pre>
+            <p>click のディスパッチ完了を待ってから開く。マウスなら遅延ほぼゼロ。click が来ない場合（touchcancel 等）はタイムアウトで開く。二重に open しないようフラグでガードする。</p>
+          </div>
+        </div>
+        <div class="callout soft"><code>2.5ms pointerup → canvas · 7.6ms click touch → canvas · 19.9ms note ダイアログを開く</code>（対策 4 の実測）</div>
+      </div>
+    </section>
+
+    <!-- 11. 対策 5 -->
+    <section class="slide">
+      <div class="slide-body">
+        <p class="eyebrow c">対策 C</p>
+        <h2>5. ダイアログ側の時間ガード</h2>
+        <div class="grid side">
+<pre>useLayoutEffect(() =&gt; {
+  const openedAt = performance.now();
+  const guard = (e) =&gt; {
+    if (performance.now() - openedAt &lt; 500) {
+<span class="good">      e.stopPropagation();
+      e.preventDefault();</span>
+    }
+  };
+  el.addEventListener("click", guard, true);
+  return () =&gt; el.removeEventListener("click", guard, true);
+}, []);</pre>
+          <div style="display:flex; flex-direction:column; gap:.8rem;">
+            <p class="note">ダイアログ要素に <b>capture 段階</b>のネイティブリスナーを付け、開いた直後の click を握りつぶす。</p>
+            <p class="note">React の onClick は root で bubble を待っているので届かない。共通ダイアログに<b>フック 1 行</b>で済む。</p>
+            <div class="callout bad"><span class="role">トレードオフ</span>本物の高速な 2 タップ目も一定時間無視される。閾値はヒューリスティック。</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 12. 対策 6 -->
+    <section class="slide">
+      <div class="slide-body">
+        <p class="eyebrow c">対策 C</p>
+        <h2>6. 透明シールドで最初の click を吸収</h2>
+        <div class="grid side">
+<pre>&lt;dialog&gt;
+<span class="good">  {shield &amp;&amp; (
+    &lt;div className="click-shield"
+      onClick={(e) =&gt; {
+        e.stopPropagation();
+        setShield(false);
+      }} /&gt;
+  )}</span>
+  &lt;button&gt;削除&lt;/button&gt;
+&lt;/dialog&gt;
+
+<span class="dim">.click-shield { position: fixed; inset: 0; }</span></pre>
+          <div style="display:flex; flex-direction:column; gap:.8rem;">
+            <p class="note">全画面の透明要素を最前面に置き、最初の click を吸収して自身を消す（タイムアウト付き）。<b>ghost がどこに落ちても安全</b>。</p>
+            <div class="callout warn"><span class="role">top layer の罠</span>showModal() した <code class="inline">&lt;dialog&gt;</code> は top layer にあり、通常の z-index では上に置けない。シールドは <b>dialog の子</b>として描画する。</div>
+            <p class="note">マウスでは ghost が来ないためタイムアウトまでシールドが残る。pointerType で出し分けると改善できる。backdrop クリックで閉じる light dismiss の誤発火も防げる。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 13. 対策 7 -->
+    <section class="slide">
+      <div class="slide-body">
+        <p class="eyebrow c">対策 C</p>
+        <h2>7. pointerdown と click の整合性チェック</h2>
+        <div class="grid side">
+<pre>let down = null;
+window.addEventListener("pointerdown",
+  (e) =&gt; { down = e.target; }, true);
+window.addEventListener("click", (e) =&gt; {
+<span class="dim">  if (e.detail === 0) return;      // keyboard
+  if (!down?.isConnected) return;  // 差し替え済み</span>
+<span class="good">  if (!e.target.contains(down)) {
+    e.stopImmediatePropagation();
+    e.preventDefault();            // ghost
+  }</span>
+}, true);</pre>
+          <div style="display:flex; flex-direction:column; gap:.8rem;">
+            <p class="note">マウスの規則「click のターゲットは pointerdown ターゲットの祖先」をタッチにも適用する。祖先でなければ ghost。</p>
+            <p class="note"><b>アプリ全体で 1 箇所</b>。canvas にもダイアログにも手を入れない。</p>
+            <div class="callout bad"><span class="role">トレードオフ</span>pointerdown 後に DOM が差し替わる UI で誤検知しうる。差し替えで外れた場合は isConnected で素通し。detail === 0 はキーボードや element.click() 由来なので対象外。</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 14. 比較 -->
+    <section class="slide">
+      <div class="slide-body">
+        <p class="eyebrow fix">比較</p>
+        <h2>7 つの対策を並べる</h2>
+        <table>
+          <tr><th>対策</th><th>ghost click</th><th>変更箇所</th><th>主なトレードオフ</th></tr>
+          <tr><td>1. touchend で preventDefault()</td><td class="ok">発生しない</td><td>canvas</td><td>非 passive 必須。開いた時だけ呼ぶ</td></tr>
+          <tr><td>2. click で開く</td><td class="ok">canvas に落ちる</td><td>canvas</td><td>ドラッグ系 UI では使いにくい</td></tr>
+          <tr><td>3. setTimeout(400ms)</td><td class="ok">canvas に落ちる</td><td>開く側</td><td>体感遅延。マウスでも待たされる</td></tr>
+          <tr><td>4. 互換 click を待つ</td><td class="ok">canvas に落ちる</td><td>開く側</td><td>実装がやや複雑。タイムアウト管理</td></tr>
+          <tr><td>5. 時間ガード</td><td class="blk">届くがブロック</td><td>ダイアログ</td><td>高速な本物の 2 タップ目も無視</td></tr>
+          <tr><td>6. 透明シールド</td><td class="blk">シールドが吸収</td><td>ダイアログ</td><td>dialog の子に置く。マウスでは残留</td></tr>
+          <tr><td>7. 整合性フィルタ</td><td class="blk">届くがブロック</td><td>アプリ全体</td><td>DOM 差し替え UI で誤検知の可能性</td></tr>
+        </table>
+        <p class="note">「発生しない」は 1 だけ。2〜4 は発生するが無害な場所に落ちる。5〜7 は発生してダイアログ側に届くが実害を防ぐ。</p>
+      </div>
+    </section>
+
+    <!-- 15. 選び方 -->
+    <section class="slide">
+      <div class="slide-body">
+        <p class="eyebrow fix">選び方</p>
+        <h2>どこに手を入れられるかで決める</h2>
+        <div class="grid cols-2">
+          <div class="card teal"><span class="role">新規に書ける</span><span class="big">1 か 2</span><p>touchend の preventDefault、または click で開く。原因そのものを断つので副作用が最も少ない。</p></div>
+          <div class="card amber"><span class="role">ダイアログが共通コンポーネント</span><span class="big">5 か 6</span><p>開く側が多数あるなら、受け側のダイアログに時間ガードかシールドを入れて一括で守る。</p></div>
+          <div class="card amber"><span class="role">既存アプリに横断適用</span><span class="big">7</span><p>開く側もダイアログも触らずに window で 1 箇所。誤検知の可能性は把握した上で。</p></div>
+          <div class="card blue"><span class="role">最後の手段</span><span class="big">3 か 4</span><p>遅延型は仕組みが分かりやすい反面、体感に影響する。他が使えないときに。</p></div>
+        </div>
+        <p class="note">複数を併用しても問題ない。例えば 1 を基本にしつつ、共通ダイアログに 5 を保険として入れる。</p>
+      </div>
+    </section>
+
+    <!-- 16. 検証 -->
+    <section class="slide">
+      <div class="slide-body">
+        <p class="eyebrow fix">検証</p>
+        <h2>Playwright で再現と対策を固定する</h2>
+        <div class="grid side">
+          <div style="display:flex; flex-direction:column; gap:.9rem;">
+            <div class="annot">
+              <div><span class="when" style="color:var(--red-ink);">mobile-touch（Pixel 7, hasTouch）</span>
+                <p class="note">対策なし: タップ 1 回で「削除」が実行される（再現の固定）<br>各対策: タップ後に「削除」が実行されない<br>各対策: その後の本物のタップで「削除」「キャンセル」が動く</p></div>
+              <div class="t"><span class="when" style="color:var(--teal-ink);">desktop-mouse</span>
+                <p class="note">全対策でマウス操作が壊れていない</p></div>
+            </div>
+<pre>cd react-ghost-click-poc
+npm install
+npm test</pre>
+          </div>
+          <div class="stat"><span class="num">30</span><p style="font-weight:700; color:var(--dark-ink) !important;">passed</p><p>touch 22 / mouse 8<br>対策一覧を走査して自動生成</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 17. まとめ -->
+    <section class="slide dark">
+      <div class="slide-body">
+        <p class="eyebrow">まとめ</p>
+        <h2 style="font-size:clamp(1.8rem, 4vw, 3rem);">覚えて帰ること</h2>
+        <div class="takeaways">
+          <div><span class="n">1</span><p>互換 click は touchend の後に<b>改めてヒットテスト</b>される</p></div>
+          <div><span class="n">2</span><p>pointerup で<b>同期的に UI を変える</b>と、その新しい要素に落ちる</p></div>
+          <div><span class="n">3</span><p>原因を断つなら touchend の preventDefault か click で開く。受け側で守るならガード / シールド / フィルタ</p></div>
+        </div>
+        <p class="note" style="color:var(--ink-faint);">コードと Playwright テスト: <a href="../react-ghost-click-poc/README.md" style="color:#5bc0b2;">react-ghost-click-poc</a></p>
+      </div>
+    </section>
+
+  </div>
+
+  <div class="hud">
+    <span class="title">Ghost Click 解説 — タッチ端末で canvas → dialog のボタンが勝手に押される現象と 7 つの対策</span>
+    <span class="kbd-hint"><kbd>←</kbd> <kbd>→</kbd> で移動</span>
+    <span class="count" id="count">1 / 17</span>
+    <button id="prev" aria-label="前のスライド">← 前へ</button>
+    <button id="next" aria-label="次のスライド">次へ →</button>
+  </div>
+</div>
+
+<script>
+  const slides = Array.from(document.querySelectorAll(".slide"));
+  const bar = document.getElementById("bar");
+  const count = document.getElementById("count");
+  let i = 0;
+
+  function show(n, updateHash = true) {
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach((s, k) => s.classList.toggle("active", k === i));
+    count.textContent = (i + 1) + " / " + slides.length;
+    bar.style.width = ((i + 1) / slides.length * 100) + "%";
+    if (updateHash) history.replaceState(null, "", "#" + (i + 1));
+  }
+  document.getElementById("next").addEventListener("click", () => show(i + 1));
+  document.getElementById("prev").addEventListener("click", () => show(i - 1));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight" || e.key === " " || e.key === "PageDown") { e.preventDefault(); show(i + 1); }
+    if (e.key === "ArrowLeft" || e.key === "PageUp") { e.preventDefault(); show(i - 1); }
+    if (e.key === "Home") show(0);
+    if (e.key === "End") show(slides.length - 1);
+  });
+  // スワイプ (タッチ端末向け)
+  let touchX = null;
+  document.addEventListener("touchstart", (e) => { touchX = e.touches[0].clientX; }, { passive: true });
+  document.addEventListener("touchend", (e) => {
+    if (touchX === null) return;
+    const dx = e.changedTouches[0].clientX - touchX;
+    touchX = null;
+    if (Math.abs(dx) > 60) show(dx < 0 ? i + 1 : i - 1);
+  }, { passive: true });
+  window.addEventListener("hashchange", () => show(parseInt(location.hash.slice(1), 10) - 1 || 0, false));
+  show(parseInt(location.hash.slice(1), 10) - 1 || 0, false);
+</script>
+</body>
+</html>

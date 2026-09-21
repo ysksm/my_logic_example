@@ -20,6 +20,8 @@ npm test           # Playwright (touch / mouse の 2 プロファイル)
 
 URL クエリ `?strategy=<id>` で対策を指定できます（例: `/?strategy=none`）。
 
+解説スライド: [docs/ghost-click.slides.html](../docs/ghost-click.slides.html)（ブラウザで開いて ← → キー、またはスワイプで移動）
+
 ## 現象の仕組み
 
 タッチ端末で 1 回タップすると、ブラウザは次の順でイベントを投げます。
