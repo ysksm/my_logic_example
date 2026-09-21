@@ -29,6 +29,7 @@
 | [exporters](./exporters) | 監視 / メトリクス | Go + Rust + Prometheus + Grafana | 🟠 POC / 実験 | ✅ |
 | [jira_db_sync](./jira_db_sync) | Jira 連携 (旧版) | Python + marimo + DuckDB | 🟠 POC / 実験 | ✅ |
 | [react-calendar-poc](./react-calendar-poc) | カレンダー UI | React + TypeScript + Vite | 🟠 POC / 実験 | ✅ |
+| [react-ghost-click-poc](./react-ghost-click-poc) | タッチ UI / 不具合再現 | React + TypeScript + Vite + Playwright | 🟠 POC / 実験 | ✅ |
 | [youtube_list](./youtube_list) | YouTube 同期 | Python + marimo + DuckDB | 🟠 POC / 実験 | ✅ |
 | [docs](./docs) | 横断ドキュメント | Markdown / SVG / Slides | 📄 資料 | — |
 
@@ -112,6 +113,9 @@ macOS のメトリクス（CPU / メモリ / Swap）を Go と Rust の両方で
 #### [react-calendar-poc](./react-calendar-poc) — Google Calendar 風 UI
 1 日 / 5 日 / 週 / 月の 4 ビュー、イベント CRUD、localStorage 永続化を持つカレンダー UI。`package.json` の description に明示的に "POC" / "prototype" と記載。
 
+#### [react-ghost-click-poc](./react-ghost-click-poc) — タッチ端末の ghost click 再現と対策
+canvas 上のパーツをタップ → 指の真下に `<dialog>` が開く → タップ由来の互換 `click` がダイアログの「削除」ボタンに命中する現象（ghost click）を React で再現し、7 種類の対策（`touchend` の `preventDefault` / `click` で開く / 遅延 / 時間ガード / 透明シールド / pointerdown⇔click 整合性フィルタ）を切り替えて比較できる。window capture の生イベントログ付き。Playwright のタッチ / マウス両プロファイルで全対策を検証。
+
 #### [youtube_list](./youtube_list) — YouTube メタデータ同期
 YouTube Data API でチャンネル／動画情報を取得して DuckDB に保存し、Plotly / Altair で可視化する marimo アプリ。API キー必須、テストなし。
 
@@ -124,7 +128,7 @@ YouTube Data API でチャンネル／動画情報を取得して DuckDB に保�
 
 - **Go** — cad-viewer / chrome_dev_tool / ddd-diagram-generator / ddd-ui-designer / exporters (mac/go-exporter) / jd-go / pcap-go / ticket-manager / ui-builder / webcam-go
 - **Python (marimo)** — chrome_dev_tool_remote / jira_db_sync / stock-price-viewer / youtube_list
-- **React + Vite + TypeScript** — chrome_dev_tool (UI) / ddd-diagram-generator (UI) / ddd-ui-designer (UI) / pcap-go (UI) / react-calendar-poc / ticket-manager (UI) / ui-builder (UI)
+- **React + Vite + TypeScript** — chrome_dev_tool (UI) / ddd-diagram-generator (UI) / ddd-ui-designer (UI) / pcap-go (UI) / react-calendar-poc / react-ghost-click-poc / ticket-manager (UI) / ui-builder (UI)
 - **CRA + Redux** — polling-app
 - **Babylon.js / three.js** — babylon-js-learning / cad-viewer
 - **Wails (デスクトップ)** — cad-viewer / jd-go
@@ -139,4 +143,4 @@ YouTube Data API でチャンネル／動画情報を取得して DuckDB に保�
 - **業務 / 社内ツール** — jd-go, jira_db_sync, ticket-manager
 - **データ収集 / ETL** — chrome_dev_tool, chrome_dev_tool_remote, exporters, stock-price-viewer, youtube_list
 - **ストリーミング / メディア** — pcap-go, webcam-go
-- **フロントエンド学習** — polling-app, react-calendar-poc
+- **フロントエンド学習** — polling-app, react-calendar-poc, react-ghost-click-poc
