@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ysksm/my_logic_example/youtube-playlist-manager/internal/jobs"
 	"github.com/ysksm/my_logic_example/youtube-playlist-manager/internal/service"
 	"github.com/ysksm/my_logic_example/youtube-playlist-manager/internal/store"
 	"github.com/ysksm/my_logic_example/youtube-playlist-manager/internal/youtube"
@@ -21,8 +22,8 @@ import (
 var staticFS embed.FS
 
 // Handler returns the root http.Handler.
-func Handler(svc *service.Service) http.Handler {
-	h := &handlers{svc: svc, st: svc.Store()}
+func Handler(svc *service.Service, jm *jobs.Manager) http.Handler {
+	h := &handlers{svc: svc, st: svc.Store(), jobs: jm}
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /api/status", h.status)
@@ -35,11 +36,18 @@ func Handler(svc *service.Service) http.Handler {
 	mux.HandleFunc("POST /api/channels/{id}/fetch", h.fetchVideos)
 	mux.HandleFunc("POST /api/channels/{id}/refresh-stats", h.refreshStats)
 	mux.HandleFunc("POST /api/channels/{id}/playlists/fetch", h.fetchPlaylists)
+	mux.HandleFunc("POST /api/channels/{id}/transcripts", h.fetchChannelTranscripts)
 
 	mux.HandleFunc("GET /api/playlists", h.listPlaylists)
 	mux.HandleFunc("POST /api/playlists/{id}/fetch", h.fetchPlaylistVideos)
+	mux.HandleFunc("POST /api/playlists/{id}/transcripts", h.fetchPlaylistTranscripts)
 
 	mux.HandleFunc("GET /api/videos", h.listVideos)
+	mux.HandleFunc("GET /api/videos/{id}/transcript", h.getTranscript)
+	mux.HandleFunc("POST /api/videos/{id}/transcript", h.fetchTranscript)
+
+	mux.HandleFunc("GET /api/jobs", h.listJobs)
+	mux.HandleFunc("POST /api/jobs/{id}/cancel", h.cancelJob)
 	mux.HandleFunc("GET /api/export", h.export)
 
 	sub, _ := fs.Sub(staticFS, "static")
@@ -48,8 +56,9 @@ func Handler(svc *service.Service) http.Handler {
 }
 
 type handlers struct {
-	svc *service.Service
-	st  *store.Store
+	svc  *service.Service
+	st   *store.Store
+	jobs *jobs.Manager
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -64,9 +73,9 @@ func writeErr(w http.ResponseWriter, err error, extra any) {
 	status := http.StatusInternalServerError
 	var ae *youtube.APIError
 	switch {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, store.ErrNotFound), errors.Is(err, jobs.ErrNotFound):
 		status = http.StatusNotFound
-	case errors.Is(err, service.ErrBusy):
+	case errors.Is(err, service.ErrBusy), errors.Is(err, jobs.ErrBusy):
 		status = http.StatusConflict
 	case errors.Is(err, youtube.ErrNoAPIKey):
 		status = http.StatusPreconditionFailed
@@ -173,50 +182,6 @@ func intParam(r *http.Request, name string, def int) int {
 	return def
 }
 
-func (h *handlers) fetchVideos(w http.ResponseWriter, r *http.Request) {
-	mode := service.FetchMode(r.URL.Query().Get("mode"))
-	if mode == "" {
-		mode = service.FetchLatest
-	}
-	res, err := h.svc.FetchVideos(r.Context(), r.PathValue("id"), mode, intParam(r, "max", 50))
-	if err != nil {
-		writeErr(w, err, res)
-		return
-	}
-	writeJSON(w, http.StatusOK, res)
-}
-
-func (h *handlers) refreshStats(w http.ResponseWriter, r *http.Request) {
-	res, err := h.svc.RefreshStats(r.Context(), r.PathValue("id"))
-	if err != nil {
-		writeErr(w, err, res)
-		return
-	}
-	writeJSON(w, http.StatusOK, res)
-}
-
-func (h *handlers) fetchPlaylists(w http.ResponseWriter, r *http.Request) {
-	res, err := h.svc.FetchPlaylists(r.Context(), r.PathValue("id"), intParam(r, "maxPages", 4))
-	if err != nil {
-		writeErr(w, err, res)
-		return
-	}
-	writeJSON(w, http.StatusOK, res)
-}
-
-func (h *handlers) listPlaylists(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, h.st.Playlists(r.URL.Query().Get("channelId")))
-}
-
-func (h *handlers) fetchPlaylistVideos(w http.ResponseWriter, r *http.Request) {
-	res, err := h.svc.FetchPlaylistVideos(r.Context(), r.PathValue("id"), intParam(r, "max", 200))
-	if err != nil {
-		writeErr(w, err, res)
-		return
-	}
-	writeJSON(w, http.StatusOK, res)
-}
-
 func filterFrom(r *http.Request) store.VideoFilter {
 	q := r.URL.Query()
 	return store.VideoFilter{ChannelID: q.Get("channelId"), PlaylistID: q.Get("playlistId")}
@@ -234,4 +199,8 @@ func logging(next http.Handler) http.Handler {
 			log.Printf("%s %s (%s)", r.Method, r.URL.RequestURI(), time.Since(start).Round(time.Millisecond))
 		}
 	})
+}
+
+func (h *handlers) listPlaylists(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, h.st.Playlists(r.URL.Query().Get("channelId")))
 }

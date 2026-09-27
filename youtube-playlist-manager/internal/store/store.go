@@ -32,8 +32,9 @@ type Channel struct {
 	OlderPageToken string `json:"olderPageToken"`
 	ReachedEnd     bool   `json:"reachedEnd"`
 	// Derived, filled in by the store on read.
-	StoredVideoCount    int `json:"storedVideoCount"`
-	StoredPlaylistCount int `json:"storedPlaylistCount"`
+	StoredVideoCount      int `json:"storedVideoCount"`
+	StoredPlaylistCount   int `json:"storedPlaylistCount"`
+	StoredTranscriptCount int `json:"storedTranscriptCount"`
 }
 
 // Video is a fetched video with the metadata the UI shows.
@@ -50,6 +51,9 @@ type Video struct {
 	LikeCount    int64     `json:"likeCount"`
 	CommentCount int64     `json:"commentCount"`
 	FetchedAt    time.Time `json:"fetchedAt"`
+	// Derived from the transcript index on read; never persisted here.
+	TranscriptStatus   string `json:"transcriptStatus,omitempty"`
+	TranscriptLanguage string `json:"transcriptLanguage,omitempty"`
 }
 
 // Playlist is a channel's public playlist.
@@ -79,12 +83,34 @@ type Settings struct {
 	DailyLimit int    `json:"dailyLimit"`
 }
 
+// Transcript statuses.
+const (
+	TranscriptOK    = "ok"    // fetched and stored
+	TranscriptNone  = "none"  // the video has no captions
+	TranscriptError = "error" // fetching failed (may succeed on retry)
+)
+
+// TranscriptMeta is the index entry of a video's transcript. The body lives
+// in its own file (transcripts/<videoID>.json) to keep data.json small.
+type TranscriptMeta struct {
+	VideoID      string    `json:"videoId"`
+	Status       string    `json:"status"`
+	Language     string    `json:"language,omitempty"`
+	LanguageName string    `json:"languageName,omitempty"`
+	IsGenerated  bool      `json:"isGenerated,omitempty"`
+	IsTranslated bool      `json:"isTranslated,omitempty"`
+	Chars        int       `json:"chars,omitempty"`
+	Error        string    `json:"error,omitempty"`
+	FetchedAt    time.Time `json:"fetchedAt"`
+}
+
 type data struct {
-	Settings  Settings             `json:"settings"`
-	Quota     Quota                `json:"quota"`
-	Channels  map[string]*Channel  `json:"channels"`
-	Videos    map[string]*Video    `json:"videos"`
-	Playlists map[string]*Playlist `json:"playlists"`
+	Settings    Settings                   `json:"settings"`
+	Quota       Quota                      `json:"quota"`
+	Channels    map[string]*Channel        `json:"channels"`
+	Videos      map[string]*Video          `json:"videos"`
+	Playlists   map[string]*Playlist       `json:"playlists"`
+	Transcripts map[string]*TranscriptMeta `json:"transcripts"`
 }
 
 // Store is a concurrency-safe JSON file store.
@@ -93,6 +119,7 @@ type Store struct {
 	path string
 	d    data
 	now  func() time.Time
+	mem  map[string]Transcript // transcript bodies when path == ""
 }
 
 // ErrNotFound is returned when an entity does not exist.
@@ -102,10 +129,11 @@ var ErrNotFound = errors.New("not found")
 func Open(path string) (*Store, error) {
 	s := &Store{path: path, now: time.Now}
 	s.d = data{
-		Settings:  Settings{DailyLimit: 10000},
-		Channels:  map[string]*Channel{},
-		Videos:    map[string]*Video{},
-		Playlists: map[string]*Playlist{},
+		Settings:    Settings{DailyLimit: 10000},
+		Channels:    map[string]*Channel{},
+		Videos:      map[string]*Video{},
+		Playlists:   map[string]*Playlist{},
+		Transcripts: map[string]*TranscriptMeta{},
 	}
 	b, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
@@ -125,6 +153,9 @@ func Open(path string) (*Store, error) {
 	}
 	if s.d.Playlists == nil {
 		s.d.Playlists = map[string]*Playlist{}
+	}
+	if s.d.Transcripts == nil {
+		s.d.Transcripts = map[string]*TranscriptMeta{}
 	}
 	if s.d.Settings.DailyLimit <= 0 {
 		s.d.Settings.DailyLimit = 10000
@@ -223,10 +254,13 @@ func (s *Store) Flush() error {
 // ── Channels ─────────────────────────────────────────────
 
 func (s *Store) decorateLocked(c Channel) Channel {
-	c.StoredVideoCount, c.StoredPlaylistCount = 0, 0
-	for _, v := range s.d.Videos {
+	c.StoredVideoCount, c.StoredPlaylistCount, c.StoredTranscriptCount = 0, 0, 0
+	for id, v := range s.d.Videos {
 		if v.ChannelID == c.ID {
 			c.StoredVideoCount++
+			if m, ok := s.d.Transcripts[id]; ok && m.Status == TranscriptOK {
+				c.StoredTranscriptCount++
+			}
 		}
 	}
 	for _, p := range s.d.Playlists {
@@ -301,6 +335,7 @@ func (s *Store) DeleteChannel(id string, purge bool) error {
 		for vid, v := range s.d.Videos {
 			if v.ChannelID == id {
 				delete(s.d.Videos, vid)
+				s.deleteTranscriptLocked(vid)
 			}
 		}
 		for pid, p := range s.d.Playlists {
@@ -328,9 +363,47 @@ func (s *Store) UpsertVideos(vs []Video) error {
 	defer s.mu.Unlock()
 	for _, v := range vs {
 		cp := v
+		cp.TranscriptStatus, cp.TranscriptLanguage = "", ""
 		s.d.Videos[v.ID] = &cp
 	}
 	return s.saveLocked()
+}
+
+// PruneChannelVideos deletes the channel's stored videos whose IDs are not in
+// keep (videos removed from the channel). It returns how many were deleted.
+func (s *Store) PruneChannelVideos(channelID string, keep map[string]bool) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	n := 0
+	for id, v := range s.d.Videos {
+		if v.ChannelID == channelID && !keep[id] {
+			delete(s.d.Videos, id)
+			s.deleteTranscriptLocked(id)
+			n++
+		}
+	}
+	if n == 0 {
+		return 0, nil
+	}
+	return n, s.saveLocked()
+}
+
+// Video returns one stored video.
+func (s *Store) Video(id string) (Video, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	v, ok := s.d.Videos[id]
+	if !ok {
+		return Video{}, ErrNotFound
+	}
+	return s.decorateVideoLocked(*v), nil
+}
+
+func (s *Store) decorateVideoLocked(v Video) Video {
+	if m, ok := s.d.Transcripts[v.ID]; ok {
+		v.TranscriptStatus, v.TranscriptLanguage = m.Status, m.Language
+	}
+	return v
 }
 
 // VideoFilter narrows Videos().
@@ -352,7 +425,7 @@ func (s *Store) Videos(f VideoFilter) []Video {
 		}
 		for _, id := range p.VideoIDs {
 			if v, ok := s.d.Videos[id]; ok {
-				out = append(out, *v)
+				out = append(out, s.decorateVideoLocked(*v))
 			}
 		}
 		if out == nil {
@@ -365,9 +438,14 @@ func (s *Store) Videos(f VideoFilter) []Video {
 		if f.ChannelID != "" && v.ChannelID != f.ChannelID {
 			continue
 		}
-		out = append(out, *v)
+		out = append(out, s.decorateVideoLocked(*v))
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].PublishedAt.After(out[j].PublishedAt) })
+	sort.Slice(out, func(i, j int) bool {
+		if !out[i].PublishedAt.Equal(out[j].PublishedAt) {
+			return out[i].PublishedAt.After(out[j].PublishedAt)
+		}
+		return out[i].ID < out[j].ID
+	})
 	return out
 }
 
@@ -439,3 +517,6 @@ func (s *Store) SetPlaylistVideos(id string, videoIDs []string) error {
 	p.LastFetchedAt = s.now()
 	return s.saveLocked()
 }
+
+// Path returns the data file path.
+func (s *Store) Path() string { return s.path }

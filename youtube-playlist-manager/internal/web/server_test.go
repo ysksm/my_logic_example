@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ysksm/my_logic_example/youtube-playlist-manager/internal/jobs"
 	"github.com/ysksm/my_logic_example/youtube-playlist-manager/internal/service"
 	"github.com/ysksm/my_logic_example/youtube-playlist-manager/internal/store"
 )
@@ -18,7 +19,7 @@ func newTestServer(t *testing.T) *httptest.Server {
 	if err != nil {
 		t.Fatal(err)
 	}
-	srv := httptest.NewServer(Handler(service.New(st, "")))
+	srv := httptest.NewServer(Handler(service.New(st, ""), jobs.NewManager(10)))
 	t.Cleanup(srv.Close)
 	return srv
 }
