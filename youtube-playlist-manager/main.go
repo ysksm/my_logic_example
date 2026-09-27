@@ -21,6 +21,7 @@ import (
 	// on Windows machines without a system zoneinfo.
 	_ "time/tzdata"
 
+	"github.com/ysksm/my_logic_example/youtube-playlist-manager/internal/jobs"
 	"github.com/ysksm/my_logic_example/youtube-playlist-manager/internal/service"
 	"github.com/ysksm/my_logic_example/youtube-playlist-manager/internal/store"
 	"github.com/ysksm/my_logic_example/youtube-playlist-manager/internal/web"
@@ -40,6 +41,8 @@ func main() {
 	dataPath := flag.String("data", envOr("YPM_DATA", defaultDataPath()), "path of the JSON data file")
 	open := flag.Bool("open", true, "open the browser on start")
 	apiBase := flag.String("api-base", envOr("YPM_API_BASE", ""), "override the YouTube Data API base URL (for testing)")
+	youtubeBase := flag.String("youtube-base", envOr("YPM_YOUTUBE_BASE", ""), "override https://www.youtube.com for transcript fetching (for testing)")
+	transcriptDelay := flag.Duration("transcript-delay", 1500*time.Millisecond, "pause between videos when fetching transcripts in bulk")
 	showVersion := flag.Bool("version", false, "print version and exit")
 	flag.Parse()
 
@@ -56,13 +59,17 @@ func main() {
 	if *apiBase != "" {
 		svc.SetBaseURL(*apiBase)
 	}
+	if *youtubeBase != "" {
+		svc.SetTranscriptBaseURL(*youtubeBase)
+	}
+	svc.SetTranscriptDelay(*transcriptDelay)
 
 	ln, err := net.Listen("tcp", *addr)
 	if err != nil {
 		log.Fatalf("listen %s: %v", *addr, err)
 	}
 	url := "http://" + displayAddr(ln.Addr().String())
-	srv := &http.Server{Handler: web.Handler(svc), ReadHeaderTimeout: 10 * time.Second}
+	srv := &http.Server{Handler: web.Handler(svc, jobs.NewManager(30)), ReadHeaderTimeout: 10 * time.Second}
 
 	log.Printf("youtube-playlist-manager %s", version)
 	log.Printf("data file: %s", *dataPath)

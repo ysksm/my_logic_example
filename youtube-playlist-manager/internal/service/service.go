@@ -25,12 +25,18 @@ type Service struct {
 
 	mu   sync.Mutex
 	busy map[string]bool
+
+	transcriptBase  string        // overridable for tests
+	transcriptDelay time.Duration // pause between videos in bulk runs
 }
 
 // New creates a Service. envAPIKey, when non-empty, overrides the key saved
 // in settings.
 func New(st *store.Store, envAPIKey string) *Service {
-	return &Service{st: st, baseURL: youtube.DefaultBaseURL, envKey: envAPIKey, busy: map[string]bool{}}
+	return &Service{
+		st: st, baseURL: youtube.DefaultBaseURL, envKey: envAPIKey, busy: map[string]bool{},
+		transcriptDelay: 1500 * time.Millisecond,
+	}
 }
 
 // SetBaseURL points the service at a different API endpoint (tests).
@@ -138,15 +144,31 @@ func (s *Service) RefreshChannel(ctx context.Context, id string) (store.Channel,
 
 // ── Videos ───────────────────────────────────────────────
 
+// Progress receives progress updates of long operations. total <= 0 means
+// unknown. It may be nil.
+type Progress func(done, total int, message string)
+
+func (p Progress) report(done, total int, msg string) {
+	if p != nil {
+		p(done, total, msg)
+	}
+}
+
 // FetchMode selects which part of the uploads list to read.
 type FetchMode string
 
 const (
-	// FetchLatest reads from the newest upload and stops as soon as it meets
-	// an already stored video (incremental update).
+	// FetchLatest is the incremental update: read from the newest upload and
+	// stop at the first page containing an already stored video.
 	FetchLatest FetchMode = "latest"
 	// FetchOlder continues past the oldest video fetched so far.
 	FetchOlder FetchMode = "older"
+	// FetchAll fetches every video not stored yet (latest + older to the end).
+	FetchAll FetchMode = "all"
+	// FetchRefetch re-reads the whole channel: every video's title,
+	// description and statistics are refreshed and videos that no longer
+	// exist on the channel are removed.
+	FetchRefetch FetchMode = "refetch"
 )
 
 // FetchResult summarises a fetch.
@@ -154,6 +176,7 @@ type FetchResult struct {
 	Usage
 	Fetched    int  `json:"fetched"`
 	New        int  `json:"new"`
+	Removed    int  `json:"removed"`
 	ReachedEnd bool `json:"reachedEnd"`
 	HasOlder   bool `json:"hasOlder"`
 }
@@ -192,12 +215,15 @@ func (s *Service) storeVideos(ctx context.Context, c *youtube.Client, ids []stri
 	return len(out), err
 }
 
-// FetchVideos fetches up to max videos of a channel.
-func (s *Service) FetchVideos(ctx context.Context, channelID string, mode FetchMode, max int) (FetchResult, error) {
+// FetchVideos fetches videos of a channel. max limits the number of new
+// videos for FetchLatest / FetchOlder (0 = no limit) and is ignored by
+// FetchAll / FetchRefetch.
+//
+// Videos are stored page by page (50 at a time), so an interrupted run
+// (quota exhausted, cancellation) keeps everything fetched so far and the
+// next FetchOlder / FetchAll resumes where it stopped.
+func (s *Service) FetchVideos(ctx context.Context, channelID string, mode FetchMode, max int, progress Progress) (FetchResult, error) {
 	var res FetchResult
-	if max <= 0 {
-		max = 50
-	}
 	unlock, err := s.lock("ch:" + channelID)
 	if err != nil {
 		return res, err
@@ -213,31 +239,57 @@ func (s *Service) FetchVideos(ctx context.Context, channelID string, mode FetchM
 		return res, errors.New("このチャンネルには uploads 再生リストがありません")
 	}
 	c := s.client(&res.Usage)
+	total := int(ch.VideoCount)
 
+	switch mode {
+	case FetchLatest, FetchOlder:
+		err = s.walk(ctx, c, ch, mode, max, &res, total, progress)
+	case FetchAll:
+		// New uploads first, then everything older than what we have.
+		if err = s.walk(ctx, c, ch, FetchLatest, 0, &res, total, progress); err == nil {
+			ch, _ = s.st.Channel(channelID)
+			err = s.walk(ctx, c, ch, FetchOlder, 0, &res, total, progress)
+		}
+	case FetchRefetch:
+		err = s.refetch(ctx, c, ch, &res, total, progress)
+	default:
+		return res, fmt.Errorf("unknown mode: %q", mode)
+	}
+	if ch, gerr := s.st.Channel(channelID); gerr == nil {
+		res.ReachedEnd, res.HasOlder = ch.ReachedEnd, !ch.ReachedEnd
+	}
+	return res, err
+}
+
+// walk implements FetchLatest and FetchOlder.
+func (s *Service) walk(ctx context.Context, c *youtube.Client, ch store.Channel, mode FetchMode, max int, res *FetchResult, total int, progress Progress) error {
 	neverFetched := ch.LastFetchedAt.IsZero()
 	token := ""
 	if mode == FetchOlder {
 		if ch.ReachedEnd {
-			res.ReachedEnd = true
-			return res, nil
+			return nil
 		}
 		// An empty cursor means "start from the newest upload"; stored
-		// videos are skipped below so only unseen ones count toward max.
+		// videos are skipped so only unseen ones count toward max.
 		token = ch.OlderPageToken
-	} else if mode != FetchLatest {
-		return res, fmt.Errorf("unknown mode: %q", mode)
 	}
-
-	var ids []string
-	hitKnown, exhausted := false, false
-	for len(ids) < max {
-		page, next, _, err := c.PlaylistItemsPage(ctx, ch.UploadsPlaylistID, token, max-len(ids))
-		if err != nil {
-			// Keep whatever we managed to collect.
-			n, _ := s.storeVideos(ctx, c, ids)
-			res.Fetched = n
-			return res, err
+	// Only move the "older" cursor when this run walks the list from the
+	// cursor's position (older mode, or the very first latest run).
+	moveCursor := mode == FetchOlder || neverFetched
+	newCount, hitKnown := 0, false
+	for max <= 0 || newCount < max {
+		if err := ctx.Err(); err != nil {
+			return err
 		}
+		per := 50
+		if max > 0 {
+			per = min(50, max-newCount)
+		}
+		page, next, _, err := c.PlaylistItemsPage(ctx, ch.UploadsPlaylistID, token, per)
+		if err != nil {
+			return err
+		}
+		var ids []string
 		for _, id := range page {
 			if s.st.HasVideo(id) {
 				hitKnown = true
@@ -245,40 +297,79 @@ func (s *Service) FetchVideos(ctx context.Context, channelID string, mode FetchM
 			}
 			ids = append(ids, id)
 		}
-		token = next
-		if next == "" {
-			exhausted = true
-			break
+		n, err := s.storeVideos(ctx, c, ids)
+		res.Fetched += n
+		res.New += len(ids)
+		newCount += len(ids)
+		if err != nil {
+			return err
 		}
 		if mode == FetchLatest && hitKnown {
+			moveCursor = false
+		}
+		exhausted := next == ""
+		if err := s.st.UpdateChannel(ch.ID, func(c *store.Channel) {
+			c.LastFetchedAt = time.Now()
+			if moveCursor {
+				c.OlderPageToken, c.ReachedEnd = next, exhausted
+			}
+		}); err != nil {
+			return err
+		}
+		stored := len(s.st.VideoIDsByChannel(ch.ID))
+		progress.report(stored, total, fmt.Sprintf("保存済み %d 本（今回の新規 %d 本）", stored, res.New))
+		token = next
+		if exhausted || (mode == FetchLatest && hitKnown) {
 			break
 		}
 	}
+	return nil
+}
 
-	res.New = len(ids)
-	n, err := s.storeVideos(ctx, c, ids)
-	res.Fetched = n
-	if err != nil {
-		return res, err
-	}
-
-	uerr := s.st.UpdateChannel(channelID, func(c *store.Channel) {
-		c.LastFetchedAt = time.Now()
-		// Only move the "older" cursor when this run walked the list from
-		// the cursor's position (older mode, or the very first latest run).
-		if mode == FetchOlder || (neverFetched && !hitKnown) {
-			c.OlderPageToken = token
-			c.ReachedEnd = exhausted
+// refetch re-reads the whole uploads list and every video's details.
+func (s *Service) refetch(ctx context.Context, c *youtube.Client, ch store.Channel, res *FetchResult, total int, progress Progress) error {
+	seen := map[string]bool{}
+	token := ""
+	for {
+		if err := ctx.Err(); err != nil {
+			return err
 		}
-		res.ReachedEnd = c.ReachedEnd
-		res.HasOlder = !c.ReachedEnd
+		page, next, _, err := c.PlaylistItemsPage(ctx, ch.UploadsPlaylistID, token, 50)
+		if err != nil {
+			return err
+		}
+		for _, id := range page {
+			if !s.st.HasVideo(id) {
+				res.New++
+			}
+			seen[id] = true
+		}
+		n, err := s.storeVideos(ctx, c, page)
+		res.Fetched += n
+		if err != nil {
+			return err
+		}
+		progress.report(len(seen), total, fmt.Sprintf("再取得 %d 本", len(seen)))
+		if next == "" {
+			break
+		}
+		token = next
+	}
+	// The walk completed, so anything not listed is gone from the channel.
+	removed, err := s.st.PruneChannelVideos(ch.ID, seen)
+	res.Removed = removed
+	if err != nil {
+		return err
+	}
+	return s.st.UpdateChannel(ch.ID, func(c *store.Channel) {
+		c.LastFetchedAt = time.Now()
+		c.OlderPageToken, c.ReachedEnd = "", true
 	})
-	return res, uerr
 }
 
 // RefreshStats re-reads statistics of every stored video of a channel.
 // Cost: 1 unit per 50 stored videos.
-func (s *Service) RefreshStats(ctx context.Context, channelID string) (FetchResult, error) {
+func (s *Service) RefreshStats(ctx context.Context, channelID string, progress Progress) (FetchResult, error) {
 	var res FetchResult
 	unlock, err := s.lock("ch:" + channelID)
 	if err != nil {
@@ -290,9 +381,19 @@ func (s *Service) RefreshStats(ctx context.Context, channelID string) (FetchResu
 		return res, err
 	}
 	c := s.client(&res.Usage)
-	n, err := s.storeVideos(ctx, c, s.st.VideoIDsByChannel(channelID))
-	res.Fetched = n
-	return res, err
+	ids := s.st.VideoIDsByChannel(channelID)
+	for i := 0; i < len(ids); i += 50 {
+		if err := ctx.Err(); err != nil {
+			return res, err
+		}
+		n, err := s.storeVideos(ctx, c, ids[i:min(i+50, len(ids))])
+		res.Fetched += n
+		if err != nil {
+			return res, err
+		}
+		progress.report(res.Fetched, len(ids), fmt.Sprintf("統計更新 %d / %d 本", res.Fetched, len(ids)))
+	}
+	return res, nil
 }
 
 // ── Playlists ────────────────────────────────────────────
@@ -303,12 +404,9 @@ type PlaylistsResult struct {
 	Fetched int `json:"fetched"`
 }
 
-// FetchPlaylists fetches the public playlists of a channel (1 unit / 50).
-func (s *Service) FetchPlaylists(ctx context.Context, channelID string, maxPages int) (PlaylistsResult, error) {
+// FetchPlaylists fetches all public playlists of a channel (1 unit / 50).
+func (s *Service) FetchPlaylists(ctx context.Context, channelID string, progress Progress) (PlaylistsResult, error) {
 	var res PlaylistsResult
-	if maxPages <= 0 {
-		maxPages = 4
-	}
 	unlock, err := s.lock("pl-of:" + channelID)
 	if err != nil {
 		return res, err
@@ -320,70 +418,82 @@ func (s *Service) FetchPlaylists(ctx context.Context, channelID string, maxPages
 	}
 	c := s.client(&res.Usage)
 	token := ""
-	var all []store.Playlist
-	for i := 0; i < maxPages; i++ {
-		ps, next, err := c.PlaylistsPage(ctx, channelID, token)
-		if err != nil {
-			_ = s.st.UpsertPlaylists(all)
-			res.Fetched = len(all)
+	for {
+		if err := ctx.Err(); err != nil {
 			return res, err
 		}
+		ps, next, err := c.PlaylistsPage(ctx, channelID, token)
+		if err != nil {
+			return res, err
+		}
+		page := make([]store.Playlist, 0, len(ps))
 		for _, p := range ps {
 			pub, _ := time.Parse(time.RFC3339, p.Snippet.PublishedAt)
-			all = append(all, store.Playlist{
+			page = append(page, store.Playlist{
 				ID: p.ID, ChannelID: channelID, Title: p.Snippet.Title,
 				Description: p.Snippet.Description, ThumbnailURL: p.Snippet.Thumbnails.Best(),
 				PublishedAt: pub, ItemCount: p.ContentDetails.ItemCount,
 			})
 		}
+		if err := s.st.UpsertPlaylists(page); err != nil {
+			return res, err
+		}
+		res.Fetched += len(page)
+		progress.report(res.Fetched, 0, fmt.Sprintf("再生リスト %d 件", res.Fetched))
 		if next == "" {
-			break
+			return res, nil
 		}
 		token = next
 	}
-	res.Fetched = len(all)
-	return res, s.st.UpsertPlaylists(all)
 }
 
-// FetchPlaylistVideos fetches up to max videos of a playlist in order.
-func (s *Service) FetchPlaylistVideos(ctx context.Context, playlistID string, max int) (FetchResult, error) {
+// FetchPlaylistVideos fetches the videos of a playlist in order
+// (max <= 0 = the whole playlist). Re-running it re-reads the playlist and
+// refreshes every video's details.
+func (s *Service) FetchPlaylistVideos(ctx context.Context, playlistID string, max int, progress Progress) (FetchResult, error) {
 	var res FetchResult
-	if max <= 0 {
-		max = 200
-	}
 	unlock, err := s.lock("pl:" + playlistID)
 	if err != nil {
 		return res, err
 	}
 	defer unlock()
 	defer s.st.Flush()
-	if _, err := s.st.Playlist(playlistID); err != nil {
+	pl, err := s.st.Playlist(playlistID)
+	if err != nil {
 		return res, err
 	}
 	c := s.client(&res.Usage)
 	var ids []string
 	token := ""
-	for len(ids) < max {
-		page, next, _, err := c.PlaylistItemsPage(ctx, playlistID, token, max-len(ids))
+	for max <= 0 || len(ids) < max {
+		if err := ctx.Err(); err != nil {
+			return res, err
+		}
+		per := 50
+		if max > 0 {
+			per = min(50, max-len(ids))
+		}
+		page, next, _, err := c.PlaylistItemsPage(ctx, playlistID, token, per)
+		if err != nil {
+			return res, err
+		}
+		for _, id := range page {
+			if !s.st.HasVideo(id) {
+				res.New++
+			}
+		}
+		n, err := s.storeVideos(ctx, c, page)
+		res.Fetched += n
 		if err != nil {
 			return res, err
 		}
 		ids = append(ids, page...)
+		progress.report(len(ids), pl.ItemCount, fmt.Sprintf("再生リストの動画 %d 本", len(ids)))
 		if next == "" {
 			res.ReachedEnd = true
 			break
 		}
 		token = next
-	}
-	for _, id := range ids {
-		if !s.st.HasVideo(id) {
-			res.New++
-		}
-	}
-	n, err := s.storeVideos(ctx, c, ids)
-	res.Fetched = n
-	if err != nil {
-		return res, err
 	}
 	return res, s.st.SetPlaylistVideos(playlistID, ids)
 }

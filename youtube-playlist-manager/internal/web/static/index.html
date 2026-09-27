@@ -31,17 +31,28 @@
     <section class="panel" id="channel-panel" hidden>
       <h2 id="cp-title"></h2>
       <p class="muted small" id="cp-meta"></p>
-      <label class="row small">取得件数
-        <select id="cp-max">
-          <option>10</option><option>25</option><option selected>50</option>
-          <option>100</option><option>200</option><option>500</option>
-        </select>
-      </label>
+      <h3>動画一覧（API クォータを使用）</h3>
       <div class="actions">
-        <button class="btn primary" data-act="latest">⟳ 最新の動画を取得</button>
-        <button class="btn" data-act="older">⤓ さらに古い動画を取得</button>
-        <button class="btn" data-act="stats">📊 保存済み動画の統計を更新</button>
+        <button class="btn primary" data-act="latest" title="新しい順に読み、保存済みの動画に当たったら止めます">⟳ 差分更新（新着のみ）</button>
+        <button class="btn" data-act="all" title="まだ保存していない動画をすべて取得します。途中で止まっても続きから再開できます">⤓ 全動画を取得</button>
+        <div class="row-btn">
+          <button class="btn" data-act="older">⤓ 古い動画を</button>
+          <select id="cp-max" aria-label="取得件数">
+            <option>50</option><option selected>100</option><option>200</option><option>500</option>
+          </select>
+          <span class="small muted">本ずつ</span>
+        </div>
+        <button class="btn" data-act="refetch" title="全動画のタイトル・概要・統計を取り直し、削除された動画を一覧から外します">↻ 全動画を再取得</button>
+        <button class="btn" data-act="stats">📊 統計のみ更新</button>
         <button class="btn" data-act="playlists">☰ 再生リスト一覧を取得</button>
+      </div>
+      <h3>字幕・文字起こし（クォータ不要）</h3>
+      <div class="actions">
+        <button class="btn" data-act="tr-missing">📝 字幕を取得（未取得分）</button>
+        <button class="btn" data-act="tr-all">📝 字幕をすべて再取得</button>
+      </div>
+      <h3>チャンネル</h3>
+      <div class="actions">
         <button class="btn ghost" data-act="refresh">ℹ チャンネル情報を更新</button>
         <button class="btn danger ghost" data-act="delete">🗑 登録解除</button>
       </div>
@@ -70,6 +81,7 @@
         <button data-view="list">☰ リスト</button>
       </div>
       <div class="export">
+        <label class="small check" title="エクスポートに字幕の全文を含めます"><input type="checkbox" id="exp-tr"> 字幕を含める</label>
         <a class="btn ghost" id="exp-csv">CSV</a>
         <a class="btn ghost" id="exp-json">JSON</a>
       </div>
@@ -123,6 +135,24 @@ youtube-playlist-manager-windows-amd64.exe</code></pre>
   </form>
 </dialog>
 
+<dialog id="tr-dialog" class="tr-dialog">
+  <div class="tr-head">
+    <div class="tr-titles">
+      <h2 id="tr-title"></h2>
+      <p class="small muted" id="tr-meta"></p>
+    </div>
+    <button class="btn ghost" id="tr-close" aria-label="閉じる">✕</button>
+  </div>
+  <div class="tr-tools">
+    <input id="tr-q" type="search" placeholder="字幕内を検索">
+    <button class="btn" id="tr-copy">📋 全文コピー</button>
+    <button class="btn" id="tr-refetch">↻ 再取得</button>
+    <a class="btn ghost" id="tr-open" target="_blank" rel="noopener">▶ YouTube で開く</a>
+  </div>
+  <div class="tr-body" id="tr-body"></div>
+</dialog>
+
+<div class="jobs" id="jobs"></div>
 <div class="toasts" id="toasts"></div>
 <script src="app.js"></script>
 </body>

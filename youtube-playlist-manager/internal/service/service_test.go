@@ -24,6 +24,7 @@ type fakeYT struct {
 	uploads   []string // newest first
 	playlists map[string][]string
 	calls     map[string]int
+	titleTag  string
 }
 
 func newFake(n int) *fakeYT {
@@ -81,7 +82,7 @@ func (f *fakeYT) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			items = append(items, map[string]any{
 				"id": id,
 				"snippet": map[string]any{
-					"channelId": owner, "title": "Title " + id, "description": "desc",
+					"channelId": owner, "title": "Title " + id + f.titleTag, "description": "desc",
 					"publishedAt": time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339),
 				},
 				"contentDetails": map[string]any{"duration": "PT4M13S"},
@@ -131,7 +132,7 @@ func TestFetchFlow(t *testing.T) {
 	}
 
 	// First latest fetch: newest 50.
-	r, err := svc.FetchVideos(ctx, chID, FetchLatest, 50)
+	r, err := svc.FetchVideos(ctx, chID, FetchLatest, 50, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,19 +141,19 @@ func TestFetchFlow(t *testing.T) {
 	}
 
 	// Continue older twice → reaches the end.
-	r, err = svc.FetchVideos(ctx, chID, FetchOlder, 50)
+	r, err = svc.FetchVideos(ctx, chID, FetchOlder, 50, nil)
 	if err != nil || r.New != 50 {
 		t.Fatalf("older#1: %+v %v", r, err)
 	}
 	if !st.HasVideo("v099") || st.HasVideo("v100") {
 		t.Fatal("older#1 fetched the wrong range")
 	}
-	r, err = svc.FetchVideos(ctx, chID, FetchOlder, 50)
+	r, err = svc.FetchVideos(ctx, chID, FetchOlder, 50, nil)
 	if err != nil || r.New != 20 || !r.ReachedEnd {
 		t.Fatalf("older#2: %+v %v", r, err)
 	}
 	// Further older requests cost nothing.
-	r, err = svc.FetchVideos(ctx, chID, FetchOlder, 50)
+	r, err = svc.FetchVideos(ctx, chID, FetchOlder, 50, nil)
 	if err != nil || r.Units != 0 || !r.ReachedEnd {
 		t.Fatalf("older#3: %+v %v", r, err)
 	}
@@ -161,7 +162,7 @@ func TestFetchFlow(t *testing.T) {
 	f.mu.Lock()
 	f.uploads = append([]string{"n2", "n1", "n0"}, f.uploads...)
 	f.mu.Unlock()
-	r, err = svc.FetchVideos(ctx, chID, FetchLatest, 50)
+	r, err = svc.FetchVideos(ctx, chID, FetchLatest, 50, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -173,13 +174,13 @@ func TestFetchFlow(t *testing.T) {
 	}
 
 	// Nothing new → 1 unit (playlistItems only).
-	r, err = svc.FetchVideos(ctx, chID, FetchLatest, 50)
+	r, err = svc.FetchVideos(ctx, chID, FetchLatest, 50, nil)
 	if err != nil || r.New != 0 || r.Units != 1 {
 		t.Fatalf("latest#3: %+v %v", r, err)
 	}
 
 	// Refresh stats: 123 videos → 3 units.
-	r, err = svc.RefreshStats(ctx, chID)
+	r, err = svc.RefreshStats(ctx, chID, nil)
 	if err != nil || r.Fetched != 123 || r.Units != 3 {
 		t.Fatalf("stats: %+v %v", r, err)
 	}
@@ -197,13 +198,13 @@ func TestOlderWithoutPriorLatest(t *testing.T) {
 		t.Fatal(err)
 	}
 	// A playlist fetch stores a few of the channel's videos first.
-	if _, err := svc.FetchPlaylists(ctx, chID, 1); err != nil {
+	if _, err := svc.FetchPlaylists(ctx, chID, nil); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := svc.FetchPlaylistVideos(ctx, "PL1", 0); err != nil {
+	if _, err := svc.FetchPlaylistVideos(ctx, "PL1", 0, nil); err != nil {
 		t.Fatal(err)
 	}
-	r, err := svc.FetchVideos(ctx, chID, FetchOlder, 50)
+	r, err := svc.FetchVideos(ctx, chID, FetchOlder, 50, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -222,11 +223,11 @@ func TestPlaylists(t *testing.T) {
 	if _, _, err := svc.AddChannel(ctx, "@fake"); err != nil {
 		t.Fatal(err)
 	}
-	pr, err := svc.FetchPlaylists(ctx, chID, 0)
+	pr, err := svc.FetchPlaylists(ctx, chID, nil)
 	if err != nil || pr.Fetched != 1 || pr.Units != 1 {
 		t.Fatalf("playlists: %+v %v", pr, err)
 	}
-	r, err := svc.FetchPlaylistVideos(ctx, "PL1", 0)
+	r, err := svc.FetchPlaylistVideos(ctx, "PL1", 0, nil)
 	if err != nil || r.Fetched != 3 || !r.ReachedEnd {
 		t.Fatalf("playlist videos: %+v %v", r, err)
 	}
@@ -235,7 +236,7 @@ func TestPlaylists(t *testing.T) {
 		t.Fatalf("playlist order not kept: %+v", vs)
 	}
 	// Re-fetching the playlist list keeps the fetched videos.
-	if _, err := svc.FetchPlaylists(ctx, chID, 0); err != nil {
+	if _, err := svc.FetchPlaylists(ctx, chID, nil); err != nil {
 		t.Fatal(err)
 	}
 	p, _ := st.Playlist("PL1")
@@ -258,7 +259,7 @@ func TestPersistence(t *testing.T) {
 	if _, _, err := svc.AddChannel(ctx, "@fake"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := svc.FetchVideos(ctx, chID, FetchLatest, 50); err != nil {
+	if _, err := svc.FetchVideos(ctx, chID, FetchLatest, 50, nil); err != nil {
 		t.Fatal(err)
 	}
 
