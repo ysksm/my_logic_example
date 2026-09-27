@@ -87,6 +87,31 @@
       <input id="set-key" type="password" placeholder="AIza..." autocomplete="off">
     </label>
     <p class="hint" id="set-key-hint"></p>
+    <details class="env-help">
+      <summary>環境変数 <code>YOUTUBE_API_KEY</code> で設定する方法</summary>
+      <p class="hint">環境変数はこの画面で保存したキーより優先され、データファイルには保存されません。設定後はアプリを起動し直してください。</p>
+
+      <h3>macOS / Linux（ターミナル）</h3>
+      <p class="hint">その場で 1 回だけ使う:</p>
+      <pre><code>YOUTUBE_API_KEY=AIza... ./youtube-playlist-manager</code></pre>
+      <p class="hint">毎回使う（zsh。bash は <code>~/.bashrc</code>）:</p>
+      <pre><code>echo 'export YOUTUBE_API_KEY=AIza...' &gt;&gt; ~/.zshrc
+source ~/.zshrc
+./youtube-playlist-manager</code></pre>
+
+      <h3>Windows（PowerShell）</h3>
+      <p class="hint">その場で 1 回だけ使う:</p>
+      <pre><code>$env:YOUTUBE_API_KEY = "AIza..."
+.\youtube-playlist-manager-windows-amd64.exe</code></pre>
+      <p class="hint">毎回使う（設定後、PowerShell を開き直す）:</p>
+      <pre><code>setx YOUTUBE_API_KEY "AIza..."</code></pre>
+
+      <h3>Windows（コマンドプロンプト）</h3>
+      <pre><code>set YOUTUBE_API_KEY=AIza...
+youtube-playlist-manager-windows-amd64.exe</code></pre>
+
+      <p class="hint">解除するには、macOS / Linux は <code>unset YOUTUBE_API_KEY</code>（シェル設定ファイルの行も削除）、Windows は <code>[Environment]::SetEnvironmentVariable("YOUTUBE_API_KEY", $null, "User")</code> を実行します。</p>
+    </details>
     <label>1 日のクォータ上限（表示用）
       <input id="set-limit" type="number" min="1" step="1">
     </label>

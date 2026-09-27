@@ -53,9 +53,42 @@ make build
 
 API キーは画面右上の「⚙ 設定」から保存するか、環境変数で渡します（環境変数が優先）。
 
+#### 環境変数での設定方法
+
+環境変数のキーは設定画面で保存したキーより優先され、データファイルには保存されません。
+変更後はアプリを再起動してください（設定画面の「環境変数で設定する方法」にも同じ手順を表示しています）。
+
+**macOS / Linux**
+
 ```bash
+# その場で 1 回だけ
 YOUTUBE_API_KEY=AIza... ./bin/youtube-playlist-manager
+
+# 毎回使う（zsh。bash は ~/.bashrc）
+echo 'export YOUTUBE_API_KEY=AIza...' >> ~/.zshrc
+source ~/.zshrc
 ```
+
+**Windows（PowerShell）**
+
+```powershell
+# その場で 1 回だけ
+$env:YOUTUBE_API_KEY = "AIza..."
+.\youtube-playlist-manager-windows-amd64.exe
+
+# 毎回使う（設定後、PowerShell を開き直す）
+setx YOUTUBE_API_KEY "AIza..."
+```
+
+**Windows（コマンドプロンプト）**
+
+```bat
+set YOUTUBE_API_KEY=AIza...
+youtube-playlist-manager-windows-amd64.exe
+```
+
+解除: macOS / Linux は `unset YOUTUBE_API_KEY`（シェル設定ファイルの行も削除）、
+Windows は PowerShell で `[Environment]::SetEnvironmentVariable("YOUTUBE_API_KEY", $null, "User")`。
 
 ### 3. 配布用バイナリ
 
