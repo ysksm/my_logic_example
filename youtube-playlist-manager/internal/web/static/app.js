@@ -420,7 +420,7 @@ function openSettings() {
   $("#set-key").value = "";
   $("#set-limit").value = s.dailyLimit || 10000;
   $("#set-key-hint").textContent =
-    s.apiKeySource === "env" ? "環境変数 YOUTUBE_API_KEY が設定されているため、そちらが優先されます。"
+    s.apiKeySource === "env" ? "環境変数 YOUTUBE_API_KEY が設定されているため、そちらが優先されます（ここで入力したキーは使われません）。キーを変えるには環境変数を変更してアプリを再起動してください。"
     : s.apiKeySource === "settings" ? `保存済み: ${s.apiKeyMasked}（空欄のまま保存すると変更しません）`
     : "Google Cloud Console で YouTube Data API v3 を有効化し、API キーを作成してください。";
   $("#settings").showModal();

@@ -184,3 +184,13 @@ dialog label { display: grid; gap: 4px; margin-top: 12px; }
   .quota-label, .meter { display: none; }
   .toolbar input[type=search] { width: 100%; order: 5; }
 }
+
+.env-help { margin: 4px 0 8px; border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; background: var(--surface-2); }
+.env-help summary { cursor: pointer; font-size: 13px; font-weight: 600; }
+.env-help h3 { font-size: 12px; margin: 12px 0 2px; }
+.env-help pre {
+  margin: 4px 0; padding: 8px; border-radius: 6px; background: var(--bg); border: 1px solid var(--border);
+  overflow-x: auto; font-size: 12px; line-height: 1.5;
+}
+.env-help code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+dialog { max-height: 90vh; overflow-y: auto; }
