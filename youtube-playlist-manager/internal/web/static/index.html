@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>YouTube Playlist Manager</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%23d92d20%22/%3E%3Cpath d=%22M12 9l12 7-12 7z%22 fill=%22white%22/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <h1>▶ YouTube Playlist Manager</h1>
+  <div class="quota" id="quota" title="YouTube Data API の本日の使用量（太平洋時間 0 時リセット・このアプリ経由の分のみ）">
+    <span class="quota-label">API クォータ</span>
+    <div class="meter"><div class="meter-fill" id="quota-fill"></div></div>
+    <span id="quota-text">-</span>
+  </div>
+  <button class="btn ghost" id="btn-settings">⚙ 設定</button>
+</header>
+
+<div class="layout">
+  <aside class="sidebar">
+    <form id="add-form" class="add-form">
+      <input id="add-input" type="text" placeholder="チャンネル URL / @ハンドル / UC... ID" autocomplete="off">
+      <button class="btn primary" type="submit">追加</button>
+    </form>
+    <p class="hint">追加時の消費: 1 unit（動画はまだ取得しません）</p>
+
+    <ul class="channel-list" id="channel-list"></ul>
+
+    <section class="panel" id="channel-panel" hidden>
+      <h2 id="cp-title"></h2>
+      <p class="muted small" id="cp-meta"></p>
+      <label class="row small">取得件数
+        <select id="cp-max">
+          <option>10</option><option>25</option><option selected>50</option>
+          <option>100</option><option>200</option><option>500</option>
+        </select>
+      </label>
+      <div class="actions">
+        <button class="btn primary" data-act="latest">⟳ 最新の動画を取得</button>
+        <button class="btn" data-act="older">⤓ さらに古い動画を取得</button>
+        <button class="btn" data-act="stats">📊 保存済み動画の統計を更新</button>
+        <button class="btn" data-act="playlists">☰ 再生リスト一覧を取得</button>
+        <button class="btn ghost" data-act="refresh">ℹ チャンネル情報を更新</button>
+        <button class="btn danger ghost" data-act="delete">🗑 登録解除</button>
+      </div>
+      <p class="hint" id="cp-cost"></p>
+
+      <h3>再生リスト</h3>
+      <ul class="playlist-list" id="playlist-list"></ul>
+    </section>
+  </aside>
+
+  <main class="main">
+    <div class="toolbar">
+      <div class="crumb" id="crumb">すべてのチャンネル</div>
+      <input id="q" type="search" placeholder="タイトル・概要で絞り込み">
+      <select id="sort">
+        <option value="date-desc">公開日（新しい順）</option>
+        <option value="date-asc">公開日（古い順）</option>
+        <option value="views">再生回数</option>
+        <option value="likes">いいね数</option>
+        <option value="comments">コメント数</option>
+        <option value="title">タイトル</option>
+        <option value="playlist">再生リスト順</option>
+      </select>
+      <div class="seg" role="group" aria-label="表示切替">
+        <button data-view="grid" class="on">▦ グリッド</button>
+        <button data-view="list">☰ リスト</button>
+      </div>
+      <div class="export">
+        <a class="btn ghost" id="exp-csv">CSV</a>
+        <a class="btn ghost" id="exp-json">JSON</a>
+      </div>
+    </div>
+    <p class="count muted small" id="count"></p>
+    <div id="videos"></div>
+    <div class="empty" id="empty" hidden></div>
+  </main>
+</div>
+
+<dialog id="settings">
+  <form method="dialog" id="settings-form">
+    <h2>設定</h2>
+    <label>YouTube Data API キー
+      <input id="set-key" type="password" placeholder="AIza..." autocomplete="off">
+    </label>
+    <p class="hint" id="set-key-hint"></p>
+    <label>1 日のクォータ上限（表示用）
+      <input id="set-limit" type="number" min="1" step="1">
+    </label>
+    <p class="hint">既定は 10,000 units / 日。リセットは太平洋時間 0 時（日本時間 16〜17 時）。</p>
+    <div class="dialog-actions">
+      <button class="btn ghost" value="cancel" formnovalidate>キャンセル</button>
+      <button class="btn primary" value="save" id="set-save">保存</button>
+    </div>
+  </form>
+</dialog>
+
+<div class="toasts" id="toasts"></div>
+<script src="app.js"></script>
+</body>
+</html>

@@ -18,6 +18,7 @@
 | [jd-go](./jd-go) | Jira 連携 | Go + DuckDB + HTMX/Alpine | 🟡 動作する試作 | — |
 | [lpic-exam-app](./lpic-exam-app) | 学習 / 試験対策 | Ruby on Rails 8 + SQLite + Hotwire | 🟡 動作する試作 | — |
 | [screen-flow-designer](./screen-flow-designer) | 画面遷移図 | React + TypeScript + React Flow + Playwright | 🟡 動作する試作 | — |
+| [youtube-playlist-manager](./youtube-playlist-manager) | YouTube 動画リスト | Go + 埋め込み Web UI（単一バイナリ） | 🟡 動作する試作 | — |
 | [npm-vuln-trends](./npm-vuln-trends) | セキュリティ / 集計 | Bun + TypeScript + SQLite + 静的 HTML/SVG | 🟡 動作する試作 | — |
 | [screen-transition-map](./screen-transition-map) | 画面遷移図 / ドキュメント | React + TypeScript + React Flow + Playwright | 🟡 動作する試作 | — |
 | [stock-price-viewer](./stock-price-viewer) | データ ETL | Python + marimo + yfinance | 🟡 動作する試作 | — |
@@ -76,6 +77,9 @@ LPIC-1 (101/102) の受験対策アプリ。章（LPIC の主題番号）を指�
 #### [screen-flow-designer](./screen-flow-designer) — React Flow 画面遷移図デザイナー
 画面をノード、遷移(クリック / フォーム送信など)をエッジとして GUI で編集できる画面遷移図ツール。dagre 自動レイアウト、localStorage 自動保存、JSON エクスポート / インポート(置換・マージ)対応。同梱の Playwright クローラーが実サイトを巡回して同フォーマットの JSON を生成し、マージインポートで手動配置を保持したまま図へ反映できる。
 
+#### [youtube-playlist-manager](./youtube-playlist-manager) — YouTube チャンネル動画リスト管理
+YouTube チャンネルを複数登録し、チャンネル単位でオンデマンドに動画リスト（タイトル・概要・再生回数・いいね・コメント数・公開日）を取得してグリッド / リスト表示する単一バイナリアプリ。クリックで動画ページへ。`search.list`（100 units）を避けて uploads 再生リスト経由（50 件 2 units）で取得し、差分取得・続き取得・統計のみ更新・再生リスト単位の取得と本日のクォータメーターで API 上限を管理する。Go 標準ライブラリのみ・cgo なしで macOS / Windows / Linux にクロスコンパイル可能。偽 API サーバを使ったテストあり。
+
 #### [npm-vuln-trends](./npm-vuln-trends) — npm の不具合・脆弱性の時系列集計
 GitHub Advisory Database / OSV / GitHub Issues / npm audit から公式情報を収集し、内容別 (CWE→カテゴリ) の変化を月次で可視化するツール。原本保存 → 正規化・履歴 → 月次集計 → 静的 HTML/SVG/CSV のパイプライン構成で、SQLite 1 ファイルと静的出力だけで完結する。alias による重複統合・公開月と観測時点の区別 (`--as-of`)・撤回の除外・欠測と 0 件の区別といった「数え方の不変条件」をテストで固定している。実データなしでも `bun run demo` で全体を確認できる。
 
@@ -126,7 +130,7 @@ YouTube Data API でチャンネル／動画情報を取得して DuckDB に保�
 
 ## 技術スタック別インデックス
 
-- **Go** — cad-viewer / chrome_dev_tool / ddd-diagram-generator / ddd-ui-designer / exporters (mac/go-exporter) / jd-go / pcap-go / ticket-manager / ui-builder / webcam-go
+- **Go** — cad-viewer / chrome_dev_tool / ddd-diagram-generator / ddd-ui-designer / exporters (mac/go-exporter) / jd-go / pcap-go / ticket-manager / ui-builder / webcam-go / youtube-playlist-manager
 - **Python (marimo)** — chrome_dev_tool_remote / jira_db_sync / stock-price-viewer / youtube_list
 - **React + Vite + TypeScript** — chrome_dev_tool (UI) / ddd-diagram-generator (UI) / ddd-ui-designer (UI) / pcap-go (UI) / react-calendar-poc / react-ghost-click-poc / ticket-manager (UI) / ui-builder (UI)
 - **CRA + Redux** — polling-app
@@ -141,6 +145,6 @@ YouTube Data API でチャンネル／動画情報を取得して DuckDB に保�
 - **3D / 可視化** — babylon-js-learning, cad-viewer, pcap-go (パケット可視化)
 - **DDD / モデリング** — ddd-diagram-generator, ddd-ui-designer, ui-builder
 - **業務 / 社内ツール** — jd-go, jira_db_sync, ticket-manager
-- **データ収集 / ETL** — chrome_dev_tool, chrome_dev_tool_remote, exporters, stock-price-viewer, youtube_list
+- **データ収集 / ETL** — chrome_dev_tool, chrome_dev_tool_remote, exporters, stock-price-viewer, youtube_list, youtube-playlist-manager
 - **ストリーミング / メディア** — pcap-go, webcam-go
 - **フロントエンド学習** — polling-app, react-calendar-poc, react-ghost-click-poc
