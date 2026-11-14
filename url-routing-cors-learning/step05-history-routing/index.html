@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STEP 5 History API ルーティング</title>
+<!-- 深い URL (/step05-history-routing/app/users/1) で開かれても読めるよう、絶対パスで指定する -->
+<link rel="stylesheet" href="/common.css">
+<style>
+  #app { min-height: 160px; border: 2px dashed var(--teal); border-radius: 10px; padding: 14px 16px; }
+  #app h3 { margin-top: 0; }
+</style>
+</head>
+<body>
+<header class="page-header">
+  <a href="/" class="back">← 目次</a>
+  <p class="step-label">STEP 05</p>
+  <h1>History API ルーティング</h1>
+  <p class="subtitle"><code>#</code> を使わず、<code>/app/users/1</code> のような普通の URL のまま、リロードせずに画面を切り替えます。React Router や Vue Router の標準モードと同じ仕組みです。</p>
+</header>
+<main>
+
+  <section class="card">
+    <h2>1. ミニ SPA</h2>
+    <nav class="route-nav" id="nav">
+      <a href="/step05-history-routing/app/" data-link>/app/</a>
+      <a href="/step05-history-routing/app/users" data-link>/app/users</a>
+      <a href="/step05-history-routing/app/users/1" data-link>/app/users/1</a>
+      <a href="/step05-history-routing/app/users/2" data-link>/app/users/2</a>
+      <a href="/step05-history-routing/app/users?sort=desc" data-link>/app/users?sort=desc</a>
+      <a href="/step05-history-routing/app/nothing" data-link>/app/nothing (404)</a>
+    </nav>
+    <p class="hint">ページ読み込み時刻: <code id="loadedAt"></code> ／ 現在の URL: <code id="currentUrl"></code></p>
+    <div id="app"></div>
+    <div class="row">
+      <button id="back">history.back()</button>
+      <button id="reload" class="primary">この URL でリロード（location.reload()）</button>
+    </div>
+    <h3>ルーティングのログ</h3>
+    <div class="log" id="log"></div>
+  </section>
+
+  <section class="card">
+    <h2>2. 仕組み</h2>
+<pre><span class="c">// ① リンクのクリックを横取りして、ページ遷移を止める</span>
+document.addEventListener("click", (e) =&gt; {
+  const a = e.target.closest("a[data-link]");
+  if (!a) return;
+  e.preventDefault();                      <span class="c">// ← これがないと普通にサーバーへリクエストされる</span>
+  navigate(a.getAttribute("href"));
+});
+
+<span class="c">// ② URL だけ書き換えて（リクエストなし）、画面を描き直す</span>
+function navigate(url) {
+  history.<span class="k">pushState</span>(null, "", url);      <span class="c">// 履歴に積む。popstate は発生しない</span>
+  router();
+}
+
+<span class="c">// ③ ブラウザの「戻る / 進む」で URL が変わったとき</span>
+window.addEventListener(<span class="k">"popstate"</span>, router);
+
+<span class="c">// ④ 現在の location.pathname を見て描画（最初の読み込み時も）</span>
+function router() {
+  const path = location.pathname.replace(BASE, "/");   <span class="c">// "/step05-history-routing/app/users/1" → "/users/1"</span>
+  const query = new URLSearchParams(location.search);
+  … STEP 4 と同じ照合処理 …
+}
+router();</pre>
+  </section>
+
+  <section class="card">
+    <h2>3. ⚠ リロードするとどうなる？ ── サーバー側の「フォールバック」が必要</h2>
+    <p>pushState で作った URL は <b>ブラウザが勝手に作った URL</b> です。その URL でリロードやブックマークからアクセスすると、ブラウザは普通に <b>サーバーへ</b> リクエストします。</p>
+<pre>GET /step05-history-routing/app/users/1
+       ↓
+サーバー「そんなファイルは無い」→ <span class="bad">404 Not Found</span>   <span class="c">← フォールバックが無い場合</span>
+サーバー「/app/ 以下は全部 index.html を返す」→ JS が URL を見て画面を復元 <span class="k">✓</span></pre>
+    <div class="row">
+      <a class="btn" href="/step05-history-routing/app/users/2">✅ フォールバックあり: /app/users/2 を直接開く</a>
+      <a class="btn" href="/step05-history-routing/no-fallback/users/2">❌ フォールバックなし: /no-fallback/users/2 を直接開く</a>
+    </div>
+    <p>server.js での実装（静的ファイルが見つからなかったときだけ index.html を返す）:</p>
+<pre>const SPA_PREFIX = "/step05-history-routing/app/";
+
+if (tryServeStatic(req, res, pathname)) return;        <span class="c">// ① 本物のファイルがあればそれを返す</span>
+
+if (pathname.startsWith(SPA_PREFIX)) {                  <span class="c">// ② 無ければ SPA の index.html を返す</span>
+  res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+  return fs.createReadStream(SPA_INDEX).pipe(res);
+}</pre>
+    <p class="hint">nginx なら <code>try_files $uri $uri/ /index.html;</code>、Vite の開発サーバーや Netlify / Vercel では設定済み、あるいは <code>_redirects</code> 等で指定します。</p>
+    <div class="callout warn">index.html 内の CSS / JS を <code>./common.css</code> のような <b>相対パス</b> で書くと、<code>/app/users/1</code> で開いたときに <code>/app/users/common.css</code> を探しに行って壊れます。<b>絶対パス</b> (<code>/common.css</code>) にしましょう。</div>
+  </section>
+
+  <section class="card">
+    <h2>4. 3 つのルーティングの比較</h2>
+    <table class="kv">
+      <tr><th></th><td><b>サーバー (STEP 3)</b> ／ <b>ハッシュ (STEP 4)</b> ／ <b>History API (STEP 5)</b></td></tr>
+      <tr><th>URL の例</th><td><code>/items/2</code> ／ <code>/#/items/2</code> ／ <code>/items/2</code></td></tr>
+      <tr><th>遷移時の通信</th><td>あり（HTML 全体） ／ なし ／ なし</td></tr>
+      <tr><th>画面を作る人</th><td>サーバー ／ ブラウザの JS ／ ブラウザの JS</td></tr>
+      <tr><th>使うイベント</th><td>— ／ <code>hashchange</code> ／ <code>popstate</code> + <code>pushState</code></td></tr>
+      <tr><th>サーバー設定</th><td>ルートごとに実装 ／ 不要 ／ フォールバック必須</td></tr>
+    </table>
+  </section>
+
+  <nav class="step-footer">
+    <a href="/step04-hash-routing/" class="btn">← STEP 4</a>
+    <a href="/slides.html#step5" class="btn">📽 スライド</a>
+    <a href="/step06-cors-basics/" class="btn">STEP 6 CORS の基本 →</a>
+  </nav>
+</main>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const BASE = "/step05-history-routing/app/";
+  $("loadedAt").textContent = new Date().toLocaleTimeString("ja-JP");
+
+  const USERS = { 1: { name: "佐藤", role: "管理者" }, 2: { name: "鈴木", role: "編集者" }, 3: { name: "高橋", role: "閲覧者" } };
+
+  function el(tag, attrs = {}, ...children) {
+    const e = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (k === "dataset") Object.assign(e.dataset, v); else e[k] = v;
+    }
+    e.append(...children);
+    return e;
+  }
+  const link = (path, text) => el("a", { href: BASE + path.replace(/^\//, ""), dataset: { link: "" } }, text);
+
+  // ---- 画面 --------------------------------------------------
+  function homeView() {
+    const onApp = location.pathname.startsWith(BASE);
+    return [
+      el("h3", {}, "🏠 ホーム"),
+      el("p", {}, onApp
+        ? "上のリンクをクリックしてください。URL バーが変わるのにリロードされないことを確認しましょう。"
+        : "まだ SPA の URL (/app/…) ではありません。上のリンクをクリックしてみてください。"),
+    ];
+  }
+  function userListView(params, query) {
+    const desc = query.get("sort") === "desc";
+    const ids = Object.keys(USERS).sort((a, b) => (desc ? b - a : a - b));
+    return [
+      el("h3", {}, `👥 ユーザー一覧（sort=${desc ? "desc" : "asc"}）`),
+      el("ul", {}, ...ids.map((id) => el("li", {}, link(`/users/${id}`, `${id}: ${USERS[id].name}`)))),
+    ];
+  }
+  function userDetailView(params) {
+    const u = USERS[params.id];
+    if (!u) return notFoundView();
+    return [
+      el("h3", {}, `👤 ${u.name}`),
+      el("p", {}, `ID: ${params.id} / 役割: ${u.role}`),
+      el("p", { className: "hint" }, "この状態で「この URL でリロード」を押してみてください。サーバーのフォールバックのおかげで同じ画面に戻ってきます。"),
+      link("/users", "← 一覧へ"),
+    ];
+  }
+  function notFoundView() {
+    return [el("h3", {}, "🚫 404"), el("p", {}, "JS 側のルート定義に存在しないパスです。")];
+  }
+
+  // ---- ルーター ----------------------------------------------
+  const routes = [
+    { pattern: "/", view: homeView },
+    { pattern: "/users", view: userListView },
+    { pattern: "/users/:id", view: userDetailView },
+  ];
+
+  function matchRoute(pattern, path) {
+    const p = pattern.split("/").filter(Boolean);
+    const a = path.split("/").filter(Boolean);
+    if (p.length !== a.length) return null;
+    const params = {};
+    for (let i = 0; i < p.length; i++) {
+      if (p[i].startsWith(":")) {
+        try { params[p[i].slice(1)] = decodeURIComponent(a[i]); } catch { return null; } // 壊れた %xx → 不一致扱い
+      } else if (p[i] !== a[i]) return null;
+    }
+    return params;
+  }
+
+  function router(cause = "初回読み込み") {
+    // BASE より後ろをアプリ内パスとして扱う
+    const path = location.pathname.startsWith(BASE) ? "/" + location.pathname.slice(BASE.length) : "/";
+    const query = new URLSearchParams(location.search);
+    let nodes = notFoundView(), label = "404";
+    for (const r of routes) {
+      const params = matchRoute(r.pattern, path);
+      if (params) { nodes = r.view(params, query); label = `${r.pattern} ${JSON.stringify(params)}`; break; }
+    }
+    $("app").replaceChildren(...nodes);
+    $("currentUrl").textContent = location.pathname + location.search;
+    document.querySelectorAll("#nav a").forEach((a) => a.classList.toggle("active", a.getAttribute("href") === location.pathname + location.search));
+    $("log").prepend(el("div", {}, `${new Date().toLocaleTimeString("ja-JP")}  [${cause}] ${location.pathname}${location.search} → ${label}`));
+  }
+
+  function navigate(url) {
+    history.pushState(null, "", url);
+    router("pushState");
+  }
+
+  // data-link 付きのリンクだけ横取りする（それ以外の a は普通に遷移）
+  document.addEventListener("click", (e) => {
+    const a = e.target.closest("a[data-link]");
+    if (!a) return;
+    // Ctrl/⌘ クリック（新しいタブで開く）はブラウザに任せる
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+    e.preventDefault();
+    navigate(a.getAttribute("href"));
+  });
+
+  window.addEventListener("popstate", () => router("popstate"));
+  $("back").addEventListener("click", () => history.back());
+  $("reload").addEventListener("click", () => location.reload());
+
+  router();
+</script>
+</body>
+</html>

@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STEP 2 クエリパラメーター</title>
+<link rel="stylesheet" href="/common.css">
+</head>
+<body>
+<header class="page-header">
+  <a href="/" class="back">← 目次</a>
+  <p class="step-label">STEP 02</p>
+  <h1>クエリパラメーターで情報を渡す</h1>
+  <p class="subtitle"><code>?key=value&amp;key2=value2</code> は、ページ（やサーバー）に「追加の情報」を渡すための仕組みです。</p>
+</header>
+<main>
+
+  <section class="card">
+    <h2>1. フォームで別ページに値を渡す（JS なし）</h2>
+    <p><code>&lt;form method="get"&gt;</code> は入力値を自動でクエリパラメーターにして、<code>action</code> のページへ移動します。</p>
+    <form action="receive.html" method="get" class="row">
+      <input name="name" value="山田 太郎" aria-label="名前">
+      <select name="lang" aria-label="言語">
+        <option value="ja">日本語</option>
+        <option value="en">English</option>
+      </select>
+      <label><input type="checkbox" name="tag" value="html" checked> html</label>
+      <label><input type="checkbox" name="tag" value="js" checked> js</label>
+      <button class="primary">送信 → receive.html</button>
+    </form>
+<pre>&lt;form action="receive.html" method="get"&gt;
+  &lt;input name="name"&gt; &lt;select name="lang"&gt;…&lt;/select&gt;
+  &lt;input type="checkbox" name="tag" value="html"&gt; &lt;input type="checkbox" name="tag" value="js"&gt;
+&lt;/form&gt;
+<span class="c">// 送信すると次の URL に移動する（スペースは + 、日本語は %XX にエンコード）</span>
+receive.html?name=%E5%B1%B1%E7%94%B0+%E5%A4%AA%E9%83%8E&amp;lang=ja&amp;tag=html&amp;tag=js</pre>
+  </section>
+
+  <section class="card">
+    <h2>2. JavaScript でリンクを組み立てて渡す</h2>
+    <p>文字列連結ではなく <code>URLSearchParams</code> を使うと、エンコードを自動でやってくれます。</p>
+    <div class="row">
+      <input id="kw" value="A&amp;B=C 日本語?#" aria-label="キーワード">
+      <button id="build">URL を組み立てる</button>
+    </div>
+    <table class="kv">
+      <tr><th>❌ そのまま連結</th><td><code id="naive"></code></td></tr>
+      <tr><th>✅ URLSearchParams</th><td><code id="safe"></code></td></tr>
+    </table>
+    <p class="row"><a id="naiveLink" class="btn">❌ で開く</a><a id="safeLink" class="btn">✅ で開く</a></p>
+<pre><span class="c">// ❌ & や = や # が値の中にあると、区切り文字と区別できなくなる</span>
+<span class="bad">"receive.html?keyword=" + kw</span>
+
+<span class="c">// ✅ URLSearchParams がエンコードしてくれる</span>
+const params = new URLSearchParams({ keyword: kw, page: 1 });
+<span class="k">"receive.html?" + params.toString()</span>
+
+<span class="c">// ✅ URL オブジェクトでも同じ</span>
+const url = new URL("receive.html", location.href);
+url.searchParams.set("keyword", kw);</pre>
+  </section>
+
+  <section class="card">
+    <h2>3. 画面の状態を URL に保存する（リロード・共有しても復元される）</h2>
+    <p>絞り込み条件を URL に入れておくと、リロードしても、URL を他人に送っても同じ画面が出ます。</p>
+    <div class="row">
+      <label>カテゴリ
+        <select id="cat">
+          <option value="">すべて</option>
+          <option value="fruit">果物</option>
+          <option value="veg">野菜</option>
+        </select>
+      </label>
+      <label>並び順
+        <select id="sort">
+          <option value="name">名前</option>
+          <option value="price">価格</option>
+        </select>
+      </label>
+      <label>最大価格 <input id="max" type="number" step="50" min="0" style="width:7em"></label>
+    </div>
+    <ul id="list"></ul>
+    <p class="hint">現在の URL: <code id="currentUrl"></code><br>条件を変えたあとにリロード（⌘R / F5）してみてください。</p>
+<pre><span class="c">// 読み込み時: URL → 画面</span>
+const p = new URLSearchParams(location.search);
+cat.value = p.get("cat") ?? "";             <span class="c">// 無いときは null が返る</span>
+max.value = p.get("max") ?? "";
+
+<span class="c">// 変更時: 画面 → URL（replaceState はリロードせず URL だけ書き換える）</span>
+const p = new URLSearchParams(location.search);
+cat.value ? p.set("cat", cat.value) : p.delete("cat");
+history.replaceState(null, "", "?" + p);</pre>
+  </section>
+
+  <section class="card">
+    <h2>4. URLSearchParams のよく使うメソッド</h2>
+<pre>const p = new URLSearchParams("?tag=html&amp;tag=js&amp;page=2");
+p.get("page")       <span class="c">// "2"   ← 値は必ず文字列。数値にするなら Number()</span>
+p.get("none")       <span class="c">// null</span>
+p.getAll("tag")     <span class="c">// ["html", "js"]  ← 同名キーが複数あるとき</span>
+p.has("page")       <span class="c">// true</span>
+p.set("page", 3)    <span class="c">// 上書き</span>
+p.append("tag","css") <span class="c">// 追加</span>
+p.delete("tag")     <span class="c">// 削除</span>
+p.toString()        <span class="c">// "page=3"  ← 先頭の ? は付かない</span>
+Object.fromEntries(p) <span class="c">// { page: "3" }</span></pre>
+    <div class="callout warn"><b>注意:</b> クエリパラメーターは URL に丸見えです（履歴・サーバーログ・Referer に残る）。パスワードやトークンなどの秘密情報は入れないこと。</div>
+  </section>
+
+  <nav class="step-footer">
+    <a href="/step01-url-anatomy/" class="btn">← STEP 1</a>
+    <a href="/slides.html#step2" class="btn">📽 スライド</a>
+    <a href="/step03-server-routing/" class="btn">STEP 3 サーバーサイドルーティング →</a>
+  </nav>
+</main>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  // --- 2. URL の組み立て -------------------------------------
+  function build() {
+    const kw = $("kw").value;
+    const naive = "receive.html?keyword=" + kw + "&page=1";
+    const safe = "receive.html?" + new URLSearchParams({ keyword: kw, page: 1 });
+    $("naive").textContent = naive;
+    $("safe").textContent = safe;
+    $("naiveLink").href = naive;
+    $("safeLink").href = safe;
+  }
+  $("build").addEventListener("click", build);
+  $("kw").addEventListener("input", build);
+  build();
+
+  // --- 3. 状態を URL に保存 ----------------------------------
+  const PRODUCTS = [
+    { name: "りんご", cat: "fruit", price: 120 },
+    { name: "バナナ", cat: "fruit", price: 80 },
+    { name: "メロン", cat: "fruit", price: 900 },
+    { name: "にんじん", cat: "veg", price: 60 },
+    { name: "キャベツ", cat: "veg", price: 200 },
+  ];
+
+  // URL → 画面
+  function readStateFromUrl() {
+    const p = new URLSearchParams(location.search);
+    $("cat").value = p.get("cat") ?? "";
+    $("sort").value = p.get("sort") ?? "name";
+    $("max").value = p.get("max") ?? "";
+  }
+
+  // 画面 → URL
+  function writeStateToUrl() {
+    const p = new URLSearchParams(location.search);
+    const set = (k, v, def) => (v && v !== def ? p.set(k, v) : p.delete(k));
+    set("cat", $("cat").value, "");
+    set("sort", $("sort").value, "name");
+    set("max", $("max").value, "");
+    const qs = p.toString();
+    history.replaceState(null, "", qs ? "?" + qs : location.pathname);
+  }
+
+  function renderList() {
+    const cat = $("cat").value;
+    const max = $("max").value === "" ? Infinity : Number($("max").value);
+    const items = PRODUCTS
+      .filter((x) => (!cat || x.cat === cat) && x.price <= max)
+      .sort((a, b) => ($("sort").value === "price" ? a.price - b.price : a.name.localeCompare(b.name, "ja")));
+    $("list").replaceChildren(...items.map((x) => {
+      const li = document.createElement("li");
+      li.textContent = `${x.name}（${x.price} 円）`;
+      return li;
+    }));
+    if (!items.length) $("list").textContent = "該当なし";
+    $("currentUrl").textContent = location.href;
+  }
+
+  for (const id of ["cat", "sort", "max"]) {
+    $(id).addEventListener("input", () => { writeStateToUrl(); renderList(); });
+  }
+  readStateFromUrl();
+  renderList();
+</script>
+</body>
+</html>

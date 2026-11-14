@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STEP 6 CORS の基本</title>
+<link rel="stylesheet" href="/common.css">
+<script src="/config.js"></script>
+<script src="/cors-log.js"></script>
+</head>
+<body>
+<header class="page-header">
+  <a href="/" class="back">← 目次</a>
+  <p class="step-label">STEP 06</p>
+  <h1>CORS の基本</h1>
+  <p class="subtitle">ブラウザは「別のオリジンから取ってきたデータを JS で読む」ことを標準では禁止しています。それを <b>サーバー側の許可で</b> 解除する仕組みが CORS（Cross-Origin Resource Sharing）です。</p>
+</header>
+<main>
+
+  <section class="card">
+    <h2>1. オリジン = protocol + hostname + port</h2>
+    <p>このページのオリジン: <code id="myOrigin"></code> ／ API サーバー: <code id="apiOrigin"></code></p>
+    <table class="kv">
+      <tr><th>http://localhost:3000/step01/</th><td>✅ 同一オリジン（パスが違うだけ）</td></tr>
+      <tr><th>http://localhost:<b>4000</b>/</th><td>❌ 別オリジン（ポートが違う）← このステップで使う API</td></tr>
+      <tr><th><b>https</b>://localhost:3000/</th><td>❌ 別オリジン（プロトコルが違う）</td></tr>
+      <tr><th>http://<b>127.0.0.1</b>:3000/</th><td>❌ 別オリジン（同じマシンでもホスト名の文字列が違う）</td></tr>
+      <tr><th>http://<b>api.</b>example.com</th><td>❌ example.com から見て別オリジン（サブドメインも別）</td></tr>
+    </table>
+    <div class="row">
+      <input id="checkUrl" class="wide" value="http://localhost:4000/basic/wildcard" aria-label="比較する URL">
+    </div>
+    <p>判定: <span id="checkResult"></span></p>
+  </section>
+
+  <section class="card">
+    <h2>2. 実験: 4 つのリクエストを送ってみる</h2>
+    <p class="hint">DevTools の Console と Network も開いておくと、ブラウザが出すエラーメッセージも見られます。</p>
+    <div class="result">
+      <div class="demo">
+        <h3>A. 同一オリジン <code>fetch("/api/hello")</code></h3>
+        <p class="hint">同じオリジンなので CORS は関係なし。必ず読める。</p>
+        <button data-demo="same">実行</button>
+        <div id="r-same"></div>
+      </div>
+      <div class="demo">
+        <h3>B. 別オリジン・CORS ヘッダーなし <code>/basic/no-cors</code></h3>
+        <p class="hint">サーバーは 200 OK を返すが、<code>Access-Control-Allow-Origin</code> が無いのでブラウザがブロックする。</p>
+        <button data-demo="nocors">実行</button>
+        <div id="r-nocors"></div>
+      </div>
+      <div class="demo">
+        <h3>C. 別オリジン・<code>Access-Control-Allow-Origin: *</code> <code>/basic/wildcard</code></h3>
+        <p class="hint">「どこのオリジンからでも読んでいい」と宣言。公開 API 向け。</p>
+        <button data-demo="wildcard">実行</button>
+        <div id="r-wildcard"></div>
+      </div>
+      <div class="demo">
+        <h3>D. 別オリジン・許可リスト方式 <code>/basic/allowlist</code></h3>
+        <p class="hint">サーバーがリクエストの <code>Origin</code> ヘッダーを見て、許可リストにあればそのオリジンを返す。</p>
+        <button data-demo="allowlist">実行</button>
+        <div id="r-allowlist"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>3. API サーバー側のログ（サーバーには何が届いた？）</h2>
+    <div class="row"><button id="refreshLog">ログ更新</button><button id="clearLog">ログ消去</button></div>
+    <div class="log" id="serverLog"></div>
+    <div class="callout warn"><b>B を実行してからログを見てください。</b>ブラウザでは「失敗」なのに、サーバーには GET リクエストが<b>届いていて、処理もされている</b>はずです。<br>CORS は「サーバーを守る仕組み」ではなく、<b>ブラウザが「レスポンスを JS に渡すかどうか」を決める仕組み</b>です。</div>
+  </section>
+
+  <section class="card">
+    <h2>4. 何が起きているか</h2>
+<pre>ブラウザ (localhost:3000 のページ)                    API サーバー (localhost:4000)
+  │ fetch("http://localhost:4000/basic/no-cors")          │
+  │ ── GET /basic/no-cors ─────────────────────────────▶ │
+  │    Origin: http://localhost:3000  <span class="c">← ブラウザが自動で付ける</span>
+  │                                                      │ 処理する（ログに残る）
+  │ ◀──── 200 OK ─────────────────────────────────────── │
+  │       (Access-Control-Allow-Origin なし)               │
+  │                                                      │
+  │ <span class="bad">ブラウザ「許可が無いので JS には渡さない」</span>
+  │ <span class="bad">→ fetch は TypeError: Failed to fetch で reject</span>
+  │ <span class="bad">→ Console に "blocked by CORS policy"</span></pre>
+<pre><span class="c">// サーバー側 (server.js) の違いはヘッダー 1 行だけ</span>
+"/basic/no-cors":   () =&gt; ({ headers: {} }),
+"/basic/wildcard":  () =&gt; ({ headers: { <span class="k">"Access-Control-Allow-Origin": "*"</span> } }),
+"/basic/allowlist": (req) =&gt; {
+  const origin = ALLOWED_ORIGINS.has(req.headers.origin) ? req.headers.origin : null;
+  return { headers: origin
+    ? { <span class="k">"Access-Control-Allow-Origin": origin</span>, Vary: "Origin" }
+    : { Vary: "Origin" } };   <span class="c">// Origin ごとに結果が変わるのでキャッシュに Vary: Origin を伝える</span>
+},</pre>
+    <div class="callout info">CORS は <b>ブラウザだけ</b> が守るルールです。<code>curl http://localhost:4000/basic/no-cors</code> のようにブラウザ以外から呼べば、普通にデータが取れます。だから「秘密のデータを CORS で守る」ことはできません。認証は別途必要です。</div>
+  </section>
+
+  <section class="card">
+    <h2>5. 制限されないもの</h2>
+    <p>同一オリジンポリシーが止めるのは <b>「JS がレスポンスの中身を読むこと」</b> です。次のものは昔から別オリジンでも使えます。</p>
+    <ul>
+      <li><code>&lt;img src&gt;</code>, <code>&lt;script src&gt;</code>, <code>&lt;link rel=stylesheet&gt;</code>, <code>&lt;iframe&gt;</code> での読み込み（表示はできるが、JS で中身は読めない）</li>
+      <li><code>&lt;form&gt;</code> の送信によるページ遷移（だから CSRF 対策が別途必要）</li>
+      <li><code>fetch(url, { mode: "no-cors" })</code> … 送れるが、返ってくるのは中身が見えない <b>opaque レスポンス</b></li>
+    </ul>
+    <button id="opaque">mode: "no-cors" で /basic/no-cors を fetch</button>
+    <div id="r-opaque"></div>
+  </section>
+
+  <nav class="step-footer">
+    <a href="/step05-history-routing/" class="btn">← STEP 5</a>
+    <a href="/slides.html#step6" class="btn">📽 スライド</a>
+    <a href="/step07-cors-advanced/" class="btn">STEP 7 CORS 応用 →</a>
+  </nav>
+</main>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  $("myOrigin").textContent = location.origin;
+  $("apiOrigin").textContent = API_ORIGIN;
+
+  // --- 1. オリジン判定 ----------------------------------------
+  function checkOrigin() {
+    try {
+      const target = new URL($("checkUrl").value, location.href);
+      const same = target.origin === location.origin;
+      $("checkResult").textContent = same
+        ? `✅ 同一オリジン (${target.origin})`
+        : `❌ 別オリジン (${target.origin} ≠ ${location.origin}) → CORS の許可が必要`;
+    } catch {
+      $("checkResult").textContent = "URL として解釈できません";
+    }
+  }
+  $("checkUrl").addEventListener("input", checkOrigin);
+  checkOrigin();
+
+  // --- 2. 実験 -------------------------------------------------
+  const DEMOS = {
+    same: "/api/hello",
+    nocors: `${API_ORIGIN}/basic/no-cors`,
+    wildcard: `${API_ORIGIN}/basic/wildcard`,
+    allowlist: `${API_ORIGIN}/basic/allowlist`,
+  };
+
+  async function run(name) {
+    const url = DEMOS[name];
+    const out = $("r-" + name);
+    try {
+      const res = await fetch(url);
+      const body = await res.json();
+      showResult(out, true, `fetch("${url}")\n→ ${res.status} ${res.statusText}\n${JSON.stringify(body, null, 2)}`);
+    } catch (err) {
+      showResult(out, false, `fetch("${url}")\n→ ${err.name}: ${err.message}\n\nJS からはエラーの理由（CORS かネットワーク断か）は区別できません。\n詳しい理由は DevTools の Console に表示されています。`);
+    }
+    CorsLog.refresh($("serverLog"));
+  }
+  document.querySelectorAll("[data-demo]").forEach((b) => b.addEventListener("click", () => run(b.dataset.demo)));
+
+  $("opaque").addEventListener("click", async () => {
+    const res = await fetch(`${API_ORIGIN}/basic/no-cors`, { mode: "no-cors" });
+    const text = await res.text();
+    showResult($("r-opaque"), true,
+      `res.type   = ${JSON.stringify(res.type)}\nres.status = ${res.status}\nres.ok     = ${res.ok}\nbody       = ${JSON.stringify(text)}\n\n→ エラーにはならないが、ステータスも中身も読めない`);
+    CorsLog.refresh($("serverLog"));
+  });
+
+  // --- 3. サーバーログ ----------------------------------------
+  $("refreshLog").addEventListener("click", () => CorsLog.refresh($("serverLog")));
+  $("clearLog").addEventListener("click", () => CorsLog.clear($("serverLog")));
+  CorsLog.refresh($("serverLog"));
+</script>
+</body>
+</html>
