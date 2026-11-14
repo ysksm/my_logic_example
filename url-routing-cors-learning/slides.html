@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>URL・ルーティング・CORS 解説スライド</title>
+<style>
+  :root {
+    --bg: #f7f6f2; --panel: #fffffe; --edge: #e3e1da; --alt: #f1efe9;
+    --ink: #151b2b; --soft: #4a5568; --faint: #8a93a3;
+    --teal: #1f8a7e; --teal-ink: #155f57; --teal-soft: #ddefec;
+    --red: #d64545; --red-ink: #a83232; --red-soft: #fbecec;
+    --blue: #4f86c6; --blue-ink: #3a6ba8; --blue-soft: #eaf0f8;
+    --amber: #d98c3e; --amber-ink: #b36e25; --amber-soft: #fff4e5;
+    --code-bg: #0e121d; --code-ink: #e6eaf2; --code-dim: #9aa3b5; --code-good: #9cd98c; --code-bad: #ff8a80; --code-warn: #e8b06c;
+    --dark-bg: #151b2b; --dark-ink: #f7f6f2; --dark-soft: #c5ccd9;
+    --shadow: 0 1px 2px rgba(21,27,43,.08), 0 4px 12px rgba(21,27,43,.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0e121d; --panel: #1a2030; --edge: #2c3446; --alt: #151b2b;
+      --ink: #f0f2f6; --soft: #bfc8d6;
+      --teal-ink: #5bc0b2; --teal-soft: #163a36; --red-ink: #ff8a80; --red-soft: #3a1f22;
+      --blue-ink: #8fb4e8; --blue-soft: #1c2740; --amber-ink: #e8b06c; --amber-soft: #3a2c18;
+      --shadow: 0 1px 2px rgba(0,0,0,.5), 0 4px 12px rgba(0,0,0,.4);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e121d; --panel: #1a2030; --edge: #2c3446; --alt: #151b2b;
+    --ink: #f0f2f6; --soft: #bfc8d6;
+    --teal-ink: #5bc0b2; --teal-soft: #163a36; --red-ink: #ff8a80; --red-soft: #3a1f22;
+    --blue-ink: #8fb4e8; --blue-soft: #1c2740; --amber-ink: #e8b06c; --amber-soft: #3a2c18;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--ink); line-height: 1.6; overflow: hidden;
+    font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", Meiryo, system-ui, sans-serif; }
+  code, pre { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  a { color: var(--blue-ink); }
+
+  .deck { height: 100dvh; display: flex; flex-direction: column; }
+  .progress { height: 4px; background: var(--edge); }
+  #bar { height: 100%; background: var(--teal); width: 0; transition: width .25s ease; }
+  .stage { flex: 1; position: relative; overflow: hidden; }
+  .slide { position: absolute; inset: 0; display: none; padding: clamp(16px, 3vh, 40px) clamp(16px, 5vw, 80px); overflow-y: auto; }
+  .slide.active { display: flex; flex-direction: column; animation: rise .3s ease; }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .slide.active { animation: none; } }
+  .slide.dark { background: var(--dark-bg); color: var(--dark-ink); }
+  .slide.dark p, .slide.dark .lead { color: var(--dark-soft); }
+  .slide-body { flex: 1; display: flex; flex-direction: column; justify-content: center; max-width: 1180px; width: 100%; margin: 0 auto; gap: clamp(10px, 2vh, 22px); }
+
+  .eyebrow { color: var(--teal-ink); font-size: .78rem; font-weight: 700; letter-spacing: .16em; margin: 0; }
+  .slide.dark .eyebrow { color: #5bc0b2; }
+  .eyebrow.cors { color: var(--amber-ink); }
+  h1 { font-size: clamp(1.9rem, 5vw, 3.4rem); line-height: 1.15; margin: 0; font-weight: 700; text-wrap: balance; }
+  h2 { font-size: clamp(1.35rem, 3vw, 2.1rem); line-height: 1.25; margin: 0; font-weight: 700; text-wrap: balance; }
+  h3 { font-size: clamp(1rem, 1.6vw, 1.2rem); margin: 0; line-height: 1.3; }
+  p { margin: 0; }
+  .lead { font-size: clamp(1rem, 1.8vw, 1.2rem); color: var(--soft); max-width: 48em; }
+  .note { font-size: clamp(.88rem, 1.4vw, 1.02rem); color: var(--soft); }
+
+  .grid { display: grid; gap: clamp(10px, 1.6vw, 20px); }
+  .cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .side { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); }
+  @media (max-width: 800px) { .cols-2, .cols-3, .side { grid-template-columns: 1fr; } }
+
+  .card { background: var(--panel); border: 1px solid var(--edge); border-radius: 12px; padding: clamp(12px, 1.8vw, 22px); display: flex; flex-direction: column; gap: .45rem; box-shadow: var(--shadow); }
+  .card p { color: var(--soft); font-size: clamp(.88rem, 1.4vw, 1.02rem); }
+  .card .role { font-size: .74rem; font-weight: 700; letter-spacing: .12em; color: var(--teal-ink); }
+  .card.teal { background: var(--teal-soft); border-color: transparent; }
+  .card.red { background: var(--red-soft); border-color: transparent; }
+  .card.red .role { color: var(--red-ink); }
+  .card.amber { background: var(--amber-soft); border-color: transparent; }
+  .card.amber .role { color: var(--amber-ink); }
+  .card.blue { background: var(--blue-soft); border-color: transparent; }
+  .card.blue .role { color: var(--blue-ink); }
+  .card.top-teal { border-top: 5px solid var(--teal); }
+  .card.top-blue { border-top: 5px solid var(--blue); }
+  .card.top-amber { border-top: 5px solid var(--amber); }
+
+  .callout { background: var(--dark-bg); color: var(--dark-ink); padding: clamp(12px, 1.6vw, 18px) clamp(14px, 2vw, 26px); border-radius: 10px; font-size: clamp(.98rem, 1.7vw, 1.15rem); }
+  .callout.soft { background: var(--teal-soft); color: var(--ink); }
+  .callout.warn { background: var(--amber-soft); color: var(--ink); }
+
+  pre { margin: 0; background: var(--code-bg); color: var(--code-ink); padding: clamp(12px, 1.6vw, 20px) clamp(14px, 2vw, 24px); border-radius: 10px; font-size: clamp(.74rem, 1.2vw, .95rem); line-height: 1.55; overflow-x: auto; }
+  pre .d { color: var(--code-dim); }
+  pre .g { color: var(--code-good); }
+  pre .b { color: var(--code-bad); font-weight: 700; }
+  pre .w { color: var(--code-warn); }
+  code.i { background: var(--alt); border: 1px solid var(--edge); padding: 0 .3em; border-radius: 4px; font-size: .92em; }
+  .slide.dark code.i { background: #263042; border-color: #3a4560; color: var(--dark-ink); }
+
+  table { border-collapse: collapse; width: 100%; font-size: clamp(.8rem, 1.3vw, 1rem); background: var(--panel); border: 1px solid var(--edge); }
+  th, td { padding: .5rem .7rem; text-align: left; border-bottom: 1px solid var(--edge); vertical-align: top; }
+  th { background: var(--dark-bg); color: var(--dark-ink); font-weight: 700; }
+  tr:nth-child(even) td { background: var(--alt); }
+  .slide.dark td:not(.ok):not(.ng) { color: var(--ink); }
+  td.ok { color: var(--teal-ink); font-weight: 600; }
+  td.ng { color: var(--red-ink); font-weight: 600; }
+
+  /* URL 分解図 */
+  .url-bar { display: flex; flex-wrap: wrap; font-family: ui-monospace, Menlo, monospace; font-size: clamp(.85rem, 2vw, 1.45rem); border-radius: 10px; overflow: hidden; }
+  .url-bar span { padding: .5em .35em; display: flex; flex-direction: column; align-items: center; gap: .2em; }
+  .url-bar small { font-family: system-ui, sans-serif; font-size: .55em; font-weight: 700; letter-spacing: .06em; opacity: .85; }
+  .u1 { background: #dbe7f6; color: #23446e; } .u2 { background: #d6efe9; color: #155f57; } .u3 { background: #fbe6cf; color: #7a4a12; }
+  .u4 { background: #e6e0f5; color: #46327a; } .u5 { background: #fde2e2; color: #8a2424; } .u6 { background: #e3e8ee; color: #2c3a4b; }
+
+  .steps-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+  .steps-list a { display: flex; gap: .7rem; align-items: baseline; padding: .7rem 1rem; background: var(--panel); border: 1px solid var(--edge); border-radius: 10px; text-decoration: none; color: var(--ink); }
+  .steps-list a:hover { border-color: var(--teal); }
+  .steps-list .n { font-family: ui-monospace, Menlo, monospace; font-weight: 700; color: var(--teal-ink); }
+
+  .try { display: inline-flex; align-items: center; gap: .4em; font-size: .9rem; font-weight: 700; padding: .35em .9em; border-radius: 999px; background: var(--teal); color: #fff; text-decoration: none; align-self: flex-start; }
+  .slide.dark .try { background: #5bc0b2; color: #0e121d; }
+
+  .takeaways { display: flex; flex-direction: column; gap: .8rem; }
+  .takeaways > div { display: flex; gap: 1rem; align-items: baseline; }
+  .takeaways .n { font-size: 1.6rem; font-weight: 700; color: #5bc0b2; min-width: 2ch; }
+  .takeaways p { font-size: clamp(1rem, 1.9vw, 1.3rem); color: var(--dark-ink) !important; }
+
+  .hud { display: flex; align-items: center; gap: 12px; padding: 8px clamp(12px, 3vw, 24px); border-top: 1px solid var(--edge); background: var(--panel); font-size: .82rem; color: var(--soft); }
+  .hud .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hud .kbd-hint { display: none; }
+  @media (min-width: 720px) { .hud .kbd-hint { display: inline; } }
+  kbd { font-family: inherit; border: 1px solid var(--edge); border-bottom-width: 2px; border-radius: 4px; padding: 0 .35em; font-size: .78em; background: var(--alt); }
+  .hud button { font: inherit; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--edge); background: var(--alt); color: var(--ink); cursor: pointer; }
+  .hud button:hover { border-color: var(--teal); }
+  .hud .count { font-family: ui-monospace, Menlo, monospace; }
+</style>
+</head>
+<body>
+<div class="deck">
+  <div class="progress"><div id="bar"></div></div>
+  <div class="stage">
+
+    <!-- 表紙 -->
+    <section class="slide dark">
+      <div class="slide-body">
+        <p class="eyebrow">HTML / JavaScript</p>
+        <h1>URL・ルーティング・CORS<br>を動かして理解する</h1>
+        <p class="lead">URL の部品 → 3 種類のルーティング → クエリパラメーター → CORS の基本と実践。<br>7 つのサンプルページと 1 つの Node.js サーバーで確認します。</p>
+        <pre style="max-width:34em;"><span class="d">$</span> cd url-routing-cors-learning
+<span class="d">$</span> node server.js
+<span class="d"># → http://localhost:3000/ を開く（依存パッケージなし）</span></pre>
+      </div>
+    </section>
+
+    <!-- 全体マップ -->
+    <section class="slide">
+      <div class="slide-body">
+        <p class="eyebrow">全体像</p>
+        <h2>URL の「どこを見るか」で 3 つのテーマがつながる</h2>
+        <div class="url-bar">
+          <span class="u1">http://<small>protocol</small></span>
+          <span class="u2">localhost<small>hostname</small></span>
+          <span class="u3">:3000<small>port</small></span>
+          <span class="u4">/users/42<small>pathname</small></span>
+          <span class="u5">?sort=desc<small>search</small></span>
+          <span class="u6">#/top<small>hash</small></span>
+        </div>
+        <div class="grid cols-3">
+          <div class="card top-blue"><span class="role" style="color:var(--blue-ink)">ORIGIN = protocol + host + port</span><h3>CORS（STEP 6・7）</h3><p>1 つでも違えば別オリジン。別オリジンのレスポンスを JS で読むにはサーバーの許可が必要。</p></div>
+          <div class="card top-teal"><span class="role">PATHNAME / HASH</span><h3>ルーティング（STEP 3・4・5）</h3><p>pathname をサーバーが見る / hash を JS が見る / pathname を JS が書き換える。</p></div>
+          <div class="card top-amber"><span class="role" style="color:var(--amber-ink)">SEARCH</span><h3>クエリパラメーター（STEP 2）</h3><p>ページやサーバーへ追加情報を渡す。画面の状態を URL に保存する。</p></div>
+        </div>
+        <div class="steps-list">
+          <a href="/step01-url-anatomy/"><span class="n">01</span>URL の構造</a>
+          <a href="/step02-query-params/"><span class="n">02</span>クエリパラメーター</a>
+          <a href="/step03-server-routing/"><span class="n">03</span>サーバールーティング</a>
+          <a href="/step04-hash-routing/"><span class="n">04</span>ハッシュルーティング</a>
+          <a href="/step05-history-routing/"><span class="n">05</span>History API</a>
+          <a href="/step06-cors-basics/"><span class="n">06</span>CORS 基本</a>
+          <a href="/step07-cors-advanced/"><span class="n">07</span>CORS 応用</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- STEP 1 -->
+    <section class="slide" data-id="step1">
+      <div class="slide-body">
+        <p class="eyebrow">STEP 01 · URL の構造</p>
+        <h2>URL は <code class="i">new URL()</code> で分解できる</h2>
+        <div class="grid side">
+<pre>const url = new URL(
+  "https://example.com:8080/shop/items/42?color=red#reviews");
+
+url.protocol  <span class="d">// "https:"</span>
+url.hostname  <span class="d">// "example.com"</span>
+url.port      <span class="d">// "8080"</span>
+url.pathname  <span class="d">// "/shop/items/42"</span>
+url.search    <span class="d">// "?color=red"</span>
+url.hash      <span class="d">// "#reviews"</span>
+url.origin    <span class="d">// "https://example.com:8080"</span>
+
+<span class="d">// いまのページは location（ほぼ同じプロパティ）</span>
+location.pathname</pre>
+          <div class="grid" style="align-content:start;">
+            <div class="card red"><span class="role">最重要</span><h3>hash はサーバーに送られない</h3><p><code class="i">#</code> 以降はブラウザの中だけの情報。これがハッシュルーティングの土台。</p></div>
+            <div class="card"><span class="role">注意</span><h3>相対パスは基準 URL が必要</h3><p><code class="i">new URL("/a", location.origin)</code> のように第 2 引数を渡す。</p></div>
+          </div>
+        </div>
+        <a class="try" href="/step01-url-anatomy/">▶ STEP 1 を開く</a>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="slide-body">
+        <p class="eyebrow">STEP 01 · URL の構造</p>
+        <h2>JavaScript から URL を変える 3 つの方法</h2>
+        <table>
+          <tr><th>コード</th><th>サーバーへのリクエスト</th><th>発生するイベント</th><th>使いどころ</th></tr>
+          <tr><td><code>location.href = "/x"</code></td><td class="ng">あり（ページ遷移）</td><td>—（新しいページになる）</td><td>普通の画面遷移 / STEP 3</td></tr>
+          <tr><td><code>location.hash = "#/x"</code></td><td class="ok">なし</td><td><code>hashchange</code>（直前に <code>popstate</code> も）</td><td>ハッシュルーティング / STEP 4</td></tr>
+          <tr><td><code>history.pushState(null, "", "/x")</code></td><td class="ok">なし</td><td>なし（戻る/進むで <code>popstate</code>）</td><td>History API ルーティング / STEP 5</td></tr>
+          <tr><td><code>history.replaceState(null, "", "?q=1")</code></td><td class="ok">なし</td><td>なし（履歴を増やさない）</td><td>状態を URL に保存 / STEP 2</td></tr>
+        </table>
+        <p class="note">サンプルページでは、ボタンを押して URL バー・ログ・「ページ読み込み時刻」の変化を確認できます。読み込み時刻が変わらなければリロードしていない証拠です。</p>
+      </div>
+    </section>
+
+    <!-- STEP 2 -->
+    <section class="slide" data-id="step2">
+      <div class="slide-body">
+        <p class="eyebrow">STEP 02 · クエリパラメーター</p>
+        <h2>ページ間で値を渡す 2 つの方法</h2>
+        <div class="grid cols-2">
+          <div class="card">
+            <span class="role">HTML だけ</span><h3>form method="get"</h3>
+<pre>&lt;form action="receive.html" method="get"&gt;
+  &lt;input name="name"&gt;
+  &lt;input type="checkbox" name="tag" value="js"&gt;
+&lt;/form&gt;
+<span class="d">→ receive.html?name=%E5%B1%B1%E7%94%B0&amp;tag=js</span></pre>
+          </div>
+          <div class="card">
+            <span class="role">JavaScript</span><h3>URLSearchParams で組み立て</h3>
+<pre><span class="b">"?keyword=" + kw</span>   <span class="d">// & = # があると壊れる</span>
+
+<span class="g">"?" + new URLSearchParams({ keyword: kw })</span>
+<span class="d">// → 自動でエンコードされる</span></pre>
+          </div>
+        </div>
+        <div class="card">
+          <span class="role">受け取る側</span>
+<pre>const p = new URLSearchParams(location.search);
+p.get("name")      <span class="d">// 値は必ず文字列。無ければ null</span>
+p.getAll("tag")    <span class="d">// 同名キーが複数あるときは配列</span>
+el.textContent = p.get("name");   <span class="d">// ← innerHTML は XSS の危険。textContent で表示</span></pre>
+        </div>
+        <a class="try" href="/step02-query-params/">▶ STEP 2 を開く</a>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="slide-body">
+        <p class="eyebrow">STEP 02 · クエリパラメーター</p>
+        <h2>画面の状態を URL に置くと、リロードしても共有しても再現できる</h2>
+        <div class="grid side">
+<pre><span class="d">// 読み込み時: URL → 画面</span>
+const p = new URLSearchParams(location.search);
+cat.value = p.get("cat") ?? "";
+
+<span class="d">// 変更時: 画面 → URL</span>
+cat.addEventListener("input", () =&gt; {
+  const p = new URLSearchParams(location.search);
+  cat.value ? p.set("cat", cat.value) : p.delete("cat");
+  history.<span class="g">replaceState</span>(null, "", "?" + p);
+  render();
+});</pre>
+          <div class="grid" style="align-content:start;">
+            <div class="card teal"><span class="role">replaceState を使う理由</span><p>絞り込みを変えるたびに履歴が増えると「戻る」が使いにくい。履歴を増やしたいなら pushState。</p></div>
+            <div class="card amber"><span class="role">入れてはいけないもの</span><p>パスワードやトークン。URL は履歴・サーバーログ・Referer に残る。</p></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- STEP 3 -->
+    <section class="slide" data-id="step3">
+      <div class="slide-body">
+        <p class="eyebrow">STEP 03 · サーバーサイドルーティング</p>
+        <h2>パスを見て、サーバーが返す HTML を決める</h2>
+<pre>ブラウザ                                       server.js
+  │ &lt;a href="/server/items/2"&gt; をクリック            │
+  │ ─── GET /server/items/2 ─────────────────────▶ │  /server            ✗
+  │                                                │  /server/items      ✗
+  │                                                │  <span class="g">/server/items/:id  ✓ → params.id = "2"</span>
+  │ ◀── 200 OK + HTML（ページ全体）─────────────── │
+  │ <span class="w">画面をまるごと描き直す（フルリロード）</span></pre>
+        <div class="grid cols-2">
+          <div class="card teal"><span class="role">良い点</span><p>単純。JS なしで動く。どの URL でもリロード・ブックマーク・検索エンジンが効く。</p></div>
+          <div class="card red"><span class="role">弱い点</span><p>遷移のたびに通信して画面全体を作り直す。入力中の状態や JS の変数は消える。</p></div>
+        </div>
+        <a class="try" href="/step03-server-routing/">▶ STEP 3 を開く（各ページに「サーバーが受け取ったリクエスト」と生成時刻が出る）</a>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="slide-body">
+        <p class="eyebrow">STEP 03 · サーバーサイドルーティング</p>
+        <h2>ルーティングの正体は「パターン照合の表」</h2>
+<pre>const serverRoutes = [
+  { method: "GET", pattern: "/server",           handler: serverHome },
+  { method: "GET", pattern: "/server/items/:id", handler: serverItemDetail },
+];
+
+function matchRoute(pattern, pathname) {        <span class="d">// "/server/items/:id" vs "/server/items/2"</span>
+  const p = pattern.split("/").filter(Boolean);
+  const a = pathname.split("/").filter(Boolean);
+  if (p.length !== a.length) return null;
+  const params = {};
+  for (let i = 0; i &lt; p.length; i++) {
+    if (p[i].startsWith(":")) params[p[i].slice(1)] = decodeURIComponent(a[i]);  <span class="g">// → { id: "2" }</span>
+    else if (p[i] !== a[i]) return null;
+  }
+  return params;
+}
+<span class="d">// どれにもマッチしなければ 404。クエリは url.searchParams.get("q") でサーバーでも読める</span></pre>
+        <p class="note">Express の <code class="i">app.get("/items/:id", …)</code> も、React Router の <code class="i">&lt;Route path="/items/:id"&gt;</code> も同じ考え方。<b>この matchRoute は STEP 4・5 のブラウザ側でもそのまま使い回しています。</b></p>
+      </div>
+    </section>
+
+    <!-- STEP 4 -->
+    <section class="slide" data-id="step4">
+      <div class="slide-body">
+        <p class="eyebrow">STEP 04 · ハッシュルーティング</p>
+        <h2># 以降はサーバーに届かない → ブラウザだけで画面を切り替える</h2>
+        <div class="grid side">
+<pre>const routes = [
+  { pattern: "/",          view: homeView },
+  { pattern: "/users/:id", view: userDetailView },
+];
+
+function router() {
+  <span class="d">// "#/users/2?tab=a" → path "/users/2", query "tab=a"</span>
+  const raw = location.hash.slice(1) || "/";
+  const [path, q = ""] = raw.split("?");
+  const query = new URLSearchParams(q);
+  for (const r of routes) {
+    const params = matchRoute(r.pattern, path);
+    if (params) return render(r.view(params, query));
+  }
+  render(notFoundView());
+}
+window.addEventListener(<span class="g">"hashchange"</span>, router);
+router();   <span class="d">// 初回（リロード時）も忘れずに</span></pre>
+          <div class="grid" style="align-content:start;">
+            <div class="card teal"><span class="role">良い点</span><p>サーバー設定ゼロ。静的ホスティングや file:// でも動く。リロードしても 404 にならない。</p></div>
+            <div class="card red"><span class="role">弱い点</span><p>URL に # が入る。サーバーはパスを知らないので SSR・SEO に不利。ページ内リンクと衝突。</p></div>
+          </div>
+        </div>
+        <a class="try" href="/step04-hash-routing/">▶ STEP 4 を開く（Network タブでリクエストが増えないことを確認）</a>
+      </div>
+    </section>
+
+    <!-- STEP 5 -->
+    <section class="slide" data-id="step5">
+      <div class="slide-body">
+        <p class="eyebrow">STEP 05 · History API ルーティング</p>
+        <h2>pushState で「きれいな URL」のまま画面を切り替える</h2>
+        <div class="grid cols-2">
+<pre><span class="d">// ① リンクのクリックを横取り</span>
+document.addEventListener("click", (e) =&gt; {
+  const a = e.target.closest("a[data-link]");
+  if (!a) return;
+  e.<span class="g">preventDefault</span>();   <span class="d">// サーバーへ行かせない</span>
+  history.<span class="g">pushState</span>(null, "", a.href);
+  router();   <span class="d">// pushState はイベントを出さない</span>
+});
+
+<span class="d">// ② 戻る / 進む</span>
+window.addEventListener(<span class="g">"popstate"</span>, router);
+
+<span class="d">// ③ location.pathname を見て描画</span>
+function router() { … STEP 4 と同じ照合 … }</pre>
+          <div class="grid" style="align-content:start;">
+            <div class="card"><span class="role">STEP 4 との違い</span><p>読むのが <code class="i">location.hash</code> → <code class="i">location.pathname</code>、イベントが <code class="i">hashchange</code> → <code class="i">popstate</code>、そして <b>リンクを自分で横取りする</b> 必要がある。</p></div>
+            <div class="card amber"><span class="role">落とし穴</span><p>この URL でリロードすると、ブラウザは<b>サーバーに</b>このパスを取りに行く。→ 次のスライド</p></div>
+          </div>
+        </div>
+        <a class="try" href="/step05-history-routing/">▶ STEP 5 を開く</a>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="slide-body">
+        <p class="eyebrow">STEP 05 · History API ルーティング</p>
+        <h2>リロード対策: サーバーの「フォールバック」</h2>
+<pre>GET /step05-history-routing/app/users/1   <span class="d">（リロード・ブックマーク・URL 直打ち）</span>
+          │
+          ├─ フォールバックなし → <span class="b">404 Not Found</span>（そんなファイルは無い）
+          └─ フォールバックあり → <span class="g">index.html を返す → JS が pathname を読んで /users/1 の画面を復元</span></pre>
+        <div class="grid cols-2">
+<pre><span class="d">// server.js</span>
+<span class="d">// ① 実ファイルがあればそれを返す</span>
+if (tryServeStatic(req, res, pathname)) return;
+<span class="d">// ② 無ければ SPA の index.html を返す</span>
+if (pathname.startsWith(SPA_PREFIX)) {
+  return fs.createReadStream(SPA_INDEX).pipe(res);
+}</pre>
+<pre><span class="d"># nginx</span>
+location / {
+  try_files $uri $uri/ /index.html;
+}</pre>
+        </div>
+        <div class="callout warn"><b>相対パスに注意:</b> <code>/app/users/1</code> で開かれた index.html が <code>./style.css</code> を読むと <code>/app/users/style.css</code> を探してしまう。CSS / JS は <b>絶対パス</b> で書く。</div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="slide-body">
+        <p class="eyebrow">STEP 03〜05 · まとめ</p>
+        <h2>3 つのルーティングの比較</h2>
+        <table>
+          <tr><th></th><th>サーバー（STEP 3）</th><th>ハッシュ（STEP 4）</th><th>History API（STEP 5）</th></tr>
+          <tr><td>URL</td><td><code>/items/2</code></td><td><code>/#/items/2</code></td><td><code>/items/2</code></td></tr>
+          <tr><td>遷移時の通信</td><td class="ng">あり（HTML 全体）</td><td class="ok">なし</td><td class="ok">なし</td></tr>
+          <tr><td>画面を作るのは</td><td>サーバー</td><td>ブラウザの JS</td><td>ブラウザの JS</td></tr>
+          <tr><td>見ている値</td><td><code>req.url</code> の pathname</td><td><code>location.hash</code></td><td><code>location.pathname</code></td></tr>
+          <tr><td>イベント</td><td>—</td><td><code>hashchange</code></td><td><code>popstate</code>（+ 自分で pushState）</td></tr>
+          <tr><td>サーバー設定</td><td>ルートごとに実装</td><td class="ok">不要</td><td class="ng">フォールバック必須</td></tr>
+          <tr><td>向いている場面</td><td>一般的な Web サイト・SEO</td><td>静的ホスティング・社内ツール</td><td>React / Vue などの本格 SPA</td></tr>
+        </table>
+        <p class="note">実際のフレームワーク（Next.js など）は「初回はサーバーで HTML を作り、以降は History API で切り替える」ハイブリッド型が主流。</p>
+      </div>
+    </section>
+
+    <!-- STEP 6 -->
+    <section class="slide dark" data-id="step6">
+      <div class="slide-body">
+        <p class="eyebrow cors" style="color:#e8b06c;">STEP 06 · CORS の基本</p>
+        <h2>ブラウザは「別オリジンのレスポンスを JS で読む」ことを禁止している</h2>
+        <p class="lead">これが <b>同一オリジンポリシー</b>。サーバーが「このオリジンなら読んでいいよ」とヘッダーで許可する仕組みが <b>CORS</b>（Cross-Origin Resource Sharing）。</p>
+        <table>
+          <tr><th>localhost:3000 のページから見て</th><th>判定</th><th>理由</th></tr>
+          <tr><td>http://localhost:3000/api/hello</td><td class="ok">同一オリジン</td><td>パスが違うだけ</td></tr>
+          <tr><td>http://localhost:<b>4000</b>/basic/…</td><td class="ng">別オリジン</td><td>ポートが違う（このサンプルの API）</td></tr>
+          <tr><td>http://<b>127.0.0.1</b>:3000/</td><td class="ng">別オリジン</td><td>同じマシンでも文字列が違う</td></tr>
+          <tr><td><b>https</b>://localhost:3000/</td><td class="ng">別オリジン</td><td>プロトコルが違う</td></tr>
+        </table>
+        <a class="try" href="/step06-cors-basics/">▶ STEP 6 を開く</a>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="slide-body">
+        <p class="eyebrow cors">STEP 06 · CORS の基本</p>
+        <h2>違いはレスポンスヘッダー 1 行だけ</h2>
+        <div class="grid cols-2">
+<pre><span class="d">// server.js（API サーバー :4000）</span>
+"/basic/no-cors":  () =&gt; ({ headers: {} }),
+
+"/basic/wildcard": () =&gt; ({ headers: {
+  <span class="g">"Access-Control-Allow-Origin": "*"</span> } }),
+
+"/basic/allowlist": (req) =&gt; {
+  const o = req.headers.origin;   <span class="d">// ブラウザが自動で付ける</span>
+  return ALLOWED.has(o)
+    ? { headers: { <span class="g">"Access-Control-Allow-Origin": o</span>,
+                   Vary: "Origin" } }
+    : { headers: { Vary: "Origin" } };
+},</pre>
+          <table>
+            <tr><th>実験</th><th>JS で読める？</th></tr>
+            <tr><td>A. 同一オリジン</td><td class="ok">✓ 読める</td></tr>
+            <tr><td>B. ACAO なし</td><td class="ng">✗ TypeError: Failed to fetch</td></tr>
+            <tr><td>C. ACAO: *</td><td class="ok">✓ 誰でも読める</td></tr>
+            <tr><td>D. ACAO: 許可リスト</td><td class="ok">✓ 許可オリジンだけ</td></tr>
+            <tr><td>mode: "no-cors"</td><td>エラーにならないが中身は空（opaque）</td></tr>
+          </table>
+        </div>
+        <p class="note">JS 側から見えるのは「失敗した」ことだけ。<b>理由は DevTools の Console にしか出ない</b>（攻撃者に情報を渡さないため）。</p>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="slide-body">
+        <p class="eyebrow cors">STEP 06 · CORS の基本</p>
+        <h2>ブロックされても、リクエストはサーバーに届いている</h2>
+        <div class="grid side">
+<pre>ブラウザ (:3000)                         API (:4000)
+  │ ── GET /basic/no-cors ───────────────▶ │
+  │    Origin: http://localhost:3000        │ <span class="w">処理される</span>
+  │ ◀── 200 OK（ACAO なし）─────────────── │ <span class="w">ログにも残る</span>
+  │
+  │ <span class="b">ブラウザ「許可がないので JS に渡さない」</span></pre>
+          <div class="grid" style="align-content:start;">
+            <div class="card amber"><span class="role">誤解しやすい点</span><h3>CORS はサーバーを守らない</h3><p>ブラウザが「レスポンスを JS に渡すか」を決めるだけ。curl なら普通に取れる。認証・CSRF 対策は別途必要。</p></div>
+          </div>
+        </div>
+        <p class="note">STEP 6 のページには API サーバーの受信ログが表示されるので、B を実行して「失敗なのにサーバーには届いている」ことを自分の目で確認できます。</p>
+      </div>
+    </section>
+
+    <!-- STEP 7 -->
+    <section class="slide" data-id="step7">
+      <div class="slide-body">
+        <p class="eyebrow cors">STEP 07 · CORS 応用</p>
+        <h2>プリフライト: 本番の前に OPTIONS で「送っていい？」と聞く</h2>
+        <div class="grid cols-2">
+          <div class="card teal"><span class="role">単純リクエスト（プリフライトなし）</span><p>GET / HEAD / POST のどれか<br>＋ 独自ヘッダーなし<br>＋ Content-Type が text/plain・form-urlencoded・multipart/form-data</p></div>
+          <div class="card amber"><span class="role">プリフライトあり</span><p>それ以外すべて。<br>PUT / DELETE / PATCH、<b>Content-Type: application/json</b>、Authorization や X-Xxx ヘッダー</p></div>
+        </div>
+<pre>── <span class="w">OPTIONS</span> /advanced/preflight-ok ─────────▶   Access-Control-Request-Method: PUT
+                                                Access-Control-Request-Headers: x-demo-token
+◀── 204 ───────────────────────────────────   Access-Control-Allow-Origin: http://localhost:3000
+                                                Access-Control-Allow-Methods: GET, POST, PUT, DELETE
+                                                Access-Control-Allow-Headers: Content-Type, X-Demo-Token
+                                                Access-Control-Max-Age: 0   <span class="d">← 結果のキャッシュ秒数（学習用に 0）</span>
+── <span class="g">PUT</span> /advanced/preflight-ok ─────────────▶   <span class="d">（許可されたので本番を送る）</span></pre>
+        <a class="try" href="/step07-cors-advanced/">▶ STEP 7 を開く</a>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="slide-body">
+        <p class="eyebrow cors">STEP 07 · CORS 応用</p>
+        <h2>プリフライトで断られると、本番リクエストは送られない</h2>
+        <table>
+          <tr><th>ケース</th><th>サーバーに届くもの</th><th>JS の結果</th></tr>
+          <tr><td>STEP 6-B：単純リクエスト・ACAO なし</td><td><b>GET が届いて処理される</b></td><td class="ng">失敗（読めないだけ）</td></tr>
+          <tr><td>STEP 7-C：PUT + X-Demo-Token・許可あり</td><td>OPTIONS → PUT</td><td class="ok">成功</td></tr>
+          <tr><td>STEP 7-D：PUT + X-Demo-Token・ヘッダー不許可</td><td><b>OPTIONS だけ</b>（PUT は来ない）</td><td class="ng">失敗</td></tr>
+        </table>
+        <div class="callout soft">だから「副作用のある操作は PUT / DELETE / JSON で受ける」と、許可していないオリジンからの変更を<b>ブラウザが事前に止めて</b>くれる。逆に単純リクエストの POST は届いてしまうので、CSRF トークン等で守る。</div>
+        <p class="note">よくある事故: 認証ミドルウェアが OPTIONS にも認証を要求して 401 を返し、プリフライトが失敗する。<b>OPTIONS は認証より前で処理する。</b></p>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="slide-body">
+        <p class="eyebrow cors">STEP 07 · CORS 応用</p>
+        <h2>ヘッダーを読む・Cookie を送るには、さらに明示的な許可が必要</h2>
+        <div class="grid cols-2">
+          <div class="card">
+            <span class="role">レスポンスヘッダーの公開</span>
+<pre><span class="d">// サーバー</span>
+"X-Total-Count": "42",
+"Access-Control-Expose-Headers": "X-Total-Count",
+
+<span class="d">// ブラウザ</span>
+res.headers.get("X-Total-Count") <span class="g">// "42"</span>
+res.headers.get("X-Request-Id")  <span class="b">// null</span></pre>
+            <p>標準で読めるのは Content-Type など一部だけ。</p>
+          </div>
+          <div class="card">
+            <span class="role">Cookie（credentials）</span>
+<pre><span class="d">// ブラウザ</span>
+fetch(url, { <span class="g">credentials: "include"</span> });
+
+<span class="d">// サーバー</span>
+"Access-Control-Allow-Origin": <span class="g">origin</span>, <span class="d">// * は不可</span>
+"Access-Control-Allow-Credentials": "true",</pre>
+            <p><b>両方</b>そろって初めて Cookie が送受信される。<code class="i">ACAO: *</code> + include はブラウザが拒否。</p>
+          </div>
+        </div>
+        <p class="note">本当に別ドメインの Cookie は <code class="i">SameSite=None; Secure</code>（HTTPS 必須）も必要。サンプルの localhost:3000 → :4000 は「別オリジンだが同一サイト」なので Lax でも送られる。</p>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="slide-body">
+        <p class="eyebrow cors">STEP 07 · CORS 応用</p>
+        <h2>実務用: CORS ミドルウェアの全体像</h2>
+<pre>function applyCors(req, res) {
+  const origin = req.headers.origin;
+  res.setHeader("Vary", "Origin");                               <span class="d">// Origin で結果が変わることをキャッシュに伝える</span>
+  if (!origin || !ALLOWED_ORIGINS.has(origin)) return false;     <span class="d">// ① 許可リスト外には何も付けない</span>
+
+  res.setHeader("Access-Control-Allow-Origin", origin);          <span class="d">// ② 具体的なオリジンを返す</span>
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+  res.setHeader("Access-Control-Expose-Headers", "X-Total-Count");
+
+  if (req.method === "OPTIONS") {                                <span class="d">// ③ プリフライトはここで完結</span>
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    res.setHeader("Access-Control-Max-Age", "600");
+    res.writeHead(204).end();
+    return true;
+  }
+  return false;
+}
+http.createServer((req, res) =&gt; { if (applyCors(req, res)) return; <span class="d">/* ルーティング */</span> });</pre>
+        <p class="note">開発中に CORS を避けたいだけなら、Vite の <code class="i">server.proxy</code> などで API を<b>同一オリジンに見せる</b>のが定番。</p>
+      </div>
+    </section>
+
+    <!-- まとめ -->
+    <section class="slide dark">
+      <div class="slide-body">
+        <p class="eyebrow">まとめ</p>
+        <h2 style="font-size:clamp(1.8rem, 4vw, 2.8rem);">覚えて帰ること</h2>
+        <div class="takeaways">
+          <div><span class="n">1</span><p>URL は <code class="i">new URL()</code> / <code class="i">URLSearchParams</code> で扱う。文字列連結はしない</p></div>
+          <div><span class="n">2</span><p>ルーティングは「パスと処理の対応表」。サーバーで見るか、JS で hash / pathname を見るかの違い</p></div>
+          <div><span class="n">3</span><p>History API ルーティングはサーバーのフォールバックとセットで使う</p></div>
+          <div><span class="n">4</span><p>CORS はブラウザのルール。サーバーが <code class="i">Access-Control-Allow-*</code> で許可を出す</p></div>
+          <div><span class="n">5</span><p>単純リクエストは届いてから止まる / プリフライトは届く前に止まる</p></div>
+        </div>
+        <a class="try" href="/">▶ サンプル目次へ</a>
+      </div>
+    </section>
+
+  </div>
+
+  <div class="hud">
+    <span class="title">URL・ルーティング・CORS 解説</span>
+    <span class="kbd-hint"><kbd>←</kbd> <kbd>→</kbd> で移動</span>
+    <span class="count" id="count"></span>
+    <button id="prev" aria-label="前のスライド">← 前へ</button>
+    <button id="next" aria-label="次のスライド">次へ →</button>
+  </div>
+</div>
+
+<script>
+  const slides = Array.from(document.querySelectorAll(".slide"));
+  const bar = document.getElementById("bar");
+  const count = document.getElementById("count");
+  let i = 0;
+
+  // #3 のような番号、または #step3 のような名前でスライドを指定できる（ハッシュルーティングの応用）
+  function indexFromHash() {
+    const h = decodeURIComponent(location.hash.slice(1));
+    const byId = slides.findIndex((s) => s.dataset.id === h);
+    if (byId >= 0) return byId;
+    return (parseInt(h, 10) || 1) - 1;
+  }
+
+  function show(n, updateHash = true) {
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach((s, k) => s.classList.toggle("active", k === i));
+    count.textContent = (i + 1) + " / " + slides.length;
+    bar.style.width = ((i + 1) / slides.length * 100) + "%";
+    if (updateHash) history.replaceState(null, "", "#" + (slides[i].dataset.id || (i + 1)));
+  }
+  document.getElementById("next").addEventListener("click", () => show(i + 1));
+  document.getElementById("prev").addEventListener("click", () => show(i - 1));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight" || e.key === " " || e.key === "PageDown") { e.preventDefault(); show(i + 1); }
+    if (e.key === "ArrowLeft" || e.key === "PageUp") { e.preventDefault(); show(i - 1); }
+    if (e.key === "Home") show(0);
+    if (e.key === "End") show(slides.length - 1);
+  });
+  let touchX = null;
+  document.addEventListener("touchstart", (e) => { touchX = e.touches[0].clientX; }, { passive: true });
+  document.addEventListener("touchend", (e) => {
+    if (touchX === null) return;
+    const dx = e.changedTouches[0].clientX - touchX;
+    touchX = null;
+    if (Math.abs(dx) > 60) show(dx < 0 ? i + 1 : i - 1);
+  }, { passive: true });
+  window.addEventListener("hashchange", () => show(indexFromHash(), false));
+  show(indexFromHash(), false);
+</script>
+</body>
+</html>

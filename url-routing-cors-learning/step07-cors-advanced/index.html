@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STEP 7 CORS 応用</title>
+<link rel="stylesheet" href="/common.css">
+<script src="/config.js"></script>
+<script src="/cors-log.js"></script>
+<style>
+  .split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+  @media (max-width: 860px) { .split { grid-template-columns: minmax(0, 1fr); } .sticky { position: static; } }
+  .sticky { position: sticky; top: 8px; }
+</style>
+</head>
+<body>
+<header class="page-header">
+  <a href="/" class="back">← 目次</a>
+  <p class="step-label">STEP 07</p>
+  <h1>CORS 応用 ── プリフライト・ヘッダー・Cookie</h1>
+  <p class="subtitle">実際の API 開発でハマるポイントを、ブラウザ側とサーバー側のコードを並べて確認します。</p>
+</header>
+<main>
+
+  <section class="card">
+    <h2>1. 単純リクエストとプリフライトリクエスト</h2>
+    <p>「サーバーに副作用を与えうる」リクエストの場合、ブラウザは本番のリクエストの前に <code>OPTIONS</code> で <b>「これ送っていい？」と事前確認（プリフライト）</b> します。</p>
+    <table class="kv">
+      <tr><th>単純リクエスト<br>（プリフライトなし）</th><td>メソッドが <code>GET</code> / <code>HEAD</code> / <code>POST</code> のどれか<br>かつ 独自ヘッダーなし（Accept, Content-Type など一部のみ）<br>かつ Content-Type が <code>text/plain</code> / <code>application/x-www-form-urlencoded</code> / <code>multipart/form-data</code></td></tr>
+      <tr><th>プリフライトあり</th><td>上記以外すべて。例: <code>PUT</code> / <code>DELETE</code> / <code>PATCH</code>、<code>Content-Type: application/json</code>、<code>Authorization</code> や <code>X-Xxx</code> ヘッダー</td></tr>
+    </table>
+<pre>ブラウザ                                                   API サーバー
+  │ fetch(url, { method: "PUT", headers: { "X-Demo-Token": "abc" } })
+  │
+  │ ── <span class="k">OPTIONS</span> /advanced/preflight-ok ──────────────────────▶ │ ① プリフライト
+  │    Origin: http://localhost:3000                            │
+  │    Access-Control-Request-Method: PUT                       │
+  │    Access-Control-Request-Headers: x-demo-token             │
+  │ ◀── 204 ────────────────────────────────────────────────── │
+  │    Access-Control-Allow-Origin: http://localhost:3000       │
+  │    Access-Control-Allow-Methods: GET, POST, PUT, DELETE     │
+  │    Access-Control-Allow-Headers: Content-Type, X-Demo-Token │
+  │    Access-Control-Max-Age: 0  <span class="c">← この結果を何秒キャッシュするか（学習用に 0）</span>
+  │                                                             │
+  │ ── <span class="k">PUT</span> /advanced/preflight-ok ──────────────────────────▶ │ ② 本番リクエスト
+  │ ◀── 200 + Access-Control-Allow-Origin ───────────────────── │</pre>
+  </section>
+
+  <div class="split">
+    <section class="card">
+      <h2>2. 実験</h2>
+      <div class="result">
+        <div class="demo">
+          <h3>A. POST + text/plain <span class="badge ok">単純</span></h3>
+<pre>fetch(API + "/advanced/preflight-ok", {
+  method: "POST",
+  headers: { "Content-Type": "text/plain" },
+  body: "hello",
+});</pre>
+          <button data-demo="simplePost">実行</button><div id="r-simplePost"></div>
+        </div>
+
+        <div class="demo">
+          <h3>B. POST + application/json <span class="badge pf">プリフライト</span></h3>
+<pre>fetch(API + "/advanced/preflight-ok", {
+  method: "POST",
+  headers: { <span class="k">"Content-Type": "application/json"</span> },
+  body: JSON.stringify({ hello: "world" }),
+});</pre>
+          <button data-demo="jsonPost">実行</button><div id="r-jsonPost"></div>
+        </div>
+
+        <div class="demo">
+          <h3>C. PUT + 独自ヘッダー（サーバーが許可）<span class="badge pf">プリフライト</span></h3>
+<pre>fetch(API + "/advanced/preflight-ok", {
+  <span class="k">method: "PUT"</span>,
+  headers: { <span class="k">"X-Demo-Token": "abc123"</span> },
+});</pre>
+          <button data-demo="putOk">実行</button><div id="r-putOk"></div>
+        </div>
+
+        <div class="demo">
+          <h3>D. PUT + 独自ヘッダー（サーバーが不許可）<span class="badge ng">失敗例</span></h3>
+<pre>fetch(API + <span class="bad">"/advanced/preflight-ng"</span>, {
+  method: "PUT",
+  headers: { "X-Demo-Token": "abc123" },
+});</pre>
+          <p class="hint">→ ログを見ると <b>OPTIONS だけ</b> 届いていて、PUT は <b>送られていない</b>。STEP 6 の B（送られたが読めない）との違いに注目。</p>
+          <button data-demo="putNg">実行</button><div id="r-putNg"></div>
+        </div>
+
+        <div class="demo">
+          <h3>E. レスポンスヘッダーを JS で読む <code>Access-Control-Expose-Headers</code></h3>
+<pre>const res = await fetch(API + "/advanced/expose");
+res.headers.get("X-Total-Count"); <span class="c">// "42"（Expose 済み）</span>
+res.headers.get("X-Request-Id");  <span class="c">// null（Expose されていない）</span></pre>
+          <button data-demo="expose">実行</button><div id="r-expose"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card sticky">
+      <h2>API サーバーのログ</h2>
+      <p class="hint"><span style="color:var(--amber-ink)">■</span> OPTIONS（プリフライト） <span style="color:var(--teal-ink)">■</span> 本番リクエスト ／ <code>&gt;</code> 受信ヘッダー <code>&lt;</code> 返した CORS ヘッダー</p>
+      <div class="row"><button id="refreshLog">更新</button><button id="clearLog">消去</button></div>
+      <div class="log" id="serverLog" style="max-height: 70vh"></div>
+    </section>
+  </div>
+
+  <section class="card">
+    <h2>3. Cookie を送る（credentials）</h2>
+    <p>別オリジンへの fetch は、<b>標準では Cookie を送らないし、受け取った Set-Cookie も保存しない</b>。送りたいときはクライアントとサーバーの<b>両方</b>で明示的に許可します。</p>
+    <table class="kv">
+      <tr><th>クライアント</th><td><code>fetch(url, { credentials: "include" })</code></td></tr>
+      <tr><th>サーバー</th><td><code>Access-Control-Allow-Credentials: true</code><br><code>Access-Control-Allow-Origin</code> は <b><code>*</code> 不可</b>。具体的なオリジンを返す</td></tr>
+    </table>
+    <div class="row">
+      <button data-demo="login">① ログイン（Cookie をセット）</button>
+      <button data-demo="meInclude">② /me（credentials: "include"）</button>
+      <button data-demo="meOmit">③ /me（credentials 指定なし）</button>
+      <button data-demo="meWildcard">④ /me-wildcard（Allow-Origin: * + include）</button>
+      <button data-demo="logout">⑤ ログアウト</button>
+    </div>
+    <div id="r-cookie"></div>
+    <p class="hint">②は session が返る。③は Cookie が送られないので <code>null</code>。④は「Allow-Origin が * なのに credentials」でブラウザが拒否。<br>
+      ※ localhost:3000 と localhost:4000 は「別オリジン」だが「同一サイト」なので、SameSite=Lax の Cookie でも送られます。本当に別ドメインの場合は <code>SameSite=None; Secure</code>（HTTPS 必須）が必要です。</p>
+  </section>
+
+  <section class="card">
+    <h2>4. 実務で使える CORS ミドルウェア（Node.js 標準モジュールのみ）</h2>
+    <p>ここまでのルールを 1 つの関数にまとめたものです。Express の <code>cors</code> パッケージが内部でやっていることとほぼ同じです。</p>
+<pre>const ALLOWED_ORIGINS = new Set(["http://localhost:3000", "https://app.example.com"]);
+
+function applyCors(req, res) {
+  const origin = req.headers.origin;
+
+  <span class="c">// Origin によってレスポンスが変わるので、CDN やブラウザのキャッシュに伝える</span>
+  res.setHeader("Vary", "Origin");
+
+  <span class="c">// ① 許可リストにないオリジン（または Origin なし = 同一オリジンや curl）には何も付けない</span>
+  if (!origin || !ALLOWED_ORIGINS.has(origin)) return false;
+
+  <span class="c">// ② 許可するオリジンをそのまま返す（credentials を使うなら * は使えない）</span>
+  res.setHeader("Access-Control-Allow-Origin", origin);
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+  res.setHeader("Access-Control-Expose-Headers", "X-Total-Count");
+
+  <span class="c">// ③ プリフライトなら、許可するメソッド・ヘッダーを返して終了（本番の処理はしない）</span>
+  if (req.method === "OPTIONS") {
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    res.setHeader("Access-Control-Max-Age", "600");  <span class="c">// 10 分キャッシュ（Chrome の上限は 2 時間）</span>
+    res.writeHead(204);
+    res.end();
+    return true;  <span class="c">// ← 呼び出し側はここで処理を打ち切る</span>
+  }
+  return false;
+}
+
+http.createServer((req, res) =&gt; {
+  if (applyCors(req, res)) return;  <span class="c">// プリフライトはここで終わり</span>
+  <span class="c">// … 通常のルーティング …</span>
+});</pre>
+    <p class="hint">このサンプルの各エンドポイントの実装は <code>server.js</code> の <code>apiRoutes</code> にあります。わざと失敗させるもの（preflight-ng, me-wildcard）も含めて読み比べてみてください。</p>
+  </section>
+
+  <section class="card">
+    <h2>5. よくあるエラーと対処</h2>
+    <table class="kv">
+      <tr><th>No 'Access-Control-Allow-Origin' header is present</th><td>サーバーが ACAO を返していない。エラー時（500 など）のレスポンスにも付け忘れていないか確認</td></tr>
+      <tr><th>Response to preflight request doesn't pass access control check</th><td>OPTIONS に応答していない / 認証ミドルウェアが OPTIONS を 401 にしている。OPTIONS は認証より前に処理する</td></tr>
+      <tr><th>Request header field x-xxx is not allowed by Access-Control-Allow-Headers</th><td>独自ヘッダーを <code>Access-Control-Allow-Headers</code> に追加する</td></tr>
+      <tr><th>The value of the 'Access-Control-Allow-Origin' header must not be the wildcard '*' when the request's credentials mode is 'include'</th><td>credentials を使うなら ACAO に具体的なオリジンを返す</td></tr>
+      <tr><th>開発中だけ回避したい</th><td>Vite の <code>server.proxy</code> などで <b>同一オリジンに見せる</b> のが定番。ブラウザから見れば同一オリジンなので CORS 不要</td></tr>
+    </table>
+  </section>
+
+  <nav class="step-footer">
+    <a href="/step06-cors-basics/" class="btn">← STEP 6</a>
+    <a href="/slides.html#step7" class="btn">📽 スライド</a>
+    <a href="/" class="btn">目次へ</a>
+  </nav>
+</main>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const API = API_ORIGIN;
+
+  // 各デモ: [結果を出す場所, fetch の引数, 結果の読み方]
+  const DEMOS = {
+    simplePost: ["r-simplePost", () => fetch(API + "/advanced/preflight-ok", { method: "POST", headers: { "Content-Type": "text/plain" }, body: "hello" })],
+    jsonPost: ["r-jsonPost", () => fetch(API + "/advanced/preflight-ok", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ hello: "world" }) })],
+    putOk: ["r-putOk", () => fetch(API + "/advanced/preflight-ok", { method: "PUT", headers: { "X-Demo-Token": "abc123" } })],
+    putNg: ["r-putNg", () => fetch(API + "/advanced/preflight-ng", { method: "PUT", headers: { "X-Demo-Token": "abc123" } })],
+    expose: ["r-expose", () => fetch(API + "/advanced/expose"), (res) =>
+      `X-Total-Count = ${JSON.stringify(res.headers.get("X-Total-Count"))}\nX-Request-Id  = ${JSON.stringify(res.headers.get("X-Request-Id"))}\nJS から見えるヘッダー一覧: ${JSON.stringify([...res.headers.keys()])}`],
+    login: ["r-cookie", () => fetch(API + "/advanced/login", { method: "POST", credentials: "include" })],
+    meInclude: ["r-cookie", () => fetch(API + "/advanced/me", { credentials: "include" })],
+    meOmit: ["r-cookie", () => fetch(API + "/advanced/me")],
+    meWildcard: ["r-cookie", () => fetch(API + "/advanced/me-wildcard", { credentials: "include" })],
+    logout: ["r-cookie", () => fetch(API + "/advanced/logout", { method: "POST", credentials: "include" })],
+  };
+
+  async function run(name) {
+    const [outId, doFetch, describe] = DEMOS[name];
+    const out = $(outId);
+    try {
+      const res = await doFetch();
+      const extra = describe ? describe(res) + "\n\n" : "";
+      const body = await res.text();
+      showResult(out, true, `[${name}] → ${res.status}\n${extra}${body}`);
+    } catch (err) {
+      showResult(out, false, `[${name}] → ${err.name}: ${err.message}\n詳しい理由は DevTools の Console を確認してください。`);
+    }
+    CorsLog.refresh($("serverLog"));
+  }
+
+  document.querySelectorAll("[data-demo]").forEach((b) => b.addEventListener("click", () => run(b.dataset.demo)));
+  $("refreshLog").addEventListener("click", () => CorsLog.refresh($("serverLog")));
+  $("clearLog").addEventListener("click", () => CorsLog.clear($("serverLog")));
+  CorsLog.refresh($("serverLog"));
+</script>
+</body>
+</html>

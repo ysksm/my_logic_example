@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>URL・ルーティング・CORS 学習</title>
+<link rel="stylesheet" href="/common.css">
+</head>
+<body>
+<header class="page-header">
+  <p class="step-label">HTML / JavaScript ステップバイステップ</p>
+  <h1>URL の扱い・ルーティング・CORS</h1>
+  <p class="subtitle">URL の分解から始めて、3 種類のルーティングとクエリパラメーター、最後に CORS までを 1 ステップずつ動かしながら学びます。</p>
+</header>
+<main>
+  <section class="card">
+    <h2>はじめかた</h2>
+<pre>cd url-routing-cors-learning
+node server.js
+<span class="c"># → http://localhost:3000/ をブラウザで開く</span></pre>
+    <p class="hint">依存パッケージはありません（Node.js 18 以上）。<span class="tag">サーバー必須</span> の付いたステップは <code>server.js</code> 経由で開いてください。<code>file://</code> や <code>python -m http.server</code> では再現できません。</p>
+    <p><a class="btn" href="/slides.html">📽 解説スライドを開く</a></p>
+  </section>
+
+  <ul class="step-list">
+    <li><a href="/step01-url-anatomy/"><span class="n">01</span><span><span class="t">URL の構造を分解する</span><span class="d">protocol / host / port / pathname / search / hash / origin。URL オブジェクトと location</span></span></a></li>
+    <li><a href="/step02-query-params/"><span class="n">02</span><span><span class="t">クエリパラメーターで情報を渡す</span><span class="d">URLSearchParams・form GET・エンコード・ページ間の受け渡し・状態を URL に保存</span></span></a></li>
+    <li><a href="/step03-server-routing/"><span class="n">03</span><span><span class="t">サーバーサイドルーティング<span class="tag">サーバー必須</span></span><span class="d">パスごとにサーバーが HTML を返す。毎回フルリロード。:id パラメーター・404</span></span></a></li>
+    <li><a href="/step04-hash-routing/"><span class="n">04</span><span><span class="t">ハッシュルーティング</span><span class="d">#/users/42。hashchange イベント。サーバーにリクエストが飛ばない SPA</span></span></a></li>
+    <li><a href="/step05-history-routing/"><span class="n">05</span><span><span class="t">History API ルーティング<span class="tag">サーバー必須</span></span><span class="d">pushState / popstate。きれいな URL と、リロード時に必要なサーバー側フォールバック</span></span></a></li>
+    <li><a href="/step06-cors-basics/"><span class="n">06</span><span><span class="t">CORS の基本<span class="tag">サーバー必須</span></span><span class="d">同一オリジンポリシー。Access-Control-Allow-Origin。ブロックされてもリクエストは届いている</span></span></a></li>
+    <li><a href="/step07-cors-advanced/"><span class="n">07</span><span><span class="t">CORS 応用（実コード）<span class="tag">サーバー必須</span></span><span class="d">プリフライト・独自ヘッダー・Expose-Headers・Cookie (credentials)・よくある失敗</span></span></a></li>
+  </ul>
+</main>
+</body>
+</html>

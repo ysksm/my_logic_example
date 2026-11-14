@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STEP 3 サーバーサイドルーティング</title>
+<link rel="stylesheet" href="/common.css">
+</head>
+<body>
+<header class="page-header">
+  <a href="/" class="back">← 目次</a>
+  <p class="step-label">STEP 03</p>
+  <h1>サーバーサイドルーティング</h1>
+  <p class="subtitle">いちばん基本の形。<b>URL のパスを見て、サーバーがどの HTML を返すかを決める</b>のがルーティングです。</p>
+</header>
+<main>
+
+  <section class="card">
+    <h2>1. 流れ</h2>
+<pre>ブラウザ                                     サーバー (server.js)
+  │  リンクをクリック: /server/items/2            │
+  │ ───── GET /server/items/2 ─────────────────▶ │  ルーティングテーブルを上から照合
+  │                                              │   /server            ✗
+  │                                              │   /server/items      ✗
+  │                                              │   /server/items/:id  ✓ → params.id = "2"
+  │ ◀──── 200 OK + HTML（ページ全体）──────────── │  serverItemDetail() が HTML を生成
+  │  画面を丸ごと描き直す（フルリロード）           │</pre>
+    <ul>
+      <li>ページ遷移のたびに <b>サーバーへリクエスト</b> が飛び、<b>HTML 全体</b> が返ってくる</li>
+      <li>JavaScript は不要。<code>&lt;a href&gt;</code> と <code>&lt;form&gt;</code> だけで動く</li>
+      <li>どのルートにもマッチしなければ <b>404</b> を返す（これもサーバーが決める）</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>2. 動かしてみる</h2>
+    <p>下のリンクは <code>server.js</code> が動的に HTML を作って返すページです。各ページに「サーバーが受け取ったリクエスト」と「生成時刻」が表示されます。</p>
+    <nav class="route-nav">
+      <a href="/server">/server</a>
+      <a href="/server/items">/server/items</a>
+      <a href="/server/items/1">/server/items/1</a>
+      <a href="/server/items/3">/server/items/3</a>
+      <a href="/server/items/999">/server/items/999 (404)</a>
+      <a href="/server/search?q=ん">/server/search?q=ん</a>
+    </nav>
+    <p class="hint">DevTools → Network を開いた状態でクリックすると、毎回 <code>document</code> 型のリクエストが飛んでいるのがわかります。</p>
+    <p class="hint" id="noServer" hidden>⚠ server.js 経由で開かれていないようです。<code>node server.js</code> を起動して <code>http://localhost:3000/</code> から開き直してください。</p>
+  </section>
+
+  <section class="card">
+    <h2>3. サーバー側のコード（server.js から抜粋）</h2>
+<pre><span class="c">// ① ルーティングテーブル: パスのパターン → 処理する関数</span>
+const serverRoutes = [
+  { method: "GET", pattern: "/server",           handler: serverHome },
+  { method: "GET", pattern: "/server/items",     handler: serverItemList },
+  { method: "GET", pattern: "/server/items/:id", handler: serverItemDetail },
+  { method: "GET", pattern: "/server/search",    handler: serverSearch },
+];
+
+<span class="c">// ② パターン照合: "/server/items/:id" と "/server/items/2" → { id: "2" }</span>
+function matchRoute(pattern, pathname) {
+  const p = pattern.split("/").filter(Boolean);
+  const a = pathname.split("/").filter(Boolean);
+  if (p.length !== a.length) return null;
+  const params = {};
+  for (let i = 0; i &lt; p.length; i++) {
+    if (p[i].startsWith(":")) params[p[i].slice(1)] = decodeURIComponent(a[i]);
+    else if (p[i] !== a[i]) return null;
+  }
+  return params;
+}
+
+<span class="c">// ③ リクエストごとに URL を分解し、マッチしたハンドラを呼ぶ</span>
+http.createServer((req, res) =&gt; {
+  const url = new URL(req.url, `http://${req.headers.host}`);  <span class="c">// STEP 1 と同じ URL クラス</span>
+  for (const r of serverRoutes) {
+    const params = matchRoute(r.pattern, url.pathname);
+    if (params) return r.handler(req, res, url, params);
+  }
+  serverNotFound(req, res, url);  <span class="c">// どれにも当たらなければ 404</span>
+});
+
+<span class="c">// ④ クエリパラメーターはサーバーでも searchParams で読める</span>
+function serverSearch(req, res, url) {
+  const q = url.searchParams.get("q") || "";
+  <span class="c">// … 結果の HTML を作って返す（埋め込む値は必ず escapeHtml する）</span>
+}</pre>
+    <p class="hint">Express なら <code>app.get("/server/items/:id", (req, res) =&gt; …)</code> と書く部分です。フレームワークは ①〜③ をやってくれています。</p>
+  </section>
+
+  <section class="card">
+    <h2>4. 特徴まとめ</h2>
+    <table class="kv">
+      <tr><th>👍 良い点</th><td>仕組みが単純 / JS 無しで動く / 検索エンジンに強い / どの URL でもリロード・ブックマークが効く</td></tr>
+      <tr><th>👎 弱い点</th><td>遷移ごとに画面全体を再読み込みするので、入力中の状態や JS の変数は消える / 毎回通信が発生</td></tr>
+    </table>
+    <div class="callout info">この「毎回フルリロード」を避けたい → ブラウザの中だけで画面を切り替える <b>クライアントサイドルーティング</b>（STEP 4 ハッシュ、STEP 5 History API）へ。</div>
+  </section>
+
+  <nav class="step-footer">
+    <a href="/step02-query-params/" class="btn">← STEP 2</a>
+    <a href="/slides.html#step3" class="btn">📽 スライド</a>
+    <a href="/step04-hash-routing/" class="btn">STEP 4 ハッシュルーティング →</a>
+  </nav>
+</main>
+<script>
+  // server.js 以外（file:// など）で開かれたら注意書きを出す
+  fetch("/api/hello").then((r) => { if (!r.ok) throw 0; }).catch(() => { document.getElementById("noServer").hidden = false; });
+</script>
+</body>
+</html>

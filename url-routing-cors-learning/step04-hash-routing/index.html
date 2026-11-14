@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STEP 4 ハッシュルーティング</title>
+<link rel="stylesheet" href="/common.css">
+<style>
+  #app { min-height: 160px; border: 2px dashed var(--teal); border-radius: 10px; padding: 14px 16px; }
+  #app h3 { margin-top: 0; }
+</style>
+</head>
+<body>
+<header class="page-header">
+  <a href="/" class="back">← 目次</a>
+  <p class="step-label">STEP 04</p>
+  <h1>ハッシュルーティング</h1>
+  <p class="subtitle">URL の <code>#</code> 以降は <b>サーバーに送られない</b>。この性質を使って、ブラウザの中だけで画面を切り替えます。</p>
+</header>
+<main>
+
+  <section class="card">
+    <h2>1. ミニ SPA（Single Page Application）</h2>
+    <nav class="route-nav" id="nav">
+      <a href="#/">#/</a>
+      <a href="#/users">#/users</a>
+      <a href="#/users/1">#/users/1</a>
+      <a href="#/users/2">#/users/2</a>
+      <a href="#/users?sort=desc">#/users?sort=desc</a>
+      <a href="#/nothing">#/nothing (404)</a>
+    </nav>
+    <p class="hint">ページ読み込み時刻: <code id="loadedAt"></code>（画面を切り替えても変わらない = リロードしていない）</p>
+    <div id="app"></div>
+    <div class="row">
+      <button id="back">history.back()（戻る）</button>
+      <button id="goUser">location.hash = "#/users/2"</button>
+    </div>
+    <h3>ルーティングのログ</h3>
+    <div class="log" id="log"></div>
+  </section>
+
+  <section class="card">
+    <h2>2. 仕組み</h2>
+<pre>ブラウザ                                       サーバー
+  │  リンクをクリック: #/users/2                    │
+  │  ✗ リクエストは飛ばない                         │  （何も知らない）
+  │  hashchange イベント発生                       │
+  │  JS が location.hash を読んで画面を描き換える   │
+
+  <span class="c">リロードした場合でも、サーバーに送られるのは # より前だけ</span>
+  │ ── GET /step04-hash-routing/ ────────────────▶ │  いつもの index.html を返すだけ
+  │  JS が起動時に location.hash を読んで画面を復元  │</pre>
+    <div class="callout">DevTools → Network を開いてリンクをクリックしても、<b>リクエストが 1 件も増えない</b> ことを確認してみましょう。</div>
+  </section>
+
+  <section class="card">
+    <h2>3. コード（このページで実際に動いているもの）</h2>
+<pre><span class="c">// ① ルート定義: パターン → 画面を作る関数</span>
+const routes = [
+  { pattern: "/",          view: homeView },
+  { pattern: "/users",     view: userListView },
+  { pattern: "/users/:id", view: userDetailView },
+];
+
+<span class="c">// ② location.hash を「パス」と「クエリ」に分ける</span>
+function parseHash() {
+  const raw = location.hash.slice(1) || "/";      <span class="c">// "#/users?sort=desc" → "/users?sort=desc"</span>
+  const [path, query = ""] = raw.split("?");
+  return { path, query: new URLSearchParams(query) };
+}
+
+<span class="c">// ③ 照合して描画（matchRoute は STEP 3 のサーバー側と同じ考え方）</span>
+function router() {
+  const { path, query } = parseHash();
+  for (const r of routes) {
+    const params = matchRoute(r.pattern, path);
+    if (params) return render(r.view(params, query));
+  }
+  render(notFoundView());
+}
+
+<span class="c">// ④ hash が変わったとき + 最初の読み込み時に実行</span>
+window.addEventListener(<span class="k">"hashchange"</span>, router);
+router();</pre>
+  </section>
+
+  <section class="card">
+    <h2>4. 特徴まとめ</h2>
+    <table class="kv">
+      <tr><th>👍 良い点</th><td>サーバー側の設定が不要（静的ファイル置き場・<code>file://</code> でも動く）/ リロードしても 404 にならない / 戻る・進むが効く</td></tr>
+      <tr><th>👎 弱い点</th><td>URL に <code>#</code> が入って見た目が不自然 / サーバーがパスを知らないので SSR や検索エンジン対応がしにくい / 本来の「ページ内リンク (#section)」と衝突する</td></tr>
+    </table>
+    <p class="hint">GitHub Pages のような「サーバーの設定をいじれない」場所でよく使われます。</p>
+  </section>
+
+  <nav class="step-footer">
+    <a href="/step03-server-routing/" class="btn">← STEP 3</a>
+    <a href="/slides.html#step4" class="btn">📽 スライド</a>
+    <a href="/step05-history-routing/" class="btn">STEP 5 History API ルーティング →</a>
+  </nav>
+</main>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  $("loadedAt").textContent = new Date().toLocaleTimeString("ja-JP");
+
+  const USERS = { 1: { name: "佐藤", role: "管理者" }, 2: { name: "鈴木", role: "編集者" }, 3: { name: "高橋", role: "閲覧者" } };
+
+  // 小さな DOM ヘルパー: el("h3", {}, "text", child, ...)
+  function el(tag, attrs = {}, ...children) {
+    const e = document.createElement(tag);
+    Object.assign(e, attrs);
+    e.append(...children);
+    return e;
+  }
+
+  // ---- 画面（view）--------------------------------------------
+  function homeView() {
+    return [el("h3", {}, "🏠 ホーム"), el("p", {}, "上のリンクで画面を切り替えてください。")];
+  }
+  function userListView(params, query) {
+    const desc = query.get("sort") === "desc";
+    const ids = Object.keys(USERS).sort((a, b) => (desc ? b - a : a - b));
+    return [
+      el("h3", {}, `👥 ユーザー一覧（sort=${desc ? "desc" : "asc"}）`),
+      el("ul", {}, ...ids.map((id) => el("li", {}, el("a", { href: `#/users/${id}` }, `${id}: ${USERS[id].name}`)))),
+      el("p", { className: "hint" }, "ハッシュの中にもクエリパラメーター（?sort=desc）を入れられます。"),
+    ];
+  }
+  function userDetailView(params) {
+    const u = USERS[params.id];
+    if (!u) return notFoundView();
+    return [
+      el("h3", {}, `👤 ${u.name}`),
+      el("p", {}, `ID: ${params.id} / 役割: ${u.role}`),
+      el("p", { className: "hint" }, `パターン /users/:id にマッチ → params = ${JSON.stringify(params)}`),
+      el("a", { href: "#/users" }, "← 一覧へ"),
+    ];
+  }
+  function notFoundView() {
+    return [el("h3", {}, "🚫 404"), el("p", {}, "このルートは定義されていません（サーバーではなく JS が 404 を表示しています）。")];
+  }
+
+  // ---- ルーター ------------------------------------------------
+  const routes = [
+    { pattern: "/", view: homeView },
+    { pattern: "/users", view: userListView },
+    { pattern: "/users/:id", view: userDetailView },
+  ];
+
+  function matchRoute(pattern, path) {
+    const p = pattern.split("/").filter(Boolean);
+    const a = path.split("/").filter(Boolean);
+    if (p.length !== a.length) return null;
+    const params = {};
+    for (let i = 0; i < p.length; i++) {
+      if (p[i].startsWith(":")) {
+        try { params[p[i].slice(1)] = decodeURIComponent(a[i]); } catch { return null; } // 壊れた %xx → 不一致扱い
+      } else if (p[i] !== a[i]) return null;
+    }
+    return params;
+  }
+
+  function parseHash() {
+    const raw = location.hash.slice(1) || "/";
+    const [path, query = ""] = raw.split("?");
+    return { path, query: new URLSearchParams(query) };
+  }
+
+  function render(nodes, label) {
+    $("app").replaceChildren(...nodes);
+    // 今いるリンクを強調
+    document.querySelectorAll("#nav a").forEach((a) => a.classList.toggle("active", a.getAttribute("href") === (location.hash || "#/")));
+    const line = el("div", {}, `${new Date().toLocaleTimeString("ja-JP")}  hash=${JSON.stringify(location.hash)} → ${label}`);
+    $("log").prepend(line);
+  }
+
+  function router() {
+    const { path, query } = parseHash();
+    for (const r of routes) {
+      const params = matchRoute(r.pattern, path);
+      if (params) return render(r.view(params, query), `${r.pattern} ${JSON.stringify(params)}`);
+    }
+    render(notFoundView(), "404");
+  }
+
+  window.addEventListener("hashchange", router);
+  router();
+
+  $("back").addEventListener("click", () => history.back());
+  $("goUser").addEventListener("click", () => { location.hash = "#/users/2"; });
+</script>
+</body>
+</html>

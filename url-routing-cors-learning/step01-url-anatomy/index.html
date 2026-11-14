@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STEP 1 URL の構造</title>
+<link rel="stylesheet" href="/common.css">
+</head>
+<body>
+<header class="page-header">
+  <a href="/" class="back">← 目次</a>
+  <p class="step-label">STEP 01</p>
+  <h1>URL の構造を分解する</h1>
+  <p class="subtitle">ルーティングも CORS も、すべて「URL のどの部分を見ているか」の話です。まずは部品の名前を覚えましょう。</p>
+</header>
+<main>
+
+  <section class="card">
+    <h2>1. URL の部品</h2>
+<pre>  https://user:pass@example.com:8080/shop/items/42?color=red&amp;size=M#reviews
+  └─┬──┘   └───┬───┘ └────┬────┘└┬─┘└──────┬─────┘└──────┬───────┘└──┬───┘
+ protocol  認証情報    hostname  port   pathname         search       hash
+           └──────────── host ─────────┘
+  └──────────── origin ─────────────────┘ <span class="c">← protocol + host（ポート込み）</span></pre>
+    <table class="kv">
+      <tr><th>pathname</th><td>サーバーが「どのページか」を判断する部分 → <b>サーバーサイドルーティング</b> / <b>History API ルーティング</b>（STEP 3, 5）</td></tr>
+      <tr><th>search（クエリ）</th><td><code>?key=value&amp;...</code> 形式でページに追加情報を渡す（STEP 2）</td></tr>
+      <tr><th>hash（フラグメント）</th><td><b>サーバーに送信されない</b>。ブラウザ内だけで使う → <b>ハッシュルーティング</b>（STEP 4）</td></tr>
+      <tr><th>origin</th><td>protocol + hostname + port。これが 1 つでも違えば「別オリジン」→ <b>CORS</b>（STEP 6, 7）</td></tr>
+    </table>
+  </section>
+
+  <section class="card">
+    <h2>2. URL オブジェクトで分解してみる</h2>
+    <p>好きな URL を入力してください。<code>new URL(文字列)</code> が自動で分解します。</p>
+    <div class="row"><input id="urlInput" class="wide" value="https://example.com:8080/shop/items/42?color=red&amp;size=M#reviews"></div>
+    <div class="row">
+      <button data-sample="https://example.com/search?q=%E3%82%8A%E3%82%93%E3%81%94&amp;page=2">日本語クエリ</button>
+      <button data-sample="http://localhost:3000/#/users/42">ハッシュルート</button>
+      <button data-sample="/relative/path?x=1">相対パス（エラー例）</button>
+    </div>
+    <table class="kv" id="parts"></table>
+<pre><span class="c">// コード</span>
+const url = new URL(input.value);
+url.protocol  <span class="c">// "https:"</span>
+url.hostname  <span class="c">// "example.com"</span>
+url.port      <span class="c">// "8080"（既定ポートなら ""）</span>
+url.pathname  <span class="c">// "/shop/items/42"</span>
+url.search    <span class="c">// "?color=red&amp;size=M"</span>
+url.hash      <span class="c">// "#reviews"</span>
+url.origin    <span class="c">// "https://example.com:8080"</span>
+
+<span class="c">// 相対パスは「基準 URL」を第 2 引数に渡すと解決できる</span>
+new URL("/relative/path?x=1", location.origin);</pre>
+  </section>
+
+  <section class="card">
+    <h2>3. いま開いているページの URL = <code>location</code></h2>
+    <p><code>window.location</code> は「現在のページの URL」を表す、URL オブジェクトとほぼ同じプロパティを持つオブジェクトです。</p>
+    <div class="row">
+      <a class="btn" href="?from=step1&amp;n=1#section-a">?from=step1&amp;n=1#section-a に移動</a>
+      <a class="btn" href="#section-b">#section-b だけ変更</a>
+      <a class="btn" href="./">クエリとハッシュを消す</a>
+    </div>
+    <table class="kv" id="locationParts"></table>
+    <p class="hint">「#section-b だけ変更」ではページがリロードされず、<code>popstate</code> → <code>hashchange</code> の順にイベントが発生します（下の時刻が変わらない）。ページ読み込み時刻: <code id="loadedAt"></code></p>
+  </section>
+
+  <section class="card">
+    <h2>4. JavaScript で URL を変える 3 つの方法</h2>
+<pre>location.href = "/other?x=1";           <span class="c">// ① 移動（サーバーへリクエスト、履歴に残る）</span>
+location.hash = "#/users/1";             <span class="c">// ② hash だけ変更（リクエストなし。popstate → hashchange）→ STEP 4</span>
+history.pushState(null, "", "/users/1"); <span class="c">// ③ URL 表示だけ変更（リクエストなし）→ STEP 5</span></pre>
+    <div class="row">
+      <button id="btnHash">② location.hash = "#changed"</button>
+      <button id="btnPush">③ history.pushState(…, "?pushed=1")</button>
+    </div>
+    <div class="log" id="log"></div>
+  </section>
+
+  <nav class="step-footer">
+    <a href="/" class="btn">← 目次</a>
+    <a href="/slides.html#step1" class="btn">📽 スライド</a>
+    <a href="/step02-query-params/" class="btn">STEP 2 クエリパラメーター →</a>
+  </nav>
+</main>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  // 表を作る小さな関数（textContent を使うので HTML として解釈されない = 安全）
+  function renderTable(table, rows) {
+    table.replaceChildren();
+    for (const [k, v] of rows) {
+      const tr = table.insertRow();
+      const th = document.createElement("th");
+      th.textContent = k;
+      const td = tr.insertCell();
+      const code = document.createElement("code");
+      code.textContent = JSON.stringify(v);
+      tr.prepend(th);
+      td.append(code);
+    }
+  }
+
+  // --- 2. URL オブジェクト ---------------------------------
+  function parse() {
+    try {
+      const url = new URL($("urlInput").value);
+      renderTable($("parts"), [
+        ["href", url.href],
+        ["protocol", url.protocol],
+        ["username / password", `${url.username} / ${url.password}`],
+        ["host", url.host],
+        ["hostname", url.hostname],
+        ["port", url.port],
+        ["pathname", url.pathname],
+        ["search", url.search],
+        ["searchParams (Object)", Object.fromEntries(url.searchParams)],
+        ["hash", url.hash],
+        ["origin", url.origin],
+      ]);
+    } catch (e) {
+      renderTable($("parts"), [["エラー", `${e.name}: ${e.message}`], ["ヒント", "相対パスは new URL(path, location.origin) のように基準 URL が必要"]]);
+    }
+  }
+  $("urlInput").addEventListener("input", parse);
+  document.querySelectorAll("[data-sample]").forEach((b) =>
+    b.addEventListener("click", () => { $("urlInput").value = b.dataset.sample; parse(); }));
+  parse();
+
+  // --- 3. location -----------------------------------------
+  function showLocation() {
+    renderTable($("locationParts"), [
+      ["location.href", location.href],
+      ["location.origin", location.origin],
+      ["location.pathname", location.pathname],
+      ["location.search", location.search],
+      ["location.hash", location.hash],
+    ]);
+  }
+  $("loadedAt").textContent = new Date().toLocaleTimeString("ja-JP");
+  showLocation();
+
+  // --- 4. URL の変化を観察する --------------------------------
+  function log(msg) {
+    const line = document.createElement("div");
+    line.textContent = `${new Date().toLocaleTimeString("ja-JP")}  ${msg}`;
+    $("log").prepend(line);
+  }
+  window.addEventListener("hashchange", (e) => {
+    log(`hashchange: ${e.oldURL} → ${e.newURL}`);
+    showLocation();
+  });
+  window.addEventListener("popstate", () => {
+    log(`popstate（戻る/進む、または hash の変更）: ${location.href}`);
+    showLocation();
+  });
+  $("btnHash").addEventListener("click", () => { location.hash = "#changed"; });
+  $("btnPush").addEventListener("click", () => {
+    history.pushState(null, "", "?pushed=1");
+    log(`pushState 実行: ${location.href}（pushState では popstate も hashchange も発生しない）`);
+    showLocation();
+  });
+</script>
+</body>
+</html>

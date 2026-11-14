@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STEP 2 受け取り側ページ</title>
+<link rel="stylesheet" href="/common.css">
+</head>
+<body>
+<header class="page-header">
+  <a href="./" class="back">← STEP 2 に戻る</a>
+  <p class="step-label">STEP 02 / receive.html</p>
+  <h1>受け取り側のページ</h1>
+  <p class="subtitle">このページは <code>location.search</code> を読んで、渡された値を表示しているだけです。</p>
+</header>
+<main>
+  <section class="card">
+    <h2>受け取った URL</h2>
+    <table class="kv">
+      <tr><th>location.search（生の文字列）</th><td><code id="raw"></code></td></tr>
+      <tr><th>デコード後</th><td><code id="decoded"></code></td></tr>
+    </table>
+  </section>
+  <section class="card">
+    <h2>URLSearchParams で読んだ結果</h2>
+    <table class="kv" id="params"></table>
+    <p id="greeting"></p>
+<pre>const p = new URLSearchParams(location.search);
+p.get("name")     <span class="c">// 1 つだけ取得</span>
+p.getAll("tag")   <span class="c">// 同じ名前が複数ある場合は配列で</span>
+for (const [key, value] of p) { … }  <span class="c">// すべて列挙</span></pre>
+    <div class="callout warn">受け取った値は <b>ユーザーが自由に書き換えられる</b> 入力です。表示するときは <code>innerHTML</code> ではなく <code>textContent</code> を使いましょう（XSS 対策）。<br>試しに URL の name を <code>&lt;img src=x onerror=alert(1)&gt;</code> にしても、このページでは文字として表示されるだけです。</div>
+  </section>
+</main>
+<script>
+  const p = new URLSearchParams(location.search);
+  document.getElementById("raw").textContent = location.search || "(なし)";
+  let decoded;
+  try { decoded = decodeURIComponent(location.search.replace(/\+/g, " ")); } catch { decoded = "(デコードできない文字列です)"; }
+  document.getElementById("decoded").textContent = decoded || "(なし)";
+
+  const table = document.getElementById("params");
+  const keys = [...new Set(p.keys())];
+  if (!keys.length) table.insertRow().insertCell().textContent = "パラメーターがありません";
+  for (const key of keys) {
+    const tr = table.insertRow();
+    const th = document.createElement("th");
+    th.textContent = key;
+    tr.append(th);
+    const values = p.getAll(key);
+    tr.insertCell().textContent = values.length > 1 ? `getAll → ${JSON.stringify(values)}` : `get → ${JSON.stringify(values[0])}`;
+  }
+
+  const name = p.get("name");
+  if (name) {
+    const lang = p.get("lang");
+    // textContent なので、name に HTML タグが入っていても実行されない
+    document.getElementById("greeting").textContent = lang === "en" ? `Hello, ${name}!` : `こんにちは、${name} さん！`;
+  }
+</script>
+</body>
+</html>
